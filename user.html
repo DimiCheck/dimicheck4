@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DIMI Check</title>
+  <meta name="color-scheme" content="light dark" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg: #0b0f14;
+      --bg-2: #0e1218;
+      --card: rgba(255,255,255,.08);
+      --card-2: rgba(255,255,255,.06);
+      --text: #e9eef6;
+      --muted: #a7b0c0;
+      --primary: #d04fff;
+      --primary-2: #ff6ad0;
+      --ring: 0 0 0 8px color-mix(in oklab, var(--primary) 30%, transparent);
+      --shadow: 0 10px 30px rgba(0, 0, 0, .45);
+      --radius: 20px;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f6f8fb;
+        --bg-2: #eef2f8;
+        --card: rgba(255,255,255,.75);
+        --card-2: rgba(255,255,255,.6);
+        --text: #0f172a;
+        --muted: #5b6475;
+        --primary: #d04fff;
+        --primary-2: #ff6ad0;
+        --shadow: 0 10px 30px rgba(57,72,103,.15);
+      }
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:"Pretendard",system-ui,-apple-system,Segoe UI,Roboto,Noto Sans KR,sans-serif;
+      color:var(--text);
+      background:var(--bg);
+      display:grid;
+      place-items:center;
+      overflow:auto;
+    }
+
+    /* background blobs */
+    .blob-container{
+      position:fixed; inset:0; overflow:hidden; z-index:-1;
+      background: radial-gradient(1200px 800px at 10% -10%, #5a6cff20, transparent 60%),
+                  radial-gradient(1200px 800px at 110% 10%, #ff009025, transparent 60%),
+                  radial-gradient(1000px 700px at 50% 120%, #ff00b325, transparent 60%);
+    }
+    .blob{position:absolute; filter:blur(40px); opacity:.6; pointer-events:none}
+    .b1{width:48vw;height:48vw;background:radial-gradient(circle,#ff6a6a60,transparent 70%); top:-10vh; left:-10vw; animation:float 18s ease-in-out infinite}
+    .b2{width:42vw;height:42vw;background:radial-gradient(circle,#e100ff50,transparent 70%); bottom:-15vh; right:-10vw; animation:float 22s ease-in-out infinite reverse}
+    .b3{width:36vw;height:36vw;background:radial-gradient(circle,#ff6ae950,transparent 70%); top:40vh; left:10vw; animation:float 26s ease-in-out infinite}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-20px)}}
+
+    /* shell layout */
+    .shell{
+      position:relative;
+      width:min(1100px,92vw);
+      height:min(720px,92vh);
+      display:grid;
+      grid-template-columns: 1.05fr .95fr;
+      grid-template-areas:'main side';
+      gap:18px; padding:18px; z-index:1;
+    }
+    @media (max-width: 1024px){
+      .shell{grid-template-columns:1fr; grid-template-areas:'main' 'side'; height:auto}
+    }
+
+    .panel{
+      position:relative; overflow:clip; border-radius:var(--radius);
+      background:linear-gradient(180deg,var(--card),var(--card-2));
+      backdrop-filter:saturate(140%) blur(14px);
+      box-shadow:var(--shadow);
+    }
+
+    /* left: main interactions */
+    .main{grid-area:main; display:grid; grid-template-rows:auto auto 1fr auto; gap:14px; padding:24px}
+    .bar{
+      display:flex; justify-content:space-between; align-items:center; gap:12px;
+    }
+    .who{
+      display:flex; align-items:center; gap:12px;
+    }
+    .dot{width:10px;height:10px;border-radius:50%; background: #3ae374; box-shadow:0 0 10px #3ae37480}
+    .who .name{font-weight:700}
+    .who .meta{color:var(--muted); font-size:13px}
+
+    .now{
+      padding:16px;
+      border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      border-radius:calc(var(--radius) + 4px);
+      background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
+    }
+    .now h3{margin:0 0 6px; font-size:16px; letter-spacing:.2px}
+    .now .val{font-size:28px; font-weight:700; line-height:1.2}
+
+    .section-head{
+      margin-top:6px; font-size:15px; color:var(--muted); letter-spacing:.5px
+    }
+
+    .grid{
+      display:grid; grid-template-columns:repeat(2, 1fr); gap:14px; margin-top:8px;
+    }
+    @media (max-width:700px){ .grid{grid-template-columns:1fr} }
+
+    .status-card{
+      cursor:pointer; position:relative; padding:16px 16px 18px;
+      border-radius:16px; border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+      transition:transform .15s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
+    }
+    .status-card:hover{transform:translateY(-1px)}
+    .status-card.selected{
+      transform:translateY(-2px);
+      box-shadow:var(--ring);
+      border-color: color-mix(in oklab, var(--primary) 50%, transparent);
+      background:linear-gradient(180deg, color-mix(in oklab, var(--primary) 10%, rgba(255,255,255,.1)), rgba(255,255,255,.05));
+    }
+    .status-card.selected.completed{
+      box-shadow:0 0 0 8px color-mix(in oklab, #38d67a 28%, transparent);
+      border-color: color-mix(in oklab, #38d67a 45%, transparent);
+    }
+    .status-label{font-weight:800; letter-spacing:.2px; margin-bottom:6px}
+    .status-desc{color:var(--muted); font-size:13px}
+
+    .etc-box{ display:none; gap:10px; margin-top:12px; flex-wrap:wrap }
+    .etc-row{ display:flex; gap:10px; width:100% }
+    .input{
+      width:100%; height:44px; padding:0 14px; border-radius:12px; outline:none; font-size:14px; color:var(--text);
+      background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      border:1px solid color-mix(in oklab, var(--text) 18%, transparent);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .chip-list{display:flex; flex-wrap:wrap; gap:8px}
+    .chip{
+      display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px;
+      border:1px solid color-mix(in oklab, var(--text) 18%, transparent);
+      background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      font-size:13px;
+    }
+    .chip .del{
+      background:transparent; border:0; color:var(--text); opacity:.7; cursor:pointer; font-size:18px; line-height:1; padding:0 4px;
+    }
+    .chip .del:hover{opacity:1}
+
+    .btn{
+      appearance:none; border:0; cursor:pointer; width:100%;
+      display:flex; align-items:center; justify-content:center; gap:10px;
+      padding:12px 14px; border-radius:12px; font-weight:700;
+      color:#0b0f14; background:#fff; box-shadow:0 2px 0 rgba(0,0,0,.05);
+      transition:transform .06s ease, box-shadow .2s ease;
+    }
+    .btn:active{transform:translateY(1px)}
+    .btn.ghost{
+      background:transparent; color:var(--text);
+      border:1px solid color-mix(in oklab, var(--text) 12%, transparent); width:auto; padding:10px 12px;
+    }
+    .btn.cta{
+      background:linear-gradient(135deg, var(--primary), var(--primary-2));
+      color:#fff;
+    }
+
+    .submit-wrap{ margin-top:4px }
+    .footer{ text-align:center; color:var(--muted); font-size:12px; margin-top:10px }
+
+    /* right: brand / time / illustration */
+    .side{grid-area:side; display:grid; grid-template-rows:auto 1fr auto; padding:24px}
+    .brand{display:flex; align-items:center; gap:12px; font-weight:800; letter-spacing:.2px}
+    .logo{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;color:#fff;box-shadow:inset 0 0 18px #ffffff40}
+    .bigcopy{align-self:center; padding:12px 6px}
+    .h1{font-size:clamp(24px,3.2vw,40px); font-weight:800; line-height:1.1; letter-spacing:-.02em; margin:0 0 10px}
+    .p{margin:0; color:var(--muted); font-size:clamp(14px,1.7vw,16px)}
+    .hero-cta{align-self:end; display:flex; gap:10px; flex-wrap:wrap}
+    .chipx{
+      border-radius:999px; padding:8px 12px;
+      background:color-mix(in oklab, var(--card) 70%, rgba(255,255,255,.12));
+      border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      font-size:.88rem; color:var(--muted)
+    }
+    .time{
+      position:absolute; top:24px; right:24px; font-size:13px; color:var(--muted); letter-spacing:.5px
+    }
+    .illus{
+      position:absolute; right:-6%; bottom:-6%; width:min(520px,60%); opacity:.9;
+      filter:drop-shadow(0 14px 30px rgba(0,0,0,.25)); pointer-events:none;
+    }
+    @media (max-width:1024px){
+      .illus{position:static; width:100%; margin-top:14px}
+      .side{padding:20px}
+    }
+
+    /* motion */
+    .fade-up{opacity:0; transform:translateY(10px); animation:rise .6s ease forwards}
+    .fade-up:nth-child(1){animation-delay:.05s}
+    .fade-up:nth-child(2){animation-delay:.12s}
+    .fade-up:nth-child(3){animation-delay:.20s}
+    .fade-up:nth-child(4){animation-delay:.28s}
+    @keyframes rise{to{opacity:1; transform:none}}
+    @media (prefers-reduced-motion: reduce){
+      .blob{animation:none}
+      .fade-up{opacity:1; transform:none; animation:none}
+    }
+  </style>
+</head>
+
+<body>
+  <div class="blob-container" aria-hidden="true">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
+
+  <main class="shell" role="main">
+    <!-- LEFT: main interaction -->
+    <section class="panel main" aria-label="개인 상태 관리">
+      <!-- 상단 로그인/프로필 바 -->
+      <div class="bar">
+        <div class="who" id="loginStatus" aria-live="polite">
+          <span class="dot" aria-hidden="true"></span>
+          <div>
+            <div class="name">로그인됨</div>
+            <div class="meta" id="userMeta">-학년 -반 -번</div>
+          </div>
+        </div>
+        <button class="btn ghost" type="button" id="logoutBtn" aria-label="로그아웃">로그아웃</button>
+      </div>
+
+      <!-- 현재 상태 표시 -->
+      <div class="now" role="region" aria-labelledby="now-title">
+        <h3 id="now-title">현재 선택된 상태</h3>
+        <div class="val" id="currentStatus">—</div>
+      </div>
+
+      <!-- 상태 선택 -->
+      <div>
+        <div class="section-head">내 위치/상태 선택</div>
+        <div class="grid" id="statusGrid">
+          <div class="status-card" data-status="화장실(물)" tabindex="0" role="button" aria-label="화장실(물)">
+            <div class="status-label">화장실(물)</div>
+            <div class="status-desc">급히 자리 비움</div>
+          </div>
+          <div class="status-card" data-status="복도" tabindex="0" role="button" aria-label="복도">
+            <div class="status-label">복도</div>
+            <div class="status-desc">교실 주변 이동</div>
+          </div>
+          <div class="status-card" data-status="동아리" tabindex="0" role="button" aria-label="동아리">
+            <div class="status-label">동아리</div>
+            <div class="status-desc">동아리실/활동</div>
+          </div>
+          <div class="status-card" data-status="방과후" tabindex="0" role="button" aria-label="방과후">
+            <div class="status-label">방과후</div>
+            <div class="status-desc">방과후</div>
+          </div>
+          <div class="status-card" data-status="프로젝트" tabindex="0" role="button" aria-label="프로젝트">
+            <div class="status-label">프로젝트</div>
+            <div class="status-desc">프로젝트실</div>
+          </div>
+          <div class="status-card" data-status="조기입실" tabindex="0" role="button" aria-label="조기입실">
+            <div class="status-label">조기입실</div>
+            <div class="status-desc">아파요ㅠ</div>
+          </div>
+
+          <!-- 기타 -->
+          <div class="status-card" data-status="기타" tabindex="0" role="button" aria-label="기타">
+            <div class="status-label">기타</div>
+            <div class="status-desc">사유 직접 입력</div>
+            <div class="etc-box" id="etcBox" aria-hidden="true">
+              <div class="etc-row">
+                <input id="etcInput" class="input" type="text" placeholder="예: 병원 예약, 상담, 급한 용무 등 입력" />
+                <button id="etcAddBtn" class="btn ghost" type="button" style="min-width:72px">추가</button>
+              </div>
+              <div id="etcChips" class="chip-list" aria-live="polite"></div>
+            </div>
+          </div>
+
+          <div class="status-card" data-status="결석(조퇴)" tabindex="0" role="button" aria-label="결석(조퇴)">
+            <div class="status-label">결석(조퇴)</div>
+            <div class="status-desc">학교장 인정/사유 확인</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 완료 -->
+      <div class="submit-wrap">
+        <button class="btn cta" id="submitBtn" type="button" aria-label="상태 저장">완료</button>
+      </div>
+    </section>
+
+    <!-- RIGHT: brand / highlights -->
+    <section class="panel side" aria-label="브랜드 & 하이라이트">
+      <div class="time" id="timeDisplay" aria-live="polite"></div>
+
+      <div class="brand fade-up">
+        <img class="logo" aria-hidden="true" src="/src/dimicheck_templogo.png" alt="">
+        <div>DimiCheck</div>
+      </div>
+
+      <div class="bigcopy fade-up">
+        <h1 class="h1">한 번의 탭으로<br/>내 상태를 정확히</h1>
+        <p class="p">디미고를 위한 새로운 출결·상태 플랫폼</p>
+      </div>
+
+      <div class="hero-cta fade-up" aria-label="하이라이트">
+        <div class="chipx">간편한 출결 인증</div>
+        <div class="chipx">원격 상태 확인</div>
+        <div class="chipx">실시간 동기화</div>
+      </div>
+
+      <svg class="illus" viewBox="0 0 600 380" fill="none" aria-hidden="true">
+        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="var(--primary)"/><stop offset="100%" stop-color="var(--primary-2)"/>
+        </linearGradient></defs>
+        <rect x="30" y="40" width="540" height="300" rx="26" fill="url(#g)" opacity=".18"/>
+        <rect x="60" y="70" width="480" height="60" rx="14" fill="#fff" opacity=".14"/>
+        <rect x="60" y="150" width="240" height="180" rx="18" fill="#fff" opacity=".12"/>
+        <rect x="320" y="150" width="220" height="120" rx="18" fill="#fff" opacity=".1"/>
+        <circle cx="520" cy="110" r="10" fill="#fff" opacity=".8"/>
+        <circle cx="490" cy="110" r="10" fill="#fff" opacity=".6"/>
+        <circle cx="460" cy="110" r="10" fill="#fff" opacity=".4"/>
+      </svg>
+    </section>
+  </main>
+
+  <script>
+    // ===== 글로벌 상태 =====
+    let myGrade = null, mySection = null, myNumber = null;
+    let selectedStatus = null;
+    const currentStatusDisplay = document.getElementById('currentStatus');
+
+    // 기타 입력 관리
+    const etcCard  = document.querySelector('.status-card[data-status="기타"]');
+    const etcBox   = document.getElementById('etcBox');
+    const etcInput = document.getElementById('etcInput');
+    const etcAddBtn= document.getElementById('etcAddBtn');
+    const etcChips = document.getElementById('etcChips');
+    const etcItems = []; // 화면 표시용 단일 값 유지
+
+    // 라벨 변환
+    const categoryLabels = {
+      toilet: "화장실(물)",
+      hallway: "복도",
+      club: "동아리",
+      afterschool: "방과후",
+      project: "프로젝트",
+      early: "조기입실",
+      etc: "기타",
+      absent: "결석(조퇴)"
+    };
+    const reverseCategoryLabels = Object.fromEntries(
+      Object.entries(categoryLabels).map(([k, v]) => [v, k])
+    );
+
+    // ===== 시간 표시 =====
+    function updateTime() {
+      const now = new Date();
+      const s = now.toLocaleString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+      document.getElementById('timeDisplay').textContent = s;
+    }
+    updateTime(); setInterval(updateTime, 1000);
+
+    // ===== 로그인 체크 & 현재 상태 불러오기 =====
+    async function checkLogin() {
+      try {
+        const res = await fetch("/auth/status", { credentials: "include" });
+        if (!res) { location.href = "/auth/login"; return; }
+        const data = await res.json();
+
+        if (!data.logged_in) { location.href = "/auth/login"; return; }
+
+        myGrade   = Math.floor(data.number/1000);
+        mySection = Math.floor((data.number%1000)/100);
+        myNumber  = Math.floor(data.number%100);
+
+        document.getElementById("userMeta").textContent =
+          `${myGrade}학년 ${mySection}반 ${myNumber}번`;
+
+        await loadMyState();
+      } catch (e) {
+        console.warn("checkLogin failed:", e);
+        location.href = "/auth/login";
+      }
+    }
+
+    async function loadMyState() {
+      try {
+        const res = await fetch(`/api/classes/state/load?grade=${myGrade}&section=${mySection}`);
+        if (!res.ok) throw new Error("상태 불러오기 실패");
+        const parsed = await res.json();
+        const magnets = parsed.magnets || {};
+        const me = magnets[myNumber];
+
+        if (!me) { currentStatusDisplay.textContent = "교실"; return; }
+
+        if (me.attachedTo === "etc" && me.reason) {
+          currentStatusDisplay.textContent = `기타 - ${me.reason}`;
+        } else {
+          const label = categoryLabels[me.attachedTo] || me.attachedTo;
+          currentStatusDisplay.textContent = label || "교실";
+        }
+      } catch (e) {
+        console.error("loadMyState error:", e);
+        currentStatusDisplay.textContent = "교실";
+      }
+    }
+
+    // ===== 상태 카드 선택 처리 =====
+    function refreshCurrentStatus() {
+      if (selectedStatus === '기타' && etcItems.length > 0) {
+        currentStatusDisplay.textContent = `기타 - ${etcItems[0]}`;
+      } else {
+        currentStatusDisplay.textContent = selectedStatus ?? '—';
+      }
+      currentStatusDisplay.style.animation = 'none';
+      requestAnimationFrame(() => {
+        currentStatusDisplay.style.animation = 'rise .3s ease-out';
+      });
+    }
+
+    function setSelected(card) {
+      const wasSelected = selectedStatus === card.dataset.status;
+
+      // 해제
+      if (wasSelected) {
+        card.classList.remove('selected','completed');
+        selectedStatus = null;
+        etcBox.style.display = 'none';
+        etcBox.setAttribute('aria-hidden','true');
+        refreshCurrentStatus();
+        return;
+      }
+
+      // 새 선택
+      document.querySelectorAll('.status-card').forEach(c => c.classList.remove('selected','completed'));
+      card.classList.add('selected');
+      selectedStatus = card.dataset.status;
+
+      const isEtc = selectedStatus === '기타';
+      etcBox.style.display = isEtc ? 'flex' : 'none';
+      etcBox.setAttribute('aria-hidden', String(!isEtc));
+      if (isEtc) etcInput?.focus();
+
+      refreshCurrentStatus();
+    }
+
+    // 키보드 접근성(Enter/Space)
+    document.querySelectorAll('.status-card').forEach(card => {
+      card.addEventListener('click', () => setSelected(card));
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setSelected(card);
+        }
+      });
+    });
+
+    // 기타 입력
+    function renderChips() {
+      etcChips.innerHTML = '';
+      etcItems.forEach((txt, idx) => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.innerHTML = `<span>${txt}</span><button class="del" aria-label="삭제" data-idx="${idx}">×</button>`;
+        etcChips.appendChild(chip);
+      });
+    }
+    function addEtcItem(text) {
+      if (!text) return;
+      etcItems.length = 0; // 단일 유지
+      etcItems.push(text.trim());
+      renderChips();
+      etcInput.value = '';
+      refreshCurrentStatus();
+    }
+
+    [etcInput, etcAddBtn, etcChips].forEach(el => {
+      el.addEventListener('click', (e) => e.stopPropagation());
+    });
+    etcAddBtn.addEventListener('click', () => addEtcItem(etcInput.value));
+    etcInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addEtcItem(etcInput.value); }
+    });
+    etcChips.addEventListener('click', (e) => {
+      const btn = e.target.closest('.del');
+      if (!btn) return;
+      const idx = Number(btn.dataset.idx);
+      etcItems.splice(idx,1);
+      renderChips();
+      refreshCurrentStatus();
+    });
+
+    // ===== 저장 =====
+    async function saveMyState(statusLabel, reason = null) {
+      if (!myGrade || !mySection || !myNumber) { alert("로그인 정보가 없습니다."); return; }
+      const key = reverseCategoryLabels[statusLabel] || statusLabel;
+
+      const magnets = {};
+      magnets[myNumber] = { attachedTo: key, reason: reason };
+
+      try {
+        const res = await fetch(`/api/classes/state/save?grade=${myGrade}&section=${mySection}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ magnets })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        // 완료 비주얼
+        const selected = document.querySelector('.status-card.selected');
+        selected?.classList.add('completed');
+      } catch (e) {
+        console.error("saveMyState failed:", e);
+        alert("저장 실패: " + e.message);
+      }
+    }
+
+    document.getElementById('submitBtn').addEventListener('click', async () => {
+      if (!selectedStatus) { alert("상태를 선택해주세요."); return; }
+      const reason = (selectedStatus === "기타" && etcItems.length > 0) ? etcItems[0] : null;
+      await saveMyState(selectedStatus, reason);
+    });
+
+    // ===== 로그아웃 (선택) =====
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      location.href = '/auth/logout';
+    });
+
+    // 진입 시 로그인 확인
+    checkLogin();
+  </script>
+</body>
+</html>

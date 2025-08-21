@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>페이지를 찾을 수 없음 | DIMI Check</title>
+  <meta name="color-scheme" content="light dark" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --card: rgba(255, 255, 255, .08);
+      --text: #e9eef6;
+      --muted: #a7b0c0;
+      --primary: #d04fff;
+      --primary-2: #ff6ad0;
+      --shadow: 0 10px 30px rgba(0, 0, 0, .45);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f6f8fb;
+        --card: rgba(255, 255, 255, .75);
+        --text: #0f172a;
+        --muted: #5b6475;
+        --shadow: 0 10px 30px rgba(57, 72, 103, .15);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Pretendard", system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      display: grid;
+      place-items: center;
+      overflow: auto;
+    }
+
+    .blob-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      z-index: -1;
+      background: radial-gradient(1200px 800px at 10% -10%, #5a6cff20, transparent 60%),
+        radial-gradient(1200px 800px at 110% 10%, #ff009025, transparent 60%),
+        radial-gradient(1000px 700px at 50% 120%, #ff00b325, transparent 60%);
+    }
+
+    .blob {
+      position: absolute;
+      inset: auto;
+      filter: blur(40px);
+      opacity: .6;
+      pointer-events: none;
+    }
+
+    .b1 {
+      width: 48vw;
+      height: 48vw;
+      background: radial-gradient(circle, #ff6a6a60, transparent 70%);
+      top: -10vh;
+      left: -10vw;
+      animation: float 18s ease-in-out infinite;
+    }
+
+    .b2 {
+      width: 42vw;
+      height: 42vw;
+      background: radial-gradient(circle, #e100ff50, transparent 70%);
+      bottom: -15vh;
+      right: -10vw;
+      animation: float 22s ease-in-out infinite reverse;
+    }
+
+    .b3 {
+      width: 36vw;
+      height: 36vw;
+      background: radial-gradient(circle, #ff6ae950, transparent 70%);
+      top: 40vh;
+      left: 10vw;
+      animation: float 26s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0) }
+      50% { transform: translateY(-20px) }
+    }
+
+    .shell {
+      position: relative;
+      width: min(1100px, 92vw);
+      padding: 20px;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+    }
+
+    .error-panel {
+      width: 100%;
+      max-width: 500px;
+      padding: 28px;
+      text-align: center;
+    }
+
+    .error-code {
+      font-size: clamp(80px, 20vw, 160px);
+      font-weight: 900;
+      line-height: 1;
+      color: var(--text);
+      text-shadow: 0 0 30px color-mix(in oklab, var(--primary) 30%, transparent);
+      margin: 0;
+      position: relative;
+    }
+
+    .error-code::before,
+    .error-code::after {
+      content: attr(data-text);
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      color: var(--text);       /* 배경 대신 글자색만 */
+      background: none;         /* 배경 완전히 제거 */
+      overflow: hidden;
+    }
+
+    .error-code::before {
+        left: 2px;
+        text-shadow: -1px 0 #ff00c1;
+        animation: subtle-glitch 0.7s infinite linear alternate-reverse;
+    }
+
+    .error-code::after {
+        left: -2px;
+        text-shadow: 1px 0 #00fff9;
+        animation: subtle-glitch 0.7s infinite linear alternate-reverse;
+        animation-delay: -0.5s;
+    }
+
+    @keyframes subtle-glitch {
+        0%, 85%, 100% {
+            clip-path: inset(0 0 0 0);
+            transform: translate(0, 0);
+        }
+        86% {
+            clip-path: inset(20% 0 60% 0);
+            transform: translate(-3px, 1px);
+        }
+        88% {
+            clip-path: inset(80% 0 5% 0);
+            transform: translate(3px, -2px);
+        }
+        90% {
+            clip-path: inset(40% 0 30% 0);
+            transform: translate(-1px, 2px);
+        }
+        92% {
+            clip-path: inset(90% 0 5% 0);
+            transform: translate(2px, -1px);
+        }
+        94%, 98% {
+            clip-path: inset(0 0 0 0);
+            transform: translate(0, 0);
+        }
+    }
+
+    .error-title {
+      font-size: clamp(22px, 5vw, 36px);
+      font-weight: 700;
+      margin: 10px 0 12px;
+      color: var(--text);
+    }
+
+    .error-description {
+      color: var(--muted);
+      font-size: clamp(14px, 2.5vw, 16px);
+      margin: 0 0 24px;
+      max-width: 400px;
+      display: inline-block;
+    }
+
+    .btn {
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      transition: transform .06s ease, box-shadow .2s ease;
+      font-size: 20px;
+    }
+    .btn:active { transform: translateY(1px); }
+
+    .cta {
+      background: linear-gradient(135deg, var(--primary), var(--primary-2));
+      color: #fff;
+      text-decoration: none;
+    }
+
+  </style>
+</head>
+
+<body>
+  <div class="blob-container">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
+
+  <main class="shell" role="main">
+    <section class="error-panel">
+      <div class="error-code" id="errorCode" data-text="404">404</div>
+      <h1 class="error-title">페이지를 찾을 수 없습니다</h1>
+      <p class="error-description" id="errorMessage">
+        요청하신 페이지가 존재하지 않거나, 주소가 변경되었을 수 있습니다.
+      </p>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+        <button class="btn cta" onclick="history.back()">이전 화면</button>
+        <button class="btn cta" onclick="location.href='/'">홈으로 가기</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // 현재 페이지 URL로 다시 fetch 해보기
+    fetch(window.location.pathname, { method: "GET" })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          document.getElementById("errorCode").textContent = data.error.code;
+          document.getElementById("errorCode").setAttribute("data-text", data.error.code);
+          document.getElementById("errorMessage").textContent = data.error.message;
+        }
+      })
+      .catch(err => {
+        console.warn("에러 메시지 불러오기 실패:", err);
+      });
+  </script>
+</body>
+
+
+</html>

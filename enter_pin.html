@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>DIMI Check</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --card: rgba(255, 255, 255, .08);
+      --card-2: rgba(255, 255, 255, .06);
+      --text: #e9eef6;
+      --muted: #a7b0c0;
+      --primary: #d04fff;
+      --primary-2: #ff6ad0;
+      --shadow: 0 10px 30px rgba(0, 0, 0, .45);
+      --radius: 20px;
+    }
+    body {
+      margin: 0;
+      font-family: Pretendard, system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      display: grid;
+      place-items: center;
+      height: 100vh;
+    }
+    .blob-container { position: fixed; inset:0; z-index:-1; overflow:hidden; }
+    .blob { position:absolute; filter:blur(40px); opacity:.6; pointer-events:none; }
+    .b1 { width: 48vw; height: 48vw; background: radial-gradient(circle,#ff6a6a60,transparent 70%); top:-10vh; left:-10vw; animation: float 18s infinite ease-in-out; }
+    .b2 { width: 42vw; height: 42vw; background: radial-gradient(circle,#e100ff50,transparent 70%); bottom:-15vh; right:-10vw; animation: float 22s infinite reverse ease-in-out; }
+    .b3 { width: 36vw; height: 36vw; background: radial-gradient(circle,#ff6ae950,transparent 70%); top:40vh; left:10vw; animation: float 26s infinite ease-in-out; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-20px)} }
+
+    .card {
+      width: min(380px,92%);
+      padding: 28px;
+      border-radius: var(--radius);
+      background: linear-gradient(180deg,var(--card),var(--card-2));
+      backdrop-filter: blur(14px);
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    .card h2 { margin:0 0 12px; font-size:22px; font-weight:700; }
+    .error { color:#ff5c5c; margin-bottom:12px; font-size:14px; }
+    input {
+      width:100%; padding:12px; margin-bottom:14px;
+      border-radius:12px; border:1px solid rgba(255,255,255,.2);
+      background: rgba(255,255,255,.1); color: var(--text); font-size:15px;
+    }
+    input::placeholder { color: var(--muted); }
+    button {
+      width:100%; padding:12px; border:none; border-radius:12px;
+      font-weight:600; cursor:pointer; color:#fff;
+      background: linear-gradient(135deg,var(--primary),var(--primary-2));
+    }
+    button:active { transform:translateY(1px); }
+  </style>
+</head>
+<body>
+  <div class="blob-container">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
+
+  <div class="card">
+    <h2 id="title">학년 반 칠판 PIN 입력</h2>
+    <div class="error" id="errorMsg" style="display:none"></div>
+    <form method="POST"> <input type="password" name="pin" placeholder="PIN 입력" required> <button type="submit">확인</button> </form>
+  </div>
+
+  <script>
+    // URL에서 grade, section 가져오기
+    const params = new URLSearchParams(window.location.search);
+    const grade = params.get("grade") || "?";
+    const section = params.get("section") || "?";
+
+    // 제목 업데이트
+    document.getElementById("title").textContent = `${grade}학년 ${section}반 칠판 PIN 입력`;
+  
+  </script>
+</body>
+</html>

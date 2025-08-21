@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DimiCheck 학년 현황</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background:#0b0f14;
+      min-height:100vh;
+      font-family:"Pretendard",system-ui,-apple-system,Segoe UI,Roboto,Noto Sans KR,sans-serif;
+      color:#e9eef6; display:flex; justify-content:center; align-items:center; padding:40px;
+    }
+    .blob-container{position:fixed;inset:0;z-index:-1;overflow:hidden;}
+    .blob{position:absolute;filter:blur(40px);opacity:.5;pointer-events:none;}
+    .b1{width:40vw;height:40vw;background:radial-gradient(circle,#7a4fff40,transparent 70%);top:-10vh;left:-10vw;animation:float 20s ease-in-out infinite;}
+    .b2{width:38vw;height:38vw;background:radial-gradient(circle,#4f6aff40,transparent 70%);bottom:-10vh;right:-10vw;animation:float 24s ease-in-out infinite reverse;}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-20px)}}
+
+    .main-container{width:100%;max-width:1200px;}
+
+    /* Header */
+    .header{
+      background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1);
+      border-radius:18px; padding:20px 28px; display:flex; justify-content:space-between; align-items:center;
+      backdrop-filter:blur(12px); margin-bottom:24px;
+    }
+    .header-left{display:flex;align-items:center;gap:20px;}
+    .header-title{font-size:26px;font-weight:700;}
+    .grade-btn{
+      background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15);
+      padding:8px 16px; border-radius:10px; font-weight:500; color:#fff; cursor:pointer; transition:.25s;
+    }
+    .grade-btn:hover{background:rgba(255,255,255,.15);}
+    .grade-btn.active{background:linear-gradient(135deg,#7a4fff,#a679ff); border:none;}
+
+    .header-right{display:flex;gap:10px;align-items:center;}
+    .check-label{
+      padding:8px 16px; border-radius:10px; font-weight:600; font-size:15px;
+      background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15);
+    }
+    #grade-total{color:#c8a4ff;}
+    #grade-absent{color:#ff7a7a;}
+    #grade-present{color:#6affc1;}
+
+    .update-time{font-size:13px;color:#a7b0c0;text-align:right;margin-bottom:14px;}
+
+    .main-title{text-align:center;font-size:30px;font-weight:700;letter-spacing:4px;margin-bottom:28px;}
+
+    /* Cards */
+    .class-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;}
+    .class-card{
+      background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1);
+      border-radius:18px; padding:20px; transition:.25s; backdrop-filter:blur(10px);
+    }
+    .class-card:hover{transform:translateY(-2px);}
+    .class-header{font-size:20px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.15);}
+    .student-slots{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
+    .student-slot{font-size:16px;display:flex;gap:4px;}
+    .student-name{font-weight:600;}
+
+    /* Footer 크게 */
+    .class-footer{
+      font-size:15px; color:#e9eef6;
+      display:flex; flex-wrap:wrap; gap:12px;
+      padding:16px; border-top:1px solid rgba(255,255,255,.15);
+      margin-top:12px; min-height:60px;
+      align-items:center;
+    }
+
+    /* 칩 버튼 */
+    .chip{
+      display:inline-flex; align-items:center; justify-content:center;
+      padding:10px 16px; border-radius:999px; font-size:14px; font-weight:500;
+      cursor:pointer;
+      background:rgba(255,255,255,.1);
+      border:1px solid rgba(255,255,255,.2);
+      transition:background .2s, transform .1s;
+    }
+    .chip:hover{background:rgba(208,79,255,.25); transform:translateY(-1px);}
+    .chip:active{transform:scale(0.95);}
+
+    /* 모바일 */
+    @media (max-width:640px){
+      .chip{font-size:15px;padding:12px 18px;}
+      .class-footer{gap:14px;padding:18px;}
+    }
+
+    /* 모달 */
+    .modal {
+      position: fixed; inset: 0;
+      display: flex; justify-content: center; align-items: center;
+      background: rgba(0,0,0,.55);
+      z-index: 2000;
+      padding: 16px;
+    }
+    .modal-content {
+      background: #1b1d23;
+      padding: 24px 20px;
+      border-radius: 16px;
+      width: 92%; max-width: 400px;
+      color: #fff;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      animation: fadeUp .25s ease;
+    }
+    .modal-content h3 {
+      margin: 0 0 16px;
+      font-size: 18px; font-weight: 700; text-align: center;
+    }
+    .status-options {
+      display: grid; grid-template-columns:1fr 1fr; gap: 10px;
+    }
+    .status-btn {
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 10px;
+      padding: 12px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background .2s, transform .1s;
+    }
+    .status-btn:hover { background: rgba(255,255,255,.18); transform: translateY(-1px); }
+    .status-btn:active { transform: translateY(0); }
+    .input {
+      width: 100%; height: 42px;
+      padding: 0 12px; border-radius: 10px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.15);
+      color: #fff; font-size: 14px;
+    }
+    .modal-footer {
+      margin-top: 20px; text-align: center;
+    }
+    .btn-cancel {
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.2);
+      color: #fff;
+      font-size: 15px;
+      padding: 10px 20px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background .2s, transform .1s;
+    }
+    .btn-cancel:hover { background: rgba(255,255,255,.2); transform: translateY(-1px); }
+    .btn-cancel:active { transform: translateY(0); }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="blob-container"><div class="blob b1"></div><div class="blob b2"></div></div>
+
+  <div class="main-container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1 class="header-title">학년 현황</h1>
+        <div class="grade-buttons" id="gradeButtons">
+          <button class="grade-btn active" data-grade="1">1학년</button>
+          <button class="grade-btn" data-grade="2">2학년</button>
+          <button class="grade-btn" data-grade="3">3학년</button>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="check-label" id="grade-total">총원 0</div>
+        <div class="check-label" id="grade-absent">결원 0</div>
+        <div class="check-label" id="grade-present">현원 0</div>
+      </div>
+    </div>
+
+    <div class="update-time" id="updateTime">마지막 업데이트: --:--</div>
+    <h2 class="main-title"><span id="gradeLabel">1</span>학년 반 현황</h2>
+
+    <div class="class-grid" id="classGrid">
+      <!-- 카드 6개 -->
+      <div class="class-card"><div class="class-header">1-1반</div>
+        <div class="student-slots">
+          <div class="student-slot"><span class="student-name">총원</span><span class="empty-slot">--</span></div>
+          <div class="student-slot"><span class="student-name">결원</span><span class="empty-slot">--</span></div>
+          <div class="student-slot"><span class="student-name">현원</span><span class="empty-slot">--</span></div>
+        </div>
+        <div class="class-footer"></div>
+      </div>
+      <div class="class-card"><div class="class-header">1-2반</div>
+        <div class="student-slots">
+          <div class="student-slot"><span class="student-name">총원</span><span class="empty-slot">--</span></div>
+          <div class="student-slot"><span class="student-name">결원</span><span class="empty-slot">--</span></div>
+          <div class="student-slot"><span class="student-name">현원</span><span class="empty-slot">--</span></div>
+        </div>
+        <div class="class-footer"></div>
+      </div>
+      <div class="class-card"><div class="class-header">1-3반</div>
+        <div class="student-slots">
+          <div class="student-slot"><span class="student-name">총원</span><span class="empty-slot">--</span></div>
+          <div class="student-slot"><span class="student-name">결원</span><span class="empty-slot">--</span></div>
+          <div class="student-slot"><span class="student-name">현원</span><span class="empty-slot">--</span></div>
+        </div>
+        <div class="class-footer"></div>
+      </div>
+      <div class="class-card"><div class="class-header">1-4반</div>
+        <div class="student-slots">
+          <div class="student-slot"><span class="student-name">총원</span><span class="empty-slot">--</span></div>
+          <div class="student-slot"><span class="student-name">결원</span><span class="empty-slot">--</span></div>
+          <div class="student-slot"><span class="student-name">현원</span><span class="empty-slot">--</span></div>
+        </div>
+        <div class="class-footer"></div>
+      </div>
+      <div class="class-card"><div class="class-header">1-5반</div>
+        <div class="student-slots">
+          <div class="student-slot"><span class="student-name">총원</span><span class="empty-slot">--</span></div>
+          <div class="student-slot"><span class="student-name">결원</span><span class="empty-slot">--</span></div>
+          <div class="student-slot"><span class="student-name">현원</span><span class="empty-slot">--</span></div>
+        </div>
+        <div class="class-footer"></div>
+      </div>
+      <div class="class-card"><div class="class-header">1-6반</div>
+        <div class="student-slots">
+          <div class="student-slot"><span class="student-name">총원</span><span class="empty-slot">--</span></div>
+          <div class="student-slot"><span class="student-name">결원</span><span class="empty-slot">--</span></div>
+          <div class="student-slot"><span class="student-name">현원</span><span class="empty-slot">--</span></div>
+        </div>
+        <div class="class-footer"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 상태 변경 모달 -->
+  <div id="statusModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3 id="modalTitle">상태 변경</h3>
+      <div class="status-options">
+        <button class="status-btn" data-status="toilet">화장실</button>
+        <button class="status-btn" data-status="hallway">복도</button>
+        <button class="status-btn" data-status="club">동아리</button>
+        <button class="status-btn" data-status="afterschool">방과후</button>
+        <button class="status-btn" data-status="project">프로젝트</button>
+        <button class="status-btn" data-status="early">조기입실</button>
+        <button class="status-btn" data-status="absent">결석</button>
+        <button class="status-btn" data-status="etc">기타</button>
+      </div>
+      <div id="etcBoxModal" style="margin-top:14px; display:none;">
+        <input id="etcReasonModal" class="input" placeholder="기타 사유 입력" />
+      </div>
+      <div class="modal-footer">
+        <button id="closeModal" class="btn-cancel">취소</button>
+      </div>
+    </div>
+  </div>
+  <script>
+  let currentGrade = 1;
+  const gradeButtons=document.querySelectorAll('.grade-btn');
+  gradeButtons.forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const g=Number(btn.dataset.grade);
+      setActiveGrade(g); updateMainTitle(g); updateClassDisplay(g);
+    });
+  });
+
+  function setActiveGrade(g){ currentGrade=g; gradeButtons.forEach(b=>b.classList.toggle('active',Number(b.dataset.grade)===g)); }
+  function updateMainTitle(g){ document.getElementById('gradeLabel').textContent=g; }
+  function formatTime(d){ return d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+
+  async function loadClassState(grade){
+    const labels={toilet:"화장실",hallway:"복도",club:"동아리",afterschool:"방과후",project:"프로젝트",early:"조기입실",etc:"기타",absent:"결석"};
+    let totalG=0,absG=0,presG=0;
+
+    for(let section=1;section<=6;section++){
+      try{
+        const res=await fetch(`/api/classes/state/load?grade=${grade}&section=${section}`);
+        if(!res.ok) continue;
+        const parsed=await res.json();
+        const magnets=parsed.magnets||{};
+        const total=Object.keys(magnets).length; 
+        let absent=0; 
+        const chips=[];
+
+        Object.entries(magnets).forEach(([num,data])=>{
+          const cat=data.attachedTo;
+          if(cat==="toilet"||cat==="hallway"){
+            chips.push(`<span class="chip" data-number="${num}" data-status="${cat}" data-grade="${grade}" data-section="${section}">${num}번 ${labels[cat]}</span>`);
+          } else if(cat){
+            absent++;
+            const label=data.reason?.trim()||labels[cat]||"결석";
+            chips.push(`<span class="chip" data-number="${num}" data-status="${cat}" data-grade="${grade}" data-section="${section}">${num}번 ${label}</span>`);
+          }
+        });
+
+        const present=total-absent;
+        const card=document.querySelector(`#classGrid .class-card:nth-child(${section})`);
+        const slots=card.querySelectorAll(".student-slot .empty-slot");
+        if(slots[0])slots[0].textContent=total;
+        if(slots[1])slots[1].textContent=absent;
+        if(slots[2])slots[2].textContent=present;
+
+        const footer=card.querySelector(".class-footer");
+        footer.innerHTML=chips.join(" ")||"";
+        if(total===0)footer.textContent="DIMICHECK 등록 없음";
+
+        // ✅ 칩 이벤트 연결
+        footer.querySelectorAll(".chip").forEach(chip=>{
+          chip.addEventListener("click",()=>{
+            openStatusSelector(chip.dataset.grade,chip.dataset.section,chip.dataset.number,chip.dataset.status);
+          });
+        });
+
+        totalG+=total; absG+=absent; presG+=present;
+      }catch(e){ console.warn("loadClassState failed",e); }
+    }
+
+    document.getElementById("grade-total").textContent=`총원 ${totalG}`;
+    document.getElementById("grade-absent").textContent=`결원 ${absG}`;
+    document.getElementById("grade-present").textContent=`현원 ${presG}`;
+    document.getElementById("updateTime").textContent="마지막 업데이트: "+formatTime(new Date());
+  }
+
+  function updateClassDisplay(g){
+    document.querySelectorAll('#classGrid .class-card').forEach((c,i)=>{
+      c.querySelector('.class-header').textContent=`${g}-${i+1}반`;
+    });
+    loadClassState(g);
+  }
+
+  // ===== 모달 제어 =====
+  const modal=document.getElementById("statusModal");
+  const modalTitle=document.getElementById("modalTitle");
+  const etcBoxModal=document.getElementById("etcBoxModal");
+  const etcReasonModal=document.getElementById("etcReasonModal");
+  let targetInfo=null;
+
+  function openStatusSelector(grade,section,studentNumber,currentStatus){
+    modal.style.display="flex";
+    modalTitle.textContent=`${grade}-${section}반 ${studentNumber}번 상태 변경`;
+    targetInfo={grade,section,studentNumber};
+    etcBoxModal.style.display="none";
+    etcReasonModal.value="";
+  }
+  document.getElementById("closeModal").addEventListener("click",()=>{ modal.style.display="none"; targetInfo=null; });
+
+  document.querySelectorAll(".status-btn").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const status=btn.dataset.status;
+      if(status==="etc"){
+        etcBoxModal.style.display="block";
+        etcReasonModal.focus();
+        return;
+      }
+      saveStudentState(targetInfo.grade,targetInfo.section,targetInfo.studentNumber,status);
+      modal.style.display="none";
+    });
+  });
+
+  // 기타 저장
+  etcReasonModal.addEventListener("keydown",e=>{
+    if(e.key==="Enter"){
+      e.preventDefault();
+      saveStudentState(targetInfo.grade,targetInfo.section,targetInfo.studentNumber,"etc",etcReasonModal.value.trim());
+      modal.style.display="none";
+    }
+  });
+
+  // ===== DB 저장 =====
+  async function saveStudentState(grade,section,studentNumber,status,reason=null){
+    const magnets={};
+    magnets[studentNumber]={attachedTo:status,reason:reason};
+    try{
+      const res=await fetch(`/api/classes/state/save?grade=${grade}&section=${section}`,{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({magnets})
+      });
+      if(!res.ok) throw new Error(await res.text());
+      loadClassState(grade);
+    }catch(e){ alert("저장 실패: "+e.message); }
+  }
+
+  // 초기 실행
+  updateMainTitle(currentGrade);
+  updateClassDisplay(currentGrade);
+  setInterval(()=>loadClassState(currentGrade),5000);
+</script>
+
+
+</body>
+</html>
