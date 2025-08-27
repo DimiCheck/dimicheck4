@@ -238,7 +238,7 @@
       <!-- 현재 상태 표시 -->
       <div class="now" role="region" aria-labelledby="now-title">
         <h3 id="now-title">현재 선택된 상태</h3>
-        <div class="val" id="currentStatus">—</div>
+        <div class="val" id="currentStatus">교실</div>
       </div>
 
       <!-- 상태 선택 -->
@@ -288,6 +288,11 @@
             <div class="status-desc">학교장 인정/사유 확인</div>
           </div>
         </div>
+      </div>
+
+      <div class="status-card" data-status="교실" tabindex="0" role="button" aria-label="교실">
+          <div class="status-label">교실</div>
+          <div class="status-desc">교실에 있어요</div>
       </div>
 
       <!-- 완료 -->
@@ -354,7 +359,8 @@
       project: "프로젝트",
       early: "조기입실",
       etc: "기타",
-      absent: "결석(조퇴)"
+      absence: "결석(조퇴)",
+      section: "교실",
     };
     const reverseCategoryLabels = Object.fromEntries(
       Object.entries(categoryLabels).map(([k, v]) => [v, k])

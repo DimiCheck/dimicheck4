@@ -37,6 +37,33 @@ async function fetchMagnetConfig(grade, section) {
   }
 }
 
+function restoreToFreePosition(el, data) {
+  const container = document.getElementById('magnetContainer');
+  if (!container) return;
+
+  // 섹션에서 떼어내고 컨테이너로 복귀
+  el.classList.remove('attached');
+  container.appendChild(el);
+
+  // 자유 상태에서는 이유 제거
+  if (el.dataset.reason) {
+    delete el.dataset.reason;
+    el.classList.remove('has-reason');
+  }
+
+  // 저장된 좌표가 있으면 사용, 없으면 그리드 기본 자리로
+  const L = Number(data && data.left);
+  const T = Number(data && data.top);
+  if (!Number.isNaN(L) && !Number.isNaN(T)) {
+    el.style.left = `${L}px`;
+    el.style.top  = `${T}px`;
+    el.style.transform = 'translate(0,0)';
+  } else {
+    // 기본 고정격자 좌표로 스냅
+    snapToHome(el);
+  }
+}
+
 async function loadState(grade, section) {
   try {
     const res = await fetch(`/api/classes/state/load?grade=${grade}&section=${section}`);
@@ -44,10 +71,21 @@ async function loadState(grade, section) {
     const parsed = await res.json();
     const magnets = parsed.magnets || {};
 
+    console.log(magnets);
+    let didNormalizeSection = false;
+
     // 자석 반영
     Object.entries(magnets).forEach(([num, data]) => {
       const el = document.querySelector(`.magnet[data-number="${num}"]`);
       if (!el) return;
+
+      //console.log(data.attachedTo);
+      if (data.attachedTo == "section"){
+        console.log('dd');
+        restoreToFreePosition(el, data);
+        didNormalizeSection = true;
+        return; // 완료했으니 다음으로
+      }
 
       if (data.attachedTo) {
         const sec = document.querySelector(`.board-section[data-category="${data.attachedTo}"] .section-content`);
@@ -61,13 +99,25 @@ async function loadState(grade, section) {
             el.classList.remove("has-reason");
           }
           sec.appendChild(el);
+          return;
         }
+
+        restoreToFreePosition(el, data);
+        return;
       }
+
+      restoreToFreePosition(el, data);
     });
 
     // ✅ 끝나고 기타 패널 갱신
     updateEtcReasonPanel();
     sortAllSections();
+    updateAttendance();
+    updateMagnetOutline();
+
+    if (didNormalizeSection){
+      await saveState(grade, section);
+    }
 
   } catch (e) {
     console.error("loadState error:", e);

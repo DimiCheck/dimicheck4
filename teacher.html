@@ -41,7 +41,7 @@
       background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15);
     }
     #grade-total{color:#c8a4ff;}
-    #grade-absent{color:#ff7a7a;}
+    #grade-absence{color:#ff7a7a;}
     #grade-present{color:#6affc1;}
 
     .update-time{font-size:13px;color:#a7b0c0;text-align:right;margin-bottom:14px;}
@@ -57,8 +57,13 @@
     .class-card:hover{transform:translateY(-2px);}
     .class-header{font-size:20px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.15);}
     .student-slots{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
-    .student-slot{font-size:16px;display:flex;gap:4px;}
     .student-name{font-weight:600;}
+    .student-slot { cursor: pointer; padding: 2px 6px; border-radius: 8px; transition: background .2s; }
+    .student-slot:hover { background: rgba(255,255,255,.06); }
+    .student-slot.active { background: rgba(208,79,255,.18); }
+
+    .chip-present { border-color: rgba(106,255,193,.35); }
+    .chip-away    { border-color: rgba(255,122,122,.35); }
 
     /* Footer 크게 */
     .class-footer{
@@ -111,6 +116,9 @@
     .status-options {
       display: grid; grid-template-columns:1fr 1fr; gap: 10px;
     }
+    .status-btn[data-status="etc"] {
+      grid-column: 1 / -1;
+    }
     .status-btn {
       background: rgba(255,255,255,.08);
       border: 1px solid rgba(255,255,255,.15);
@@ -150,6 +158,12 @@
       from { opacity: 0; transform: translateY(20px); }
       to   { opacity: 1; transform: translateY(0); }
     }
+
+    /* 칩 색상 강조 */
+    .chip-present { border-color: rgba(106,255,193,.45); background: rgba(106,255,193,.12); }
+    .chip-present-soft { border-color: rgba(79,166,255,.5); background: rgba(79,166,255,.14); } /* 화장실/복도 */
+    .chip-away { border-color: rgba(255,122,122,.5); background: rgba(255,122,122,.12); }      /* 결원(동아리/방과후/…/결석) */
+
   </style>
 </head>
 <body>
@@ -168,7 +182,7 @@
       </div>
       <div class="header-right">
         <div class="check-label" id="grade-total">총원 0</div>
-        <div class="check-label" id="grade-absent">결원 0</div>
+        <div class="check-label" id="grade-absence">결원 0</div>
         <div class="check-label" id="grade-present">현원 0</div>
       </div>
     </div>
@@ -240,7 +254,8 @@
         <button class="status-btn" data-status="afterschool">방과후</button>
         <button class="status-btn" data-status="project">프로젝트</button>
         <button class="status-btn" data-status="early">조기입실</button>
-        <button class="status-btn" data-status="absent">결석</button>
+        <button class="status-btn" data-status="absence">결석</button>
+        <button class="status-btn" data-status="section">교실</button>
         <button class="status-btn" data-status="etc">기타</button>
       </div>
       <div id="etcBoxModal" style="margin-top:14px; display:none;">
@@ -261,61 +276,179 @@
     });
   });
 
+  const AWAY_TAGS = new Set(["club", "afterschool", "project", "early", "etc", "absence"]);
+  const PRESENT_SPECIAL_TAGS = new Set(["toilet","hallway"]);
+
+  const LABELS={toilet:"화장실",hallway:"복도",club:"동아리",afterschool:"방과후",project:"프로젝트",early:"조기입실",etc:"기타",absence:"결석",section:"교실"};
+
+  function buildCardChips(magnets, grade, section, view = "away") {
+    const items = []; // {num, html}
+
+    for (const [numStr, data] of Object.entries(magnets)) {
+      const num = Number(numStr);
+      const cat = data?.attachedTo;
+
+      const isPresentNormal  = !cat || cat === "section";
+      const isPresentSpecial = PRESENT_SPECIAL_TAGS.has(cat);
+      const isAbsent         = !!cat && !isPresentNormal && !isPresentSpecial;
+
+      // 총원: 전부 표기(분류만 색으로)
+      if (view === "total") {
+        if (isPresentNormal) {
+          items.push({ num, html:
+            `<span class="chip chip-present" data-number="${num}" data-status="section" data-grade="${grade}" data-section="${section}">${num}번 ${LABELS.section}</span>`
+          });
+        } else if (isPresentSpecial) {
+          items.push({ num, html:
+            `<span class="chip chip-present-soft" data-number="${num}" data-status="${cat}" data-grade="${grade}" data-section="${section}">${num}번 ${LABELS[cat]}</span>`
+          });
+        } else { // 결원
+          const label = cat === "etc" ? (data?.reason?.trim() || LABELS.etc) : (LABELS[cat] || "이동");
+          items.push({ num, html:
+            `<span class="chip chip-away" data-number="${num}" data-status="${cat}" data-grade="${grade}" data-section="${section}">${num}번 ${label}</span>`
+          });
+        }
+        continue;
+      }
+
+      // 결원 보기
+      if (view === "away" && isAbsent) {
+        const label = cat === "etc" ? (data?.reason?.trim() || LABELS.etc) : (LABELS[cat] || "이동");
+        items.push({ num, html:
+          `<span class="chip chip-away" data-number="${num}" data-status="${cat}" data-grade="${grade}" data-section="${section}">${num}번 ${label}</span>`
+        });
+      }
+
+      // 현원 보기(교실+화장실/복도)
+      if (view === "present" && (isPresentNormal || isPresentSpecial)) {
+        if (isPresentNormal) {
+          items.push({ num, html:
+            `<span class="chip chip-present" data-number="${num}" data-status="section" data-grade="${grade}" data-section="${section}">${num}번 ${LABELS.section}</span>`
+          });
+        } else {
+          items.push({ num, html:
+            `<span class="chip chip-present-soft" data-number="${num}" data-status="${cat}" data-grade="${grade}" data-section="${section}">${num}번 ${LABELS[cat]}</span>`
+          });
+        }
+      }
+    }
+
+    // ✅ 총원에서만 번호 오름차순 정렬
+    if (view === "total") items.sort((a,b)=>a.num - b.num);
+
+    return items.map(x => x.html).join(" ");
+}
+
+// 슬롯 활성 표시
+function setActiveSlot(card, which /* 'total' | 'away' | 'present' */) {
+  const slots = card.querySelectorAll(".student-slot");
+  slots.forEach(s => s.classList.remove("active"));
+  if (which === "total")   slots[0]?.classList.add("active");
+  if (which === "away")    slots[1]?.classList.add("active");
+  if (which === "present") slots[2]?.classList.add("active");
+}
+
+
   function setActiveGrade(g){ currentGrade=g; gradeButtons.forEach(b=>b.classList.toggle('active',Number(b.dataset.grade)===g)); }
   function updateMainTitle(g){ document.getElementById('gradeLabel').textContent=g; }
   function formatTime(d){ return d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
 
   async function loadClassState(grade){
-    const labels={toilet:"화장실",hallway:"복도",club:"동아리",afterschool:"방과후",project:"프로젝트",early:"조기입실",etc:"기타",absent:"결석"};
-    let totalG=0,absG=0,presG=0;
+    let totalG = 0, absG = 0, presG = 0;
 
-    for(let section=1;section<=6;section++){
-      try{
-        const res=await fetch(`/api/classes/state/load?grade=${grade}&section=${section}`);
-        if(!res.ok) continue;
-        const parsed=await res.json();
-        const magnets=parsed.magnets||{};
-        const total=Object.keys(magnets).length; 
-        let absent=0; 
-        const chips=[];
+    for (let section = 1; section <= 6; section++) {
+      try {
+        const res = await fetch(`/api/classes/state/load?grade=${grade}&section=${section}`);
+        if (!res.ok) continue;
+        const parsed  = await res.json();
+        const magnets = parsed.magnets || {};
+        const total   = Object.keys(magnets).length;
 
-        Object.entries(magnets).forEach(([num,data])=>{
-          const cat=data.attachedTo;
-          if(cat==="toilet"||cat==="hallway"){
-            chips.push(`<span class="chip" data-number="${num}" data-status="${cat}" data-grade="${grade}" data-section="${section}">${num}번 ${labels[cat]}</span>`);
-          } else if(cat){
-            absent++;
-            const label=data.reason?.trim()||labels[cat]||"결석";
-            chips.push(`<span class="chip" data-number="${num}" data-status="${cat}" data-grade="${grade}" data-section="${section}">${num}번 ${label}</span>`);
-          }
+        // 결원 집계: 교실(null/section) + 화장실/복도는 제외!
+        let absence = 0;
+        for (const [, data] of Object.entries(magnets)) {
+          const cat = data?.attachedTo;
+          const isPresentNormal  = !cat || cat === "section";
+          const isPresentSpecial = PRESENT_SPECIAL_TAGS.has(cat); // 화장실/복도
+          if (!isPresentNormal && !isPresentSpecial) absence++;
+        }
+        const present = total - absence;
+
+        // 카드 DOM
+        const card  = document.querySelector(`#classGrid .class-card:nth-child(${section})`);
+        const slots = card.querySelectorAll(".student-slot .empty-slot");
+        const footer = card.querySelector(".class-footer");
+
+        // 숫자 반영
+        if (slots[0]) slots[0].textContent = total;   // 총원
+        if (slots[1]) slots[1].textContent = absence; // 결원
+        if (slots[2]) slots[2].textContent = present; // 현원
+
+        // 기본 보기: 결원
+        if (!card.dataset.view) card.dataset.view = "away";
+
+        // 칩 렌더
+        footer.innerHTML = buildCardChips(magnets, grade, section, card.dataset.view) || "";
+        if (total === 0) footer.textContent = "DIMICHECK 등록 없음";
+
+        // 칩 클릭(상태 변경)
+        footer.querySelectorAll(".chip").forEach(chip => {
+          chip.onclick = () => {
+            openStatusSelector(chip.dataset.grade, chip.dataset.section, chip.dataset.number, chip.dataset.status);
+          };
         });
 
-        const present=total-absent;
-        const card=document.querySelector(`#classGrid .class-card:nth-child(${section})`);
-        const slots=card.querySelectorAll(".student-slot .empty-slot");
-        if(slots[0])slots[0].textContent=total;
-        if(slots[1])slots[1].textContent=absent;
-        if(slots[2])slots[2].textContent=present;
+        // 슬롯 클릭 시 보기 전환
+        const rowEls = card.querySelectorAll(".student-slots .student-slot");
+        const [slotTotal, slotAway, slotPresent] = rowEls;
 
-        const footer=card.querySelector(".class-footer");
-        footer.innerHTML=chips.join(" ")||"";
-        if(total===0)footer.textContent="DIMICHECK 등록 없음";
+        if (slotTotal) {
+          slotTotal.onclick = () => {
+            card.dataset.view = "total";
+            setActiveSlot(card, "total");
+            footer.innerHTML = buildCardChips(magnets, grade, section, "total");
+            footer.querySelectorAll(".chip").forEach(chip => {
+              chip.onclick = () => openStatusSelector(chip.dataset.grade, chip.dataset.section, chip.dataset.number, chip.dataset.status);
+            });
+          };
+        }
+        if (slotAway) {
+          slotAway.onclick = () => {
+            card.dataset.view = "away";
+            setActiveSlot(card, "away");
+            footer.innerHTML = buildCardChips(magnets, grade, section, "away");
+            footer.querySelectorAll(".chip").forEach(chip => {
+              chip.onclick = () => openStatusSelector(chip.dataset.grade, chip.dataset.section, chip.dataset.number, chip.dataset.status);
+            });
+          };
+        }
+        if (slotPresent) {
+          slotPresent.onclick = () => {
+            card.dataset.view = "present";
+            setActiveSlot(card, "present");
+            footer.innerHTML = buildCardChips(magnets, grade, section, "present");
+            footer.querySelectorAll(".chip").forEach(chip => {
+              chip.onclick = () => openStatusSelector(chip.dataset.grade, chip.dataset.section, chip.dataset.number, chip.dataset.status);
+            });
+          };
+        }
 
-        // ✅ 칩 이벤트 연결
-        footer.querySelectorAll(".chip").forEach(chip=>{
-          chip.addEventListener("click",()=>{
-            openStatusSelector(chip.dataset.grade,chip.dataset.section,chip.dataset.number,chip.dataset.status);
-          });
-        });
+        // 현재 보기 하이라이트
+        setActiveSlot(card, card.dataset.view);
 
-        totalG+=total; absG+=absent; presG+=present;
-      }catch(e){ console.warn("loadClassState failed",e); }
+        // 학년 합산
+        totalG += total; absG += absence; presG += present;
+
+      } catch(e) {
+        console.warn("loadClassState failed", e);
+      }
     }
 
-    document.getElementById("grade-total").textContent=`총원 ${totalG}`;
-    document.getElementById("grade-absent").textContent=`결원 ${absG}`;
-    document.getElementById("grade-present").textContent=`현원 ${presG}`;
-    document.getElementById("updateTime").textContent="마지막 업데이트: "+formatTime(new Date());
+    // 헤더 합계
+    document.getElementById("grade-total").textContent   = `총원 ${totalG}`;
+    document.getElementById("grade-absence").textContent = `결원 ${absG}`;
+    document.getElementById("grade-present").textContent = `현원 ${presG}`;
+    document.getElementById("updateTime").textContent    = "마지막 업데이트: " + formatTime(new Date());
   }
 
   function updateClassDisplay(g){

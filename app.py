@@ -48,10 +48,10 @@ def handle_error(err):
 
     # JSON 요청 (예: fetch, axios) → JSON 반환
     if request.accept_mimetypes.best == "application/json" or request.is_json:
-        return jsonify({"error": {"code": str(code), "message": message}}), code
+        return jsonify({"error": {"code": str(code), "message": message}})
 
     # 일반 브라우저 접근 → HTML 페이지
-    return send_from_directory(".", "404.html", code=code, message=message), code
+    return send_from_directory(".", "404.html", code=code, message=message)
 
 
 @app.get("/healthz")

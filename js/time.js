@@ -160,5 +160,4 @@ initBoard();
 
 setInterval(() => {
   loadState(grade, section);
-  console.log("으에..")
 }, 5000);

@@ -1,0 +1,72 @@
+# ======================
+# Python
+# ======================
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# 가상환경
+.venv/
+venv/
+ENV/
+env/
+pyvenv.cfg
+
+# 패키징/빌드 산출물
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+wheelhouse/
+
+# 테스트/커버리지/캐시
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.dmypy.json
+.pyre/
+.pytype/
+
+# 로그/임시파일
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+nohup.out
+
+# ======================
+# Flask / App data
+# ======================
+# Flask instance 폴더(비밀키/로컬 DB 등)
+instance/*
+!instance/.keep
+
+# 로컬 DB (필요 시 범위 조정)
+*.sqlite
+*.sqlite3
+instance/*.db
+
+# 환경변수 파일
+.env
+.env.*
+*.env
+
+# ======================
+# OS / IDE
+# ======================
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# IDE/Editor
+.vscode/
+.idea/
+*.iml
