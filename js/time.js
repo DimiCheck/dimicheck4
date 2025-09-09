@@ -143,7 +143,6 @@ async function createMagnetsFromServer(grade, section) {
   const config = await fetchMagnetConfig(grade, section);
   const end = config.end || 30;
   const skipNumbers = config.skipNumbers || [];
-
   createMagnets(end, skipNumbers);
 }
 

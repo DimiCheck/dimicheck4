@@ -33,4 +33,8 @@ class Config:
     OPENAPI_SWAGGER_UI_PATH: str = "/"  # UI 출력문서 로드
     OPENAPI_SWAGGER_UI_URL: str = "https://cdn.jsdelivr.net/npm/swagger-ui-dist/"
 
+    # GSPREAD
+    json_file_path = "dimicheck-471412-85491c7985df.json"
+    spreadsheet_url = "https://docs.google.com/spreadsheets/d/1Vm3FJ9I0tm7mmz1NnSndKCnqKFpTiOdc4JmufrFyOMQ/edit?usp=sharing"
+    
 config = Config()

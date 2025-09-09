@@ -16,8 +16,11 @@ from exports_routes import blueprint as export_bp
 from config import config
 from extensions import db
 from models import ClassConfig, ClassPin
+from config_loader import load_class_config
 from utils import after_request, before_request, metrics, setup_logging
 from ws import namespaces
+
+import gspread
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 app.config.from_object(config)
@@ -53,11 +56,9 @@ def handle_error(err):
     # 일반 브라우저 접근 → HTML 페이지
     return send_from_directory(".", "404.html", code=code, message=message)
 
-
 @app.get("/healthz")
 def health() -> Any:
     return {"status": "ok"}
-
 
 @app.get("/me")
 def me() -> Any:
@@ -74,7 +75,6 @@ def me() -> Any:
     user_data["csrf_token"] = token
     return jsonify(user_data)
 
-
 # Swagger UI
 api_spec = {
     "title": "Presence API",
@@ -85,22 +85,24 @@ api_spec = {
 }
 api = Api(app, spec_kwargs=api_spec)
 
+CLASS_CONFIGS = load_class_config()
+
 @app.route("/board", methods=["GET", "POST"])
-def board():  # type: ignore[override]
+def board():
+    CLASS_CONFIGS = load_class_config()
+
     grade = request.args.get("grade", type=int)
     section = request.args.get("section", type=int)
 
-    if not grade or not section:
+    config = CLASS_CONFIGS.get((grade, section))
+    if not config:
         return send_from_directory(".", "404.html")
 
     if request.method == "POST":
         pin = request.form.get("pin")
-
-        record = ClassPin.query.filter_by(grade=grade, section=section).first()
-        if record and record.pin == pin:
+        if str(config["pin"]) == pin:
             session[f"board_verified_{grade}_{section}"] = True
             return send_from_directory(".", "index.html")
-
         return send_from_directory(".", "enter_pin.html")
 
     if session.get(f"board_verified_{grade}_{section}"):
@@ -112,40 +114,13 @@ def board():  # type: ignore[override]
 def index():  # type: ignore[override]
     return send_from_directory(".", "login.html") 
 
+@app.route("/reload-configs")
+def reload_configs():
+    global CLASS_CONFIGS
+    CLASS_CONFIGS = load_class_config()
+    return jsonify({"status": "reloaded"})
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-
-        for grade in range(1, 4):  # 1~3학년
-            for section in range(1, 7):  # 1~6반
-                exists = ClassConfig.query.filter_by(grade=grade, section=section).first()
-
-                if not exists:
-                    if grade == 1 and section == 3:
-                        config = ClassConfig(
-                            grade=grade,
-                            section=section,
-                            end=31,  # 기본 31번까지
-                            skip_numbers=json.dumps([12]),  # 결번 없음
-                        )
-                        db.session.add(config)
-                        continue
-
-                    config = ClassConfig(
-                        grade=grade,
-                        section=section,
-                        end=30,  # 기본 31번까지
-                        skip_numbers=json.dumps([]),  # 결번 없음
-                    )
-                    db.session.add(config)
-
-                existing_pin = ClassPin.query.filter_by(grade=grade, section=section).first()
-                if existing_pin:
-                    existing_pin.pin = grade * 10 + section  # 업데이트
-                else:
-                    pin = ClassPin(grade=grade, section=section, pin=grade * 10 + section)
-                    db.session.add(pin)
-
-        db.session.commit()
-
     socketio.run(app, host="0.0.0.0", port=5000, allow_unsafe_werkzeug=True, debug=True)

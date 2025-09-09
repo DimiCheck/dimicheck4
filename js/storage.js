@@ -70,8 +70,6 @@ async function loadState(grade, section) {
     if (!res.ok) throw new Error("로드 실패");
     const parsed = await res.json();
     const magnets = parsed.magnets || {};
-
-    console.log(magnets);
     let didNormalizeSection = false;
 
     // 자석 반영

@@ -5,7 +5,8 @@ import json
 from flask import Blueprint, jsonify, request
 
 from extensions import db
-from models import ClassConfig, ClassState
+from models import ClassState
+from config_loader import load_class_config
 
 blueprint = Blueprint("classes", __name__, url_prefix="/api/classes")
 
@@ -44,7 +45,6 @@ def save_state():
     db.session.commit()
     return jsonify({"ok": True, "magnets": magnets})
 
-
 @blueprint.get("/state/load")
 def load_class_state():
     grade = request.args.get("grade", type=int)
@@ -65,15 +65,12 @@ def class_config():
     if grade is None or section is None:
         return jsonify({"error": "grade and section required"}), 400
 
-    config = ClassConfig.query.filter_by(grade=grade, section=section).first()
+    config = load_class_config().get((grade, section))
 
     if not config:
-        # 기본값 저장 (예: 30명, 결번 없음)
-        config = ClassConfig(grade=grade, section=section, end=30, skip_numbers="[]")
-        db.session.add(config)
-        db.session.commit()
+        config = {"end": 30, "skip_numbers": []}
 
     return jsonify({
-        "end": config.end,
-        "skipNumbers": json.loads(config.skip_numbers)
+        "end": config["end"],
+        "skipNumbers": config["skip_numbers"]
     })
