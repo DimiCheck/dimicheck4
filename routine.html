@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
+  <meta name="theme-color" content="#0b0f14"/>
+  <meta name="application-name" content="DIMI Check"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <script defer src="/js/pwa.js"></script>
+  <title>DIMI Check — 루틴</title>
+  <meta name="color-scheme" content="light dark" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="apple-touch-icon" sizes="180x180" href="src/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="src/favicon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="src/favicon/favicon-16x16.png">
+  <style>
+    :root{
+      --bg: #0b0f14;
+      --bg-2: #0e1218;
+      --card: rgba(255,255,255,.08);
+      --card-2: rgba(255,255,255,.06);
+      --text: #e9eef6;
+      --muted: #a7b0c0;
+      --primary: #d04fff;
+      --primary-2: #ff6ad0;
+      --ring: 0 0 0 8px color-mix(in oklab, var(--primary) 30%, transparent);
+      --shadow: 0 10px 30px rgba(0, 0, 0, .45);
+      --radius: 20px;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f6f8fb;
+        --bg-2: #eef2f8;
+        --card: rgba(255,255,255,.75);
+        --card-2: rgba(255,255,255,.6);
+        --text: #0f172a;
+        --muted: #5b6475;
+        --primary: #d04fff;
+        --primary-2: #ff6ad0;
+        --shadow: 0 10px 30px rgba(57,72,103,.15);
+      }
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:"Pretendard",system-ui,-apple-system,Segoe UI,Roboto,Noto Sans KR,sans-serif;
+      color:var(--text);
+      background:var(--bg);
+      display:grid;
+      place-items:center;
+      overflow:auto;
+    }
+
+    /* bg blobs */
+    .blob-container{
+      position:fixed; inset:0; overflow:hidden; z-index:-1;
+      background: radial-gradient(1200px 800px at 10% -10%, #5a6cff20, transparent 60%),
+                  radial-gradient(1200px 800px at 110% 10%, #ff009025, transparent 60%),
+                  radial-gradient(1000px 700px at 50% 120%, #ff00b325, transparent 60%);
+    }
+    .blob{position:absolute; filter:blur(40px); opacity:.6; pointer-events:none}
+    .b1{width:48vw;height:48vw;background:radial-gradient(circle,#ff6a6a60,transparent 70%); top:-10vh; left:-10vw; animation:float 18s ease-in-out infinite}
+    .b2{width:42vw;height:42vw;background:radial-gradient(circle,#e100ff50,transparent 70%); bottom:-15vh; right:-10vw; animation:float 22s ease-in-out infinite reverse}
+    .b3{width:36vw;height:36vw;background:radial-gradient(circle,#ff6ae950,transparent 70%); top:40vh; left:10vw; animation:float 26s ease-in-out infinite}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-20px)}}
+
+    .shell{
+      position:relative;
+      width:min(1100px,92vw);
+      height:min(720px,92vh);
+      display:grid;
+      grid-template-columns: 1.05fr .95fr;
+      grid-template-areas:'main side';
+      gap:18px; padding:18px; z-index:1;
+    }
+    @media (max-width: 1024px){
+      .shell{grid-template-columns:1fr; grid-template-areas:'main' 'side'; height:auto}
+    }
+    .panel{
+      position:relative; overflow:clip; border-radius:var(--radius);
+      background:linear-gradient(180deg,var(--card),var(--card-2));
+      backdrop-filter:saturate(140%) blur(14px);
+      box-shadow:var(--shadow);
+    }
+
+    .main{grid-area:main; display:grid; grid-template-rows:auto auto 1fr auto; gap:14px; padding:24px}
+    .side{grid-area:side; display:grid; grid-template-rows:auto 1fr auto; padding:24px}
+
+    .bar{display:flex; justify-content:space-between; align-items:center; gap:12px}
+    .who{display:flex; align-items:center; gap:12px}
+    .dot{width:10px;height:10px;border-radius:50%; background:#3ae374; box-shadow:0 0 10px #3ae37480}
+    .who .name{font-weight:700}
+    .who .meta{color:var(--muted); font-size:13px}
+
+    .section-head{margin-top:6px; font-size:15px; color:var(--muted); letter-spacing:.5px}
+    .group-title{font-weight:800; letter-spacing:.2px; margin:8px 0 6px}
+
+    .card{
+      padding:16px;
+      border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      border-radius:16px;
+      background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+    }
+
+    .pill-row{display:flex; flex-wrap:wrap; gap:10px}
+    .pill{
+      appearance:none; border:1px solid color-mix(in oklab, var(--text) 18%, transparent);
+      background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      color:var(--text); padding:10px 14px; border-radius:999px;
+      cursor:pointer; font-weight:700; letter-spacing:.1px; font-size:14px;
+      transition:transform .06s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
+    }
+    .pill[aria-pressed="true"] {
+      color: #fff;
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--primary), var(--primary-2));
+      /* box-shadow: var(--ring); */
+      transform: translateY(-1px);
+    }
+
+    .btn{
+      appearance:none; border:0; cursor:pointer; width:auto;
+      display:inline-flex; align-items:center; justify-content:center; gap:10px;
+      padding:12px 14px; border-radius:12px; font-weight:700;
+      color:#0b0f14; background:#fff; box-shadow:0 2px 0 rgba(0,0,0,.05);
+      transition:transform .06s ease, box-shadow .2s ease;
+    }
+    .btn:active{transform:translateY(1px)}
+    .btn.ghost{
+      background:transparent; color:var(--text);
+      border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+    }
+    .btn.cta{
+      background:linear-gradient(135deg, var(--primary), var(--primary-2));
+      color:#fff;
+    }
+    .btn-row{display:flex; gap:10px; flex-wrap:wrap}
+
+    .brand{display:flex; align-items:center; gap:12px; font-weight:800; letter-spacing:.2px}
+    .logo{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;color:#fff;box-shadow:inset 0 0 18px #ffffff40}
+    .bigcopy{align-self:center; padding:12px 6px}
+    .h1{font-size:clamp(24px,3.2vw,40px); font-weight:800; line-height:1.1; letter-spacing:-.02em; margin:0 0 10px}
+    .p{margin:0; color:var(--muted); font-size:clamp(14px,1.7vw,16px)}
+    .chipx{
+      border-radius:999px; padding:8px 12px;
+      background:color-mix(in oklab, var(--card) 70%, rgba(255,255,255,.12));
+      border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      font-size:.88rem; color:var(--muted)
+    }
+    .hero-cta{align-self:end; display:flex; gap:10px; flex-wrap:wrap}
+    .time{position:absolute; top:24px; right:24px; font-size:13px; color:var(--muted); letter-spacing:.5px}
+
+    /* Bottom Navigation */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: calc(60px + env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+      display: flex; background: var(--card);
+      backdrop-filter: saturate(140%) blur(14px);
+      border-top: 1px solid color-mix(in oklab, var(--text) 10%, transparent);
+      box-shadow: 0 -5px 20px rgba(0,0,0,0.1); z-index: 1000;
+    }
+    .nav-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+      color: var(--muted); text-decoration: none; font-size: 12px; font-weight: 500; transition: color .2s ease;
+    }
+    .nav-item:hover { color: var(--text) }
+    .nav-item.active { color: var(--primary) }
+    .nav-item svg { width: 24px; height: 24px }
+
+    .spacer { height: calc(60px + env(safe-area-inset-bottom)) }
+
+    /* motion */
+    .fade-up{opacity:0; transform:translateY(10px); animation:rise .6s ease forwards}
+    .fade-up:nth-child(1){animation-delay:.05s}
+    .fade-up:nth-child(2){animation-delay:.12s}
+    .fade-up:nth-child(3){animation-delay:.20s}
+    @keyframes rise{to{opacity:1; transform:none}}
+    @media (prefers-reduced-motion: reduce){
+      .blob{animation:none}
+      .fade-up{opacity:1; transform:none; animation:none}
+    }
+  </style>
+</head>
+<body>
+  <div class="blob-container" aria-hidden="true">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
+
+  <main class="shell" role="main">
+    <!-- LEFT: Routine settings -->
+    <section class="panel main" aria-label="루틴 설정">
+      <div class="bar">
+        <div class="who" id="loginStatus" aria-live="polite">
+          <span class="dot" aria-hidden="true"></span>
+          <div>
+            <div class="name">루틴</div>
+            <div class="meta" id="userMeta">-학년 -반 -번</div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <!-- <button class="btn ghost" id="resetBtn" type="button" aria-label="루틴 초기화">초기화</button> -->
+          <button class="btn cta" id="saveBtn" type="button" aria-label="루틴 저장">저장</button>
+        </div>
+      </div>
+
+      <!-- 방과후 -->
+      <div class="card fade-up" role="group" aria-labelledby="afterschool-title">
+        <div class="group-title" id="afterschool-title">방과후 요일 선택 (복수 선택 가능)</div>
+        <p class="p" style="margin:6px 0 12px">매주 반복되는 방과후 요일을 선택하세요.</p>
+        <div class="pill-row" id="afterschoolDays">
+          <button class="pill" data-day="Mon" aria-pressed="false">월</button>
+          <button class="pill" data-day="Tue" aria-pressed="false">화</button>
+          <button class="pill" data-day="Wed" aria-pressed="false">수</button>
+          <button class="pill" data-day="Thu" aria-pressed="false">목</button>
+          <button class="pill" data-day="Fri" aria-pressed="false">금</button>
+        </div>
+      </div>
+
+      <!-- 창동 -->
+      <div class="card fade-up" role="group" aria-labelledby="changdong-title">
+        <div class="group-title" id="changdong-title">창동 요일 선택 (하루만 선택)</div>
+        <p class="p" style="margin:6px 0 12px">창동 이동 요일을 한 가지만 선택하세요. (선택 해제 가능)</p>
+        <div class="pill-row" id="changdongDays" role="radiogroup" aria-label="창동 요일">
+          <button class="pill" data-day="Mon" aria-pressed="false" aria-checked="false" role="radio">월</button>
+          <button class="pill" data-day="Tue" aria-pressed="false" aria-checked="false" role="radio">화</button>
+          <button class="pill" data-day="Wed" aria-pressed="false" aria-checked="false" role="radio">수</button>
+          <button class="pill" data-day="Thu" aria-pressed="false" aria-checked="false" role="radio">목</button>
+          <button class="pill" data-day="Fri" aria-pressed="false" aria-checked="false" role="radio">금</button>
+        </div>
+      </div>
+
+      <!-- 안내 -->
+      <div class="card fade-up" aria-live="polite">
+        <div class="group-title">적용 방식</div>
+        <p class="p">
+          전자칠판에서 해당 요일·교시 시작 5분 전에 “루틴 적용” 팝업이 뜹니다.
+          도우미/교사가 <b>확인</b>을 누르면 대상자만 자동 이동되고, 종료 시점에 자동으로 교실로 복귀됩니다.
+          (결석자는 제외)
+        </p>
+      </div>
+    </section>
+
+    <!-- RIGHT: brand / hints -->
+    <section class="panel side" aria-label="브랜드 & 도움말">
+      <div class="time" id="timeDisplay" aria-live="polite"></div>
+
+      <div class="brand fade-up">
+        <img class="logo" aria-hidden="true" src="/src/dimicheck_templogo.png" alt="">
+        <div>DimiCheck</div>
+      </div>
+
+      <div class="bigcopy fade-up">
+        <h1 class="h1">반복 일정을<br/>루틴으로 가볍게</h1>
+        <p class="p">방과후/창동 요일을 저장하면, 칠판에서 한 번에 적용할 수 있어요.</p>
+      </div>
+
+      <div class="hero-cta fade-up" aria-label="하이라이트">
+        <div class="chipx">프리셋 제안</div>
+        <div class="chipx">사람 확인 후 적용</div>
+        <div class="chipx">자동 복귀</div>
+      </div>
+    </section>
+  </main>
+
+    <script>
+    const STORAGE_KEY = "dimicheck_routine";
+    const ALLOWED_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+    const ALLOWED_DAY_SET = new Set(ALLOWED_DAYS);
+
+    const defaultRoutine = () => ({ afterschool: {}, changdong: {} });
+
+    let routine = defaultRoutine();
+    let grade = null;
+    let section = null;
+    let number = null;
+    let hasUnsavedChanges = false;
+    let isSaving = false;
+    let isFetching = false;
+    let saveLabelTimer = null;
+
+    const $af = document.getElementById('afterschoolDays');
+    const $cd = document.getElementById('changdongDays');
+    const saveBtn = document.getElementById('saveBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const metaEl = document.getElementById('userMeta');
+
+    function findPillButton(event) {
+      const target = event && event.target;
+      if (target instanceof Element) {
+        return target.closest('.pill');
+      }
+      if (target && target.parentElement instanceof Element) {
+        return target.parentElement.closest('.pill');
+      }
+      return null;
+    }
+
+    function updateTime() {
+      const now = new Date();
+      const s = now.toLocaleString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      document.getElementById('timeDisplay').textContent = s;
+    }
+    updateTime();
+    setInterval(updateTime, 1000);
+
+    function getQueryParam(name) {
+      return new URLSearchParams(window.location.search).get(name);
+    }
+
+    function normalizeNumberList(list) {
+      if (!Array.isArray(list)) return [];
+      const seen = new Set();
+      const cleaned = [];
+      for (const value of list) {
+        const num = Number(value);
+        if (Number.isInteger(num) && num >= 1 && num <= 99 && !seen.has(num)) {
+          seen.add(num);
+          cleaned.push(num);
+        }
+      }
+      cleaned.sort((a, b) => a - b);
+      return cleaned;
+    }
+
+    function normalizeMap(raw) {
+      if (!raw || typeof raw !== 'object') return {};
+      const next = {};
+      for (const day of ALLOWED_DAYS) {
+        const value = raw[day];
+        if (!value) continue;
+        const numbers = normalizeNumberList(Array.isArray(value) ? value : [value]);
+        if (numbers.length) {
+          next[day] = numbers;
+        }
+      }
+      return next;
+    }
+
+    function normalizeRoutine(value) {
+      if (!value || typeof value !== 'object') {
+        return defaultRoutine();
+      }
+      const normalizedAfterschool = normalizeMap(value.afterschool || value.afterschool_data || value.afterschoolDays || {});
+      const normalizedChangdong = normalizeMap(value.changdong || value.changdong_data || {});
+      return {
+        afterschool: normalizedAfterschool,
+        changdong: normalizedChangdong
+      };
+    }
+
+    function getCurrentNumber() {
+      if (Number.isInteger(number) && number >= 1 && number <= 99) {
+        return number;
+      }
+      return null;
+    }
+
+    function persistLocal() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(routine));
+      } catch (err) {
+        console.warn('루틴 로컬 저장 실패', err);
+      }
+    }
+
+    function loadLocalRoutine() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        routine = normalizeRoutine(parsed);
+        hasUnsavedChanges = false;
+      } catch (err) {
+        console.warn('루틴 로컬 로드 실패', err);
+      }
+    }
+
+    function setSaveButtonLabel(state, revert = true) {
+      if (!saveBtn) return;
+      const labels = {
+        idle: '저장',
+        saving: '저장 중…',
+        success: '저장 완료',
+        error: '저장 실패'
+      };
+      if (saveLabelTimer) {
+        clearTimeout(saveLabelTimer);
+        saveLabelTimer = null;
+      }
+      saveBtn.textContent = labels[state] || labels.idle;
+      if (revert && state !== 'idle') {
+        saveLabelTimer = setTimeout(() => {
+          saveBtn.textContent = labels.idle;
+          saveLabelTimer = null;
+        }, 1500);
+      }
+    }
+
+    function toggleControls(enable) {
+      const canUse = enable && !isSaving && getCurrentNumber() !== null;
+      if (saveBtn) saveBtn.disabled = !canUse;
+      if (resetBtn) resetBtn.disabled = !canUse;
+    }
+
+    function updateMeta() {
+      if (!metaEl) return;
+      if (grade != null && section != null) {
+        const numPart = getCurrentNumber() != null ? ` ${String(getCurrentNumber()).padStart(2, '0')}번` : '';
+        metaEl.textContent = `${grade}학년 ${section}반${numPart}`;
+      } else {
+        metaEl.textContent = '학급 정보를 불러오는 중…';
+      }
+    }
+
+    function render() {
+      const currentNum = getCurrentNumber();
+
+      if ($af) {
+        $af.querySelectorAll('.pill').forEach(btn => {
+          const day = btn.dataset.day;
+          const members = routine.afterschool[day] || [];
+          const on = currentNum != null && members.includes(currentNum);
+          btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+          btn.dataset.count = members.length ? members.length : '';
+        });
+      }
+
+      if ($cd) {
+        $cd.querySelectorAll('.pill').forEach(btn => {
+          const day = btn.dataset.day;
+          const members = routine.changdong[day] || [];
+          const on = currentNum != null && members.includes(currentNum);
+          btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+          btn.setAttribute('aria-checked', on ? 'true' : 'false');
+          btn.dataset.count = members.length ? members.length : '';
+        });
+      }
+
+      persistLocal();
+      toggleControls(grade != null && section != null && getCurrentNumber() != null);
+    }
+
+    async function loadRoutineFromServer() {
+      if (grade == null || section == null || isFetching) return;
+      isFetching = true;
+      try {
+        const res = await fetch(`/api/classes/routine?grade=${grade}&section=${section}`, {
+          credentials: 'include'
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!hasUnsavedChanges) {
+          routine = normalizeRoutine(data);
+          hasUnsavedChanges = false;
+          render();
+        }
+      } catch (err) {
+        console.warn('루틴 서버 로드 실패', err);
+      } finally {
+        isFetching = false;
+      }
+    }
+
+    async function saveRoutineToServer() {
+      if (grade == null || section == null || isSaving) return;
+      const currentNum = getCurrentNumber();
+      if (currentNum == null) {
+        alert('학생 번호 정보를 불러온 뒤 다시 시도해주세요.');
+        return;
+      }
+
+      isSaving = true;
+      toggleControls(false);
+      setSaveButtonLabel('saving', false);
+
+      try {
+        const res = await fetch(`/api/classes/routine?grade=${grade}&section=${section}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(routine)
+        });
+        if (!res.ok) {
+          throw new Error(`status ${res.status}`);
+        }
+        const data = await res.json();
+        routine = normalizeRoutine(data);
+        hasUnsavedChanges = false;
+        render();
+        setSaveButtonLabel('success');
+      } catch (err) {
+        console.error('루틴 저장 실패', err);
+        setSaveButtonLabel('error');
+      } finally {
+        isSaving = false;
+        toggleControls(grade != null && section != null && getCurrentNumber() != null);
+        if (!saveLabelTimer && saveBtn) {
+          setSaveButtonLabel('idle', false);
+        }
+      }
+    }
+
+    function resolveClassContext(data) {
+      const queryGradeParam = getQueryParam('grade');
+      const querySectionParam = getQueryParam('section');
+      if (queryGradeParam !== null) {
+        const parsed = Number(queryGradeParam);
+        if (Number.isFinite(parsed) && parsed > 0) grade = parsed;
+      }
+      if (querySectionParam !== null) {
+        const parsed = Number(querySectionParam);
+        if (Number.isFinite(parsed) && parsed > 0) section = parsed;
+      }
+
+      if (data && typeof data === 'object') {
+        const pickNumber = (value) => {
+          if (value === null || value === undefined || value === '') {
+            return null;
+          }
+          const num = Number(value);
+          return Number.isFinite(num) ? num : null;
+        };
+
+        const gradeCandidate = [data.grade, data.Grade, data.GRADE]
+          .map(pickNumber)
+          .find((v) => v !== null);
+        if (gradeCandidate !== undefined && gradeCandidate !== null) {
+          grade = gradeCandidate;
+        }
+
+        const sectionCandidate = [data.section, data.class, data.class_no, data.classNo]
+          .map(pickNumber)
+          .find((v) => v !== null);
+        if (sectionCandidate !== undefined && sectionCandidate !== null) {
+          section = sectionCandidate;
+        }
+
+        const numberCandidate = [data.number, data.student_number, data.studentNumber]
+          .map(pickNumber)
+          .find((v) => v !== null);
+        if (numberCandidate !== undefined && numberCandidate !== null) {
+          const parsed = Number(numberCandidate);
+          if (Number.isFinite(parsed) && parsed >= 1000) {
+            const derivedGrade = Math.floor(parsed / 1000);
+            const derivedSection = Math.floor((parsed % 1000) / 100);
+            const derivedNumber = parsed % 100;
+
+            if (grade == null) grade = derivedGrade;
+            if (section == null) section = derivedSection;
+            number = derivedNumber;
+          } else if (Number.isFinite(parsed)) {
+            number = parsed;
+          }
+        }
+
+        if ((grade == null || section == null) && number != null && number >= 1000) {
+          const parsed = Number(number);
+          if (Number.isFinite(parsed)) {
+            grade = Math.floor(parsed / 1000);
+            section = Math.floor((parsed % 1000) / 100);
+            number = parsed % 100;
+          }
+        }
+      }
+
+      updateMeta();
+      render();
+    }
+
+    async function checkLogin() {
+      try {
+        const res = await fetch('/auth/status', { credentials: 'include' });
+        if (!res.ok) {
+          updateMeta();
+          toggleControls(false);
+          return;
+        }
+        const data = await res.json();
+        resolveClassContext(data);
+        await loadRoutineFromServer();
+      } catch (err) {
+        console.warn('로그인 상태 확인 실패', err);
+        updateMeta();
+        toggleControls(false);
+      }
+    }
+
+    function ensureStudentNumberOrWarn() {
+      if (getCurrentNumber() != null) return true;
+      alert('학생 번호 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+      return false;
+    }
+
+    function addSelfToDay(map, day) {
+      const currentNum = getCurrentNumber();
+      if (currentNum == null) return;
+      const list = map[day] ? [...map[day]] : [];
+      if (!list.includes(currentNum)) {
+        list.push(currentNum);
+      }
+      list.sort((a, b) => a - b);
+      map[day] = list;
+    }
+
+    function removeSelfFromDay(map, day) {
+      const currentNum = getCurrentNumber();
+      if (currentNum == null || !map[day]) return;
+      const filtered = map[day].filter(num => num !== currentNum);
+      if (filtered.length) {
+        map[day] = filtered;
+      } else {
+        delete map[day];
+      }
+    }
+
+    loadLocalRoutine();
+    render();
+    setSaveButtonLabel('idle', false);
+    checkLogin();
+
+    if ($af) {
+      $af.addEventListener('click', (event) => {
+        const btn = findPillButton(event);
+        if (!btn || !btn.dataset.day) return;
+        const day = btn.dataset.day;
+        if (!ALLOWED_DAY_SET.has(day)) return;
+        if (!ensureStudentNumberOrWarn()) return;
+
+        const currentNum = getCurrentNumber();
+        const members = routine.afterschool[day] || [];
+        if (members.includes(currentNum)) {
+          removeSelfFromDay(routine.afterschool, day);
+        } else {
+          addSelfToDay(routine.afterschool, day);
+        }
+        hasUnsavedChanges = true;
+        render();
+      });
+    }
+
+    if ($cd) {
+      $cd.addEventListener('click', (event) => {
+        const btn = findPillButton(event);
+        if (!btn || !btn.dataset.day) return;
+        const day = btn.dataset.day;
+        if (!ALLOWED_DAY_SET.has(day)) return;
+        if (!ensureStudentNumberOrWarn()) return;
+
+        const currentNum = getCurrentNumber();
+        // 다른 요일에서 제거
+        for (const key of Object.keys(routine.changdong)) {
+          if (key !== day) {
+            removeSelfFromDay(routine.changdong, key);
+          }
+        }
+
+        const members = routine.changdong[day] || [];
+        if (members.includes(currentNum)) {
+          removeSelfFromDay(routine.changdong, day);
+        } else {
+          addSelfToDay(routine.changdong, day);
+        }
+        hasUnsavedChanges = true;
+        render();
+      });
+    }
+
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        if (grade == null || section == null) {
+          alert('학급 정보를 불러온 뒤 다시 시도해주세요.');
+          return;
+        }
+        if (!ensureStudentNumberOrWarn()) return;
+        await saveRoutineToServer();
+      });
+    }
+
+    if (resetBtn) {
+      resetBtn.addEventListener('click', async () => {
+        if (grade == null || section == null) {
+          alert('학급 정보를 불러온 뒤 다시 시도해주세요.');
+          return;
+        }
+        if (!ensureStudentNumberOrWarn()) return;
+        const confirmed = window.confirm(`방과후/창동 선택을 모두 초기화할까요?
+(지금 기기에서 저장한 모든 요일이 삭제됩니다)`);
+        if (!confirmed) return;
+        routine = defaultRoutine();
+        hasUnsavedChanges = true;
+        render();
+        await saveRoutineToServer();
+      });
+    }
+  </script>
+
+  <!-- Bottom Navigation: 루틴을 홈 좌측에 배치 -->
+  <nav class="bottom-nav" role="navigation" aria-label="하단 내비게이션">
+    <a href="/routine.html" class="nav-item active" aria-current="page">
+      <!-- calendar icon -->
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1Zm13 8H4v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9ZM6 7h12V6H6v1Z"/></svg>
+      <span>루틴</span>
+    </a>
+    <a href="/user.html" class="nav-item">
+      <!-- home icon -->
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+      <span>홈</span>
+    </a>
+    <a href="/schoollife.html" class="nav-item">
+      <!-- school icon -->
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 1 9l4 2.18v6.32L12 21l7-3.5V11.18L23 9 12 3zm0 2.69L17.53 9 12 11.31 6.47 9 12 5.69zM18 17.18l-5 2.5v-5.81l5-2.5v5.81z"/></svg>
+      <span>학교 생활</span>
+    </a>
+  </nav>
+</body>
+</html>

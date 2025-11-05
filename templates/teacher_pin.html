@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <meta name="theme-color" content="#0b0f14"/>
+  <meta name="application-name" content="DIMI Check"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <script defer src="/js/pwa.js"></script>
+<meta name="color-scheme" content="dark" />
+  <title>DimiCheck 교사용 인증</title>
+  <style>
+    :root {
+      --bg: #05080f;
+      --card: rgba(255, 255, 255, 0.08);
+      --card-accent: rgba(255, 255, 255, 0.04);
+      --text: #f0f4ff;
+      --muted: #9ba7c6;
+      --accent: #7b5cff;
+      --accent-2: #ff5cc9;
+      --danger: #ff6a6a;
+      --radius: 22px;
+      --shadow: 0 30px 70px rgba(0, 0, 0, 0.45);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Pretendard", system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at 15% 15%, rgba(129, 85, 255, 0.4), transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(255, 92, 201, 0.28), transparent 52%),
+        var(--bg);
+      display: grid;
+      place-items: center;
+      padding: clamp(18px, 5vw, 42px);
+      overflow: hidden;
+    }
+
+    .blob-container {
+      position: fixed;
+      inset: -20vh -20vw;
+      filter: blur(40px);
+      z-index: -1;
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    .blob {
+      position: absolute;
+      border-radius: 999px;
+      animation: float 22s infinite ease-in-out;
+    }
+
+    .blob.b1 {
+      width: 42vw;
+      height: 42vw;
+      background: radial-gradient(circle, rgba(124, 106, 255, 0.55), transparent 70%);
+      top: -10vh;
+      left: -6vw;
+    }
+
+    .blob.b2 {
+      width: 38vw;
+      height: 38vw;
+      background: radial-gradient(circle, rgba(255, 106, 214, 0.45), transparent 70%);
+      bottom: -18vh;
+      right: -10vw;
+      animation-duration: 28s;
+    }
+
+    .blob.b3 {
+      width: 32vw;
+      height: 32vw;
+      background: radial-gradient(circle, rgba(86, 177, 255, 0.4), transparent 70%);
+      top: 36vh;
+      right: 22vw;
+      animation-duration: 24s;
+      animation-direction: reverse;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate3d(0, 0, 0); }
+      50% { transform: translate3d(0, -26px, 0); }
+    }
+
+    .card {
+      width: min(420px, 92%);
+      padding: clamp(26px, 6vw, 34px);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, var(--card), var(--card-accent));
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .card-header {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      text-align: center;
+    }
+
+    .badge {
+      align-self: center;
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(123, 92, 255, 0.35), rgba(255, 92, 201, 0.32));
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      display: grid;
+      place-items: center;
+      font-size: 28px;
+      box-shadow: 0 16px 32px rgba(100, 60, 255, 0.25);
+    }
+
+    .title {
+      font-size: clamp(22px, 4.6vw, 28px);
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      margin: 0;
+    }
+
+    .desc {
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .label-text {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    input[type="password"] {
+      width: 100%;
+      padding: 15px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(142, 165, 210, 0.32);
+      background: rgba(8, 12, 22, 0.65);
+      color: inherit;
+      font-size: 16px;
+      transition: border-color 0.2s ease, box-shadow 0.25s ease;
+    }
+
+    input[type="password"]:focus {
+      outline: none;
+      border-color: rgba(127, 155, 255, 0.9);
+      box-shadow: 0 0 0 4px rgba(123, 158, 255, 0.22);
+    }
+
+    input[type="password"][disabled] {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .remember-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: rgba(230, 235, 250, 0.8);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .remember-row input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    button[type="submit"] {
+      padding: 15px 16px;
+      border-radius: 999px;
+      border: none;
+      font-size: 16px;
+      font-weight: 600;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #fff;
+      cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.25s ease;
+    }
+
+    button[type="submit"]:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 16px 32px rgba(128, 100, 255, 0.35);
+    }
+
+    button[type="submit"]:active {
+      transform: translateY(0);
+    }
+
+    button[type="submit"][disabled] {
+      cursor: not-allowed;
+      opacity: 0.55;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .error {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(255, 106, 106, 0.16);
+      border: 1px solid rgba(255, 106, 106, 0.35);
+      color: var(--danger);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .info {
+      font-size: 13px;
+      line-height: 1.6;
+      color: rgba(221, 229, 255, 0.68);
+      text-align: center;
+      margin: 0;
+    }
+
+    .info strong {
+      color: rgba(255, 255, 255, 0.88);
+      font-weight: 600;
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 22px;
+      }
+
+      .card {
+        padding: 26px 22px;
+        gap: 20px;
+      }
+
+      .remember-row {
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="blob-container" aria-hidden="true">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
+
+  <div class="card" role="form" aria-labelledby="pinTitle">
+    <header class="card-header">
+      <div class="badge" aria-hidden="true">🔐</div>
+      <h1 class="title" id="pinTitle">교사용 PIN 인증</h1>
+      {% if has_pin %}
+        <p class="desc">교무실에서 안내받은 PIN을 입력하면 이 기기에서 교사용 현황판을 확인할 수 있습니다.</p>
+      {% else %}
+        <p class="desc">아직 교사용 PIN이 설정되지 않았습니다. 관리자에게 문의해주세요.</p>
+      {% endif %}
+    </header>
+
+    {% if error %}
+      <div class="error" role="alert">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" autocomplete="off">
+      <div class="field">
+        <label class="label-text" for="pinInput">교사용 PIN</label>
+        <input type="password" id="pinInput" name="pin" minlength="4" maxlength="12" required {% if not has_pin %}disabled{% endif %} />
+      </div>
+
+      <label class="remember-row">
+        <input type="checkbox" name="remember" />
+        이 기기 기억하기 (30일)
+      </label>
+
+      <div class="actions">
+        <button type="submit" {% if not has_pin %}disabled{% endif %}>확인</button>
+      </div>
+    </form>
+
+    <p class="info">
+      공용 PC에서는 <strong>기억하기</strong>를 사용하지 말고, 사용 후 브라우저를 종료해주세요.<br>
+      문의: hjun1052@dimigo.hs.kr
+    </p>
+  </div>
+</body>
+</html>

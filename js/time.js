@@ -17,13 +17,616 @@ function toggleFullscreen() {
     if (!document.fullscreenElement) document.body.classList.remove('fullscreen');
   });
 
+const AUTO_RETURN_SCHEDULES = [
+  { key: 'club', category: 'club', minutes: 10 * 60 + 50 },
+  { key: 'afterschool', category: 'afterschool', minutes: 18 * 60 + 35 }
+];
+const autoReturnState = Object.create(null);
+
+const ROUTINE_ALLOWED_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+let routineData = { afterschool: {}, changdong: {} };
+let routineLoaded = false;
+let routineLoading = false;
+const routinePromptState = Object.create(null);
+const ROUTINE_LABELS = { afterschool: '방과후', changdong: '창동' };
+
+const SUNEUNG_MONTH = 10; // 0-indexed (11월)
+const SUNEUNG_DAY = 13;
+const POST_SUNEUNG_START_DAY = 14;
+const POST_SUNEUNG_OFFSET_MINUTES = 10;
+const POST_SUNEUNG_MESSAGE_TEXT = '10분 더 해라';
+const POST_SUNEUNG_HOLD_VALUE = '10';
+
+const WEEKDAY_PHASES = Object.freeze([
+  { label: '아침 시간',    startMin: 0,              endMin: 8*60 + 15 },
+  { label: '아침 자습',    startMin: 8*60 + 15,      endMin: 8*60 + 50 },
+  { label: '아침 조회',    startMin: 8*60 + 50,      endMin: 9*60      },
+  { label: '오전 수업 시간', startMin: 9*60,          endMin: 12*60 + 50 },
+  { label: '점심 시간',    startMin: 12*60 + 50,     endMin: 13*60 + 10 },
+  { label: '오후 수업 시간', startMin: 13*60,         endMin: 16*60 + 40 },
+  { label: '청소 시간',    startMin: 16*60 + 40,     endMin: 17*60 },
+  { label: '종례',        startMin: 17*60,          endMin: 17*60 + 10 },
+  { label: '방과후 1타임', startMin: 17*60 + 10,     endMin: 17*60 + 50 },
+  { label: '쉬는 시간',    startMin: 17*60 + 50,     endMin: 17*60 + 55 },
+  { label: '방과후 2타임', startMin: 17*60 + 55,     endMin: 18*60 + 35 },
+  { label: '저녁 시간',    startMin: 18*60 + 35,     endMin: 19*60 + 50 },
+  { label: '야자 1타임',   startMin: 19*60 + 50,     endMin: 21*60 + 10 },
+  { label: '쉬는 시간',    startMin: 21*60 + 10,     endMin: 21*60 + 30 },
+  { label: '야자 2타임',   startMin: 21*60 + 30,     endMin: 22*60 + 50 },
+  { label: '끝.',         startMin: 22*60 + 50,     endMin: 24*60     }
+]);
+
+const SUNDAY_PHASES = Object.freeze([
+  { label: '수감',      startMin: 0,          endMin: 20*60 },
+  { label: '야자 1타임', startMin: 20*60,     endMin: 21*60 },
+  { label: '쉬는 시간',  startMin: 21*60,     endMin: 21*60 + 20 },
+  { label: '야자 2타임', startMin: 21*60 + 20,endMin: 22*60 + 20 },
+  { label: '끝.',       startMin: 22*60 + 20,endMin: 24*60 }
+]);
+
+const countdownOverlayEl = document.getElementById('countdownOverlay');
+const countdownNumberEl = document.getElementById('countdownNumber');
+
+function isPostSuneungPeriod(now) {
+  const postStart = new Date(now.getFullYear(), SUNEUNG_MONTH, POST_SUNEUNG_START_DAY);
+  return now >= postStart;
+}
+
+function isPostSuneungSpecialDay(now) {
+  return (
+    now.getMonth() === SUNEUNG_MONTH &&
+    now.getDate() === POST_SUNEUNG_START_DAY
+  );
+}
+
+function getPhasesForDate(now) {
+  const base = now.getDay() === 0 ? SUNDAY_PHASES : WEEKDAY_PHASES;
+  if (!isPostSuneungPeriod(now)) {
+    return base;
+  }
+  return base.map((phase) => {
+    if (phase.label !== '끝.') {
+      return phase;
+    }
+    const shiftedStart = Math.min(phase.startMin + POST_SUNEUNG_OFFSET_MINUTES, 24 * 60);
+    return { ...phase, startMin: shiftedStart };
+  });
+}
+
+function getCountdownTarget(now) {
+  const isSunday = now.getDay() === 0;
+  const post = isPostSuneungPeriod(now);
+  if (post) {
+    return isSunday
+      ? { hour: 22, minute: 29 }
+      : { hour: 22, minute: 59 };
+  }
+  return isSunday
+    ? { hour: 22, minute: 19 }
+    : { hour: 22, minute: 49 };
+}
+
+function setCountdownOverlay(content, { animate = true } = {}) {
+  if (!countdownOverlayEl || !countdownNumberEl) {
+    return;
+  }
+  countdownNumberEl.textContent = content;
+  countdownOverlayEl.classList.add('visible');
+  countdownOverlayEl.setAttribute('aria-hidden', 'false');
+  countdownNumberEl.classList.remove('pulse');
+  if (animate) {
+    void countdownNumberEl.offsetWidth;
+    countdownNumberEl.classList.add('pulse');
+  }
+}
+
+function hideCountdownOverlay() {
+  if (!countdownOverlayEl || !countdownNumberEl) {
+    return;
+  }
+  if (countdownOverlayEl.classList.contains('visible')) {
+    countdownOverlayEl.classList.remove('visible');
+    countdownOverlayEl.setAttribute('aria-hidden', 'true');
+  }
+  countdownNumberEl.textContent = '';
+  countdownNumberEl.classList.remove('pulse');
+}
+
+function getCountdownState(now, hourNumber, minuteNumber, secondNumber) {
+  if (isPostSuneungSpecialDay(now)) {
+    if (hourNumber === 22 && minuteNumber === 49 && secondNumber >= 50) {
+      return { type: 'hold', label: POST_SUNEUNG_HOLD_VALUE, animate: false };
+    }
+    if (hourNumber === 22 && minuteNumber === 50 && secondNumber < 10) {
+      return { type: 'message', label: POST_SUNEUNG_MESSAGE_TEXT, animate: false };
+    }
+  }
+
+  const target = getCountdownTarget(now);
+  if (
+    hourNumber === target.hour &&
+    minuteNumber === target.minute &&
+    secondNumber >= 50
+  ) {
+    return {
+      type: 'final',
+      label: String(60 - secondNumber),
+      animate: true
+    };
+  }
+
+  return { type: 'none', label: '', animate: false };
+}
+
+function normalizeRoutineData(value) {
+  if (!value || typeof value !== 'object') {
+    return { afterschool: {}, changdong: {} };
+  }
+  const normalizeMap = (raw) => {
+    if (!raw || typeof raw !== 'object') return {};
+    const map = {};
+    for (const day of ROUTINE_ALLOWED_DAYS) {
+      const list = raw[day];
+      if (!list) continue;
+      const numbers = Array.isArray(list) ? list : [list];
+      const cleaned = [];
+      numbers.forEach((item) => {
+        const num = Number(item);
+        if (Number.isInteger(num) && num >= 1 && num <= 99 && !cleaned.includes(num)) {
+          cleaned.push(num);
+        }
+      });
+      if (cleaned.length) {
+        cleaned.sort((a, b) => a - b);
+        map[day] = cleaned;
+      }
+    }
+    return map;
+  };
+  return {
+    afterschool: normalizeMap(value.afterschool),
+    changdong: normalizeMap(value.changdong)
+  };
+}
+
+async function loadRoutineData(force = false) {
+  if (routineLoading) return;
+  if (!force && routineLoaded) return;
+  routineLoading = true;
+  try {
+    const res = await fetch(`/api/classes/routine?grade=${grade}&section=${section}`, {
+      credentials: 'include'
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    routineData = normalizeRoutineData(data);
+    routineLoaded = true;
+  } catch (err) {
+    console.warn('루틴 정보를 불러오지 못했습니다:', err);
+  } finally {
+    routineLoading = false;
+  }
+}
+
+function formatParticipantList(participants) {
+  return participants.map((num) => `${String(num).padStart(2, '0')}번`).join(', ');
+}
+
+function getDayKey(date) {
+  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()];
+}
+
+function minutesOfDay(date) {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+let routinePromptOverlay = null;
+let routinePromptTitle = null;
+let routinePromptMessage = null;
+let routinePromptDetails = null;
+let routinePromptButtons = null;
+let routinePromptActive = null;
+
+function ensureRoutinePromptElements() {
+  if (routinePromptOverlay) {
+    return {
+      overlay: routinePromptOverlay,
+      titleEl: routinePromptTitle,
+      messageEl: routinePromptMessage,
+      detailsEl: routinePromptDetails,
+      buttonsEl: routinePromptButtons
+    };
+  }
+
+  const styleId = 'routinePromptStyles';
+  if (!document.getElementById(styleId)) {
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+.routine-prompt-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.35);
+  z-index: 4000;
+}
+.routine-prompt-overlay[hidden] {
+  display: none;
+}
+.routine-prompt {
+  width: min(420px, 92vw);
+  border-radius: 16px;
+  padding: 24px;
+  background: var(--card, #1f2937);
+  color: var(--text, #e2e8f0);
+  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+@media (prefers-color-scheme: light) {
+  .routine-prompt {
+    background: rgba(255, 255, 255, 0.96);
+    color: #0f172a;
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
+  }
+}
+.routine-prompt__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+.routine-prompt__message {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.routine-prompt__details {
+  font-size: 14px;
+  color: var(--muted, #94a3b8);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+@media (prefers-color-scheme: light) {
+  .routine-prompt__details {
+    color: #5b6475;
+  }
+}
+.routine-prompt__detail-item {
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+}
+@media (prefers-color-scheme: light) {
+  .routine-prompt__detail-item {
+    background: rgba(15, 23, 42, 0.08);
+  }
+}
+.routine-prompt__buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.routine-btn {
+  min-width: 88px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  transition: transform 0.1s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.routine-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);
+}
+.routine-btn:active {
+  transform: translateY(1px);
+}
+.routine-btn--cancel {
+  border-color: rgba(148, 163, 184, 0.45);
+}
+@media (prefers-color-scheme: light) {
+  .routine-btn--cancel {
+    border-color: rgba(100, 116, 139, 0.4);
+  }
+}
+.routine-btn--confirm {
+  background: #2563eb;
+  color: #fff;
+  border: 0;
+}
+.routine-btn--confirm:hover {
+  background: #1d4ed8;
+}
+`;
+    document.head.appendChild(style);
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'routine-prompt-overlay';
+  overlay.hidden = true;
+
+  const dialog = document.createElement('div');
+  dialog.className = 'routine-prompt';
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+
+  const titleEl = document.createElement('h2');
+  titleEl.className = 'routine-prompt__title';
+
+  const messageEl = document.createElement('p');
+  messageEl.className = 'routine-prompt__message';
+
+  const detailsEl = document.createElement('div');
+  detailsEl.className = 'routine-prompt__details';
+  detailsEl.hidden = true;
+
+  const buttonsEl = document.createElement('div');
+  buttonsEl.className = 'routine-prompt__buttons';
+
+  dialog.appendChild(titleEl);
+  dialog.appendChild(messageEl);
+  dialog.appendChild(detailsEl);
+  dialog.appendChild(buttonsEl);
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) {
+      triggerRoutinePromptCancel();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !overlay.hidden) {
+      triggerRoutinePromptCancel();
+    }
+  });
+
+  routinePromptOverlay = overlay;
+  routinePromptTitle = titleEl;
+  routinePromptMessage = messageEl;
+  routinePromptDetails = detailsEl;
+  routinePromptButtons = buttonsEl;
+
+  return {
+    overlay,
+    titleEl,
+    messageEl,
+    detailsEl,
+    buttonsEl
+  };
+}
+
+function renderRoutineModal({ title, message, detailItems = [], buttons = [] }) {
+  const { overlay, titleEl, messageEl, detailsEl, buttonsEl } = ensureRoutinePromptElements();
+  titleEl.textContent = title;
+  messageEl.textContent = message;
+
+  detailsEl.innerHTML = '';
+  if (detailItems.length) {
+    detailsEl.hidden = false;
+    detailItems.forEach((item) => {
+      const detail = document.createElement('div');
+      detail.className = 'routine-prompt__detail-item';
+      detail.textContent = item;
+      detailsEl.appendChild(detail);
+    });
+  } else {
+    detailsEl.hidden = true;
+  }
+
+  buttonsEl.innerHTML = '';
+  buttons.forEach((def) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `routine-btn ${def.variant === 'confirm' ? 'routine-btn--confirm' : 'routine-btn--cancel'}`;
+    btn.textContent = def.label;
+    btn.addEventListener('click', () => def.onClick(), { once: true });
+    buttonsEl.appendChild(btn);
+  });
+
+  overlay.hidden = false;
+  const firstButton = buttonsEl.querySelector('button');
+  if (firstButton) {
+    setTimeout(() => firstButton.focus(), 0);
+  }
+}
+
+function closeRoutinePrompt() {
+  if (!routinePromptOverlay) return;
+  routinePromptOverlay.hidden = true;
+  routinePromptActive = null;
+}
+
+function triggerRoutinePromptCancel() {
+  if (routinePromptActive && typeof routinePromptActive.onCancel === 'function') {
+    const handler = routinePromptActive.onCancel;
+    routinePromptActive = null;
+    handler();
+  } else {
+    closeRoutinePrompt();
+  }
+}
+
+function openRoutineDecision({ label, participants, onConfirm, onCancel }) {
+  const participantLine = participants.length ? `대상: ${formatParticipantList(participants)}` : '';
+  routinePromptActive = {
+    onCancel: () => {
+      closeRoutinePrompt();
+      if (onCancel) onCancel();
+    }
+  };
+  renderRoutineModal({
+    title: '루틴 적용',
+    message: `${label} 루틴을 적용할까요?`,
+    detailItems: participantLine ? [participantLine] : [],
+    buttons: [
+      {
+        label: '취소',
+        variant: 'cancel',
+        onClick: () => {
+          const handler = routinePromptActive ? routinePromptActive.onCancel : null;
+          routinePromptActive = null;
+          if (handler) {
+            handler();
+          } else {
+            closeRoutinePrompt();
+          }
+        }
+      },
+      {
+        label: '적용',
+        variant: 'confirm',
+        onClick: () => {
+          routinePromptActive = null;
+          if (onConfirm) onConfirm();
+        }
+      }
+    ]
+  });
+}
+
+function showRoutineSummary(label, participants, result) {
+  const missing = Array.isArray(result?.missing) ? result.missing : [];
+  const movedList = participants.filter((num) => !missing.includes(num));
+  const detailItems = [];
+  if (movedList.length) {
+    detailItems.push(`이동 완료: ${formatParticipantList(movedList)}`);
+  }
+  if (missing.length) {
+    detailItems.push(`미이동: ${formatParticipantList(missing)}`);
+  }
+  if (!detailItems.length) {
+    detailItems.push('이동할 대상이 없습니다.');
+  }
+
+  console.log('[routine] summary', { label, moved: movedList.length, missing });
+  routinePromptActive = {
+    onCancel: () => {
+      closeRoutinePrompt();
+    }
+  };
+
+  renderRoutineModal({
+    title: `${label} 루틴 적용 완료`,
+    message: `${label} 루틴이 적용되었습니다.`,
+    detailItems,
+    buttons: [
+      {
+        label: '확인',
+        variant: 'confirm',
+        onClick: () => {
+          routinePromptActive = null;
+          closeRoutinePrompt();
+        }
+      }
+    ]
+  });
+}
+
+function showRoutinePrompt(category, participants, stateKey) {
+  if (!Array.isArray(participants) || !participants.length) return;
+  if (window.isMagnetDragging || window.isAutoReturning || window.isRoutineApplying) {
+    return;
+  }
+
+  routinePromptState[stateKey] = 'shown';
+  const label = ROUTINE_LABELS[category] || '루틴';
+  console.log('[routine] prompt', { category, participants, stateKey });
+  openRoutineDecision({
+    label,
+    participants,
+    onConfirm: () => {
+      const result = applyRoutineAssignment(category, participants);
+      routinePromptState[stateKey] = 'done';
+      if (!result) {
+        closeRoutinePrompt();
+        return;
+      }
+      showRoutineSummary(label, participants, result);
+    },
+    onCancel: () => {
+      console.log('[routine] prompt cancelled', stateKey);
+      routinePromptState[stateKey] = 'done';
+    }
+  });
+}
+
+function applyRoutineAssignment(category, participants) {
+  if (typeof window.moveMagnetToCategoryByNumber !== 'function') {
+    console.warn('moveMagnetToCategoryByNumber helper 없음');
+    return null;
+  }
+  if (!Array.isArray(participants) || !participants.length) return { moved: 0, missing: [] };
+
+  window.isRoutineApplying = true;
+  const missing = [];
+  let moved = 0;
+  try {
+    participants.forEach((num) => {
+      if (window.moveMagnetToCategoryByNumber(num, category)) {
+        moved += 1;
+      } else {
+        missing.push(num);
+      }
+    });
+  } finally {
+    window.isRoutineApplying = false;
+  }
+
+  console.log('[routine] apply result', { category, moved, missing });
+  return { moved, missing };
+}
+
+const ROUTINE_PROMPTS = [
+  { key: 'afterschool', category: 'afterschool', startMinutes: 17 * 60 + 5, endMinutes: 18 * 60 + 35 },
+  { key: 'changdong', category: 'changdong', startMinutes: 19 * 60 + 45, endMinutes: 22 * 60 + 50 }
+];
+
+function checkRoutinePrompts(now) {
+  if (!routineLoaded) return;
+  const dayKey = getDayKey(now);
+  const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+  const currentMinutes = minutesOfDay(now);
+
+  ROUTINE_PROMPTS.forEach((prompt) => {
+    const map = routineData[prompt.category] || {};
+    const participants = map[dayKey] || [];
+    if (!participants.length) return;
+
+    const { startMinutes } = prompt;
+    if (currentMinutes < startMinutes) {
+      return;
+    }
+
+    const stateKey = `${prompt.key}-${todayKey}`;
+    if (routinePromptState[stateKey] === 'done' || routinePromptState[stateKey] === 'shown') return;
+
+    showRoutinePrompt(prompt.category, participants, stateKey);
+  });
+}
+
 function updateClock() {
   const now = new Date();
+  const hourNumber = now.getHours();
+  const minuteNumber = now.getMinutes();
+  const secondNumber = now.getSeconds();
+
+  checkAutoReturn(now);
+  checkRoutinePrompts(now);
 
   // ===== 1) 디지털 시계 =====
-  const h = String(now.getHours()).padStart(2, '0');
-  const m = String(now.getMinutes()).padStart(2, '0');
-  const s = String(now.getSeconds()).padStart(2, '0');
+  const h = String(hourNumber).padStart(2, '0');
+  const m = String(minuteNumber).padStart(2, '0');
+  const s = String(secondNumber).padStart(2, '0');
   document.getElementById('hours').textContent = h;
   document.getElementById('minutes').textContent = m;
   document.getElementById('seconds').textContent = s;
@@ -34,15 +637,15 @@ function updateClock() {
     `${months[now.getMonth()]} ${now.getDate()}일 ${days[now.getDay()]}`;
 
   // ===== 2) 아날로그 바늘 =====
-  const hoursDeg = (now.getHours() % 12) * 30 + (now.getMinutes() * 0.5);
-  const minutesDeg = now.getMinutes() * 6 + (now.getSeconds() * 0.1);
-  const secondsDeg = now.getSeconds() * 6;
+  const hoursDeg = (hourNumber % 12) * 30 + (minuteNumber * 0.5);
+  const minutesDeg = minuteNumber * 6 + (secondNumber * 0.1);
+  const secondsDeg = secondNumber * 6;
   document.getElementById('hourHand').style.transform   = `translateX(-50%) rotate(${hoursDeg}deg)`;
   document.getElementById('minuteHand').style.transform = `translateX(-50%) rotate(${minutesDeg}deg)`;
   document.getElementById('secondHand').style.transform = `translateX(-50%) rotate(${secondsDeg}deg)`;
   const sh = document.getElementById('secondHand');
   sh.style.transition = 'transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1)';
-  if (now.getSeconds() == 59) { // 59.5초에 베지어 없애고 각도 초기화
+  if (secondNumber === 59) { // 59.5초에 베지어 없애고 각도 초기화
     setTimeout(() => {
       sh.style.transition = '';
       sh.style.transform = 'translateX(-50%) rotate(-6deg)';
@@ -50,51 +653,27 @@ function updateClock() {
   }
 
   // ===== 3) 구간(phase) 정의 & 찾기 =====
-  // 분 단위로 하루 타임라인 정의 (startMin <= 현재 < endMin)
-  const PHASES = [
-    { label: '아침 시간',    startMin: 0,              endMin: 8*60 + 15 }, // 00:00 ~ 08:15
-    { label: '아침 자습',    startMin: 8*60 + 15,      endMin: 8*60 + 50 }, // 08:15 ~ 08:50
-    { label: '아침 조회',    startMin: 8*60 + 50,      endMin: 9*60      }, // 08:50 ~ 09:00
-    { label: '오전 수업 시간',    startMin: 9*60,      endMin: 12*60 + 50 }, //9:00 ~ 12:50
-    { label: '점심 시간',    startMin: 12*60 + 50,      endMin: 13*60 + 10 }, //12:50 ~ 1:50
-    { label: '오후 수업 시간',    startMin: 13*60,      endMin: 16*60 + 40 }, //13:50 ~ 16:40
-    { label: '청소 시간',    startMin: 16*60 + 40,      endMin: 17*60 }, //16:40 ~ 17:00
-    { label: '종례',    startMin: 17*60,      endMin: 17*60 + 10}, //17:00 ~ 17:10
-    { label: '방과후 1타임',  startMin: 17*60 + 10,     endMin: 17*60 + 50 }, // 17:10 ~ 17:50
-    { label: '쉬는 시간',    startMin: 17*60 + 50,     endMin: 17*60 + 55 }, // 17:50 ~ 17:55
-    { label: '방과후 2타임',  startMin: 17*60 + 55,     endMin: 18*60 + 35 }, // 17:55 ~ 18:35
-    { label: '저녁 시간',    startMin: 18*60 + 35,     endMin: 19*60 + 50 }, // 18:35 ~ 19:50
-    { label: '야자 1타임',   startMin: 19*60 + 50,     endMin: 21*60 + 10 }, // 19:50 ~ 21:10
-    { label: '쉬는 시간',    startMin: 21*60 + 10,     endMin: 21*60 + 30 }, // 21:10 ~ 21:30
-    { label: '야자 2타임',   startMin: 21*60 + 30,     endMin: 22*60 + 50 }, // 21:30 ~ 22:50
-    { label: '끝.',         startMin: 22*60 + 50,     endMin: 24*60     }  // 22:50 ~ 24:00
-  ];
-
-
+  const phases = getPhasesForDate(now);
   const tstatEl = document.getElementById('tstat');
   const pb = document.getElementById('progressbar');
   if (pb) pb.max = 100;
 
-  const curMin = now.getHours()*60 + now.getMinutes();
+  const curMin = hourNumber * 60 + minuteNumber;
   let phase = null;
-  for (const p of PHASES) {
+  for (const p of phases) {
     if (curMin >= p.startMin && curMin < p.endMin) { phase = p; break; }
   }
 
-  // ===== 4) 특수 카운트다운(22:49:50~22:49:59) =====
-  const hh = Number(h), mm = Number(m), ss = Number(s);
-  let overrideLabel = null;
-  if (hh === 22 && mm === 49 && ss >= 50) {
-    overrideLabel = String(60 - ss); // 10~1 초 카운트다운
-  }
+  const countdownState = getCountdownState(now, hourNumber, minuteNumber, secondNumber);
+  const countdownActive = countdownState.type !== 'none';
 
-  // ===== 5) 상태 텍스트 & 불꽃놀이 =====
-  if (overrideLabel !== null) {
-    tstatEl.textContent = overrideLabel;
-  } else if (phase) {
-    tstatEl.textContent = phase.label;
+  // ===== 4) 특수 카운트다운 & 상태 텍스트 =====
+  if (countdownActive) {
+    tstatEl.textContent = countdownState.label;
+    setCountdownOverlay(countdownState.label, { animate: countdownState.animate });
   } else {
-    tstatEl.textContent = '';
+    hideCountdownOverlay();
+    tstatEl.textContent = phase ? phase.label : '';
   }
 
   if (phase && phase.label === '끝.') {
@@ -111,13 +690,13 @@ function updateClock() {
 
   // ===== 6) 프로그레스 바(구간 진행률) =====
   if (pb) {
-    if (!phase || overrideLabel !== null) {
+    if (!phase || countdownActive) {
       // 구간 없음 또는 카운트다운 구간에서는 진행률 0으로
       pb.value = 0;
       pb.title = '';
       pb.style.setProperty('--p', 0); 
     } else {
-      const nowSec   = now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds();
+      const nowSec   = hourNumber * 3600 + minuteNumber * 60 + secondNumber;
       const startSec = phase.startMin * 60;
       const endSec   = phase.endMin * 60;
 
@@ -139,6 +718,27 @@ function updateClock() {
   }
 }
 
+function checkAutoReturn(now) {
+  if (typeof returnCategoryToClassroom !== 'function') {
+    return;
+  }
+
+  const minutesOfDay = now.getHours() * 60 + now.getMinutes();
+  const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+
+  AUTO_RETURN_SCHEDULES.forEach(schedule => {
+    const targetMinutes = schedule.minutes;
+    const stateKey = `${todayKey}-${schedule.key}`;
+
+    if (minutesOfDay >= targetMinutes) {
+      if (autoReturnState[schedule.key] !== stateKey) {
+        returnCategoryToClassroom(schedule.category);
+        autoReturnState[schedule.key] = stateKey;
+      }
+    }
+  });
+}
+
 async function createMagnetsFromServer(grade, section) {
   const config = await fetchMagnetConfig(grade, section);
   const end = config.end || 30;
@@ -149,6 +749,7 @@ async function createMagnetsFromServer(grade, section) {
 async function initBoard() {
   await createMagnetsFromServer(grade, section);
   await loadState(grade, section);
+  await loadRoutineData(true);
   updateAttendance();
   updateEtcReasonPanel();
   updateClock();
@@ -158,5 +759,13 @@ async function initBoard() {
 initBoard();
 
 setInterval(() => {
-  loadState(grade, section);
-}, 5000);
+  if (!window.isMagnetDragging && !window.isAutoReturning && !window.isRoutineApplying) {
+    loadState(grade, section);
+  }
+}, 1000);
+
+setInterval(() => {
+  if (!window.isMagnetDragging && !window.isAutoReturning && !window.isRoutineApplying) {
+    loadRoutineData(true);
+  }
+}, 5 * 60 * 1000);

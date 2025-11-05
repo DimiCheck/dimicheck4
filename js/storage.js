@@ -71,47 +71,67 @@ async function loadState(grade, section) {
     const parsed = await res.json();
     const magnets = parsed.magnets || {};
     let didNormalizeSection = false;
+    const thoughtProcessed = new Set();
 
     // 자석 반영
-    Object.entries(magnets).forEach(([num, data]) => {
-      const el = document.querySelector(`.magnet[data-number="${num}"]`);
+    Object.entries(magnets).forEach(([num, rawData]) => {
+      let el = document.querySelector(`.magnet[data-number="${num}"]`);
+      if (!el) {
+        const normalizedNum = String(parseInt(num, 10));
+        if (normalizedNum && normalizedNum !== num) {
+          el = document.querySelector(`.magnet[data-number="${normalizedNum}"]`);
+        }
+      }
       if (!el) return;
 
-      //console.log(data.attachedTo);
-      if (data.attachedTo == "section"){
-        console.log('dd');
-        restoreToFreePosition(el, data);
-        didNormalizeSection = true;
-        return; // 완료했으니 다음으로
-      }
+      const magnetData = (rawData && typeof rawData === 'object') ? rawData : {};
+      const magnetNumber = el.dataset.number || String(num);
+      thoughtProcessed.add(magnetNumber);
 
-      if (data.attachedTo) {
-        const sec = document.querySelector(`.board-section[data-category="${data.attachedTo}"] .section-content`);
+      if (magnetData.attachedTo === "section") {
+        restoreToFreePosition(el, magnetData);
+        didNormalizeSection = true;
+      } else if (magnetData.attachedTo) {
+        const sec = document.querySelector(`.board-section[data-category="${magnetData.attachedTo}"] .section-content`);
         if (sec) {
           el.classList.add("attached");
-          if (data.reason) {
-            el.dataset.reason = data.reason.trim();   // ✅ reason 저장
+          if (magnetData.reason) {
+            el.dataset.reason = magnetData.reason.trim();   // ✅ reason 저장
             el.classList.add("has-reason");
           } else {
-            delete el.dataset.reason;                 // ✅ reason 없을 때는 삭제
+            delete el.dataset.reason;                       // ✅ reason 없을 때는 삭제
             el.classList.remove("has-reason");
           }
           sec.appendChild(el);
-          return;
+        } else {
+          restoreToFreePosition(el, magnetData);
         }
-
-        restoreToFreePosition(el, data);
-        return;
+      } else {
+        restoreToFreePosition(el, magnetData);
       }
 
-      restoreToFreePosition(el, data);
+      if (typeof window.updateMagnetThoughtBubble === 'function') {
+        window.updateMagnetThoughtBubble(el, magnetData);
+      }
     });
+
+    if (typeof window.updateMagnetThoughtBubble === 'function') {
+      document.querySelectorAll('.magnet:not(.placeholder)').forEach(magnet => {
+        const num = magnet.dataset.number || '';
+        if (!thoughtProcessed.has(num)) {
+          window.updateMagnetThoughtBubble(magnet, null);
+        }
+      });
+    }
 
     // ✅ 끝나고 기타 패널 갱신
     updateEtcReasonPanel();
     sortAllSections();
     updateAttendance();
     updateMagnetOutline();
+    if (typeof window.repositionThoughtBubbles === 'function') {
+      window.repositionThoughtBubbles();
+    }
 
     if (didNormalizeSection){
       await saveState(grade, section);

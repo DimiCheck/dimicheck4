@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from flask import Flask, jsonify, request, send_from_directory, session
+from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 from flask_cors import CORS
 from flask_smorest import Api
 from flask_socketio import SocketIO
@@ -17,7 +17,15 @@ from config import config
 from extensions import db
 from models import ClassConfig, ClassPin
 from config_loader import load_class_config
-from utils import after_request, before_request, metrics, setup_logging
+from utils import (
+    after_request,
+    before_request,
+    clear_teacher_session,
+    is_teacher_session_active,
+    mark_teacher_session,
+    metrics,
+    setup_logging,
+)
 from ws import namespaces
 
 import gspread
@@ -110,9 +118,68 @@ def board():
 
     return send_from_directory(".", "enter_pin.html")
 
+
+def _validate_teacher_pin(pin: str) -> bool:
+    allowed = config.TEACHER_PINS
+    if not allowed:
+        return False
+    return pin in allowed
+
+
+def _teacher_session_valid() -> bool:
+    if is_teacher_session_active():
+        return True
+    clear_teacher_session()
+    return False
+
+
+@app.route("/teacher", methods=["GET", "POST"])
+def teacher_dashboard():
+    if _teacher_session_valid():
+        return render_template("teacher.html")
+
+    error = None
+
+    if request.method == "POST":
+        pin = (request.form.get("pin") or "").strip()
+        remember = request.form.get("remember") == "on"
+
+        if not config.TEACHER_PINS:
+            error = "교사용 PIN이 설정되지 않았습니다. 관리자에게 문의하세요."
+        elif _validate_teacher_pin(pin):
+            duration = (
+                config.TEACHER_SESSION_REMEMBER_SECONDS
+                if remember
+                else config.TEACHER_SESSION_DURATION_SECONDS
+            )
+            mark_teacher_session(duration_seconds=duration, remember=remember)
+            return redirect(url_for("teacher_dashboard"))
+        else:
+            error = "PIN이 올바르지 않습니다. 다시 시도해주세요."
+
+    return render_template(
+        "teacher_pin.html",
+        error=error,
+        has_pin=bool(config.TEACHER_PINS),
+    )
+
+
+@app.get("/teacher.html")
+def teacher_legacy_redirect():
+    return redirect(url_for("teacher_dashboard"))
+
 @app.route("/", methods=["GET", "POST"])
 def index():  # type: ignore[override]
+    user = session.get("user")
+    if user:
+        user_type = str(user.get("type", "")).lower()
+        if user_type == "teacher":
+            return redirect(url_for("teacher_dashboard"))
+        if user_type == "student":
+            return redirect("/user.html")
+
     return send_from_directory(".", "login.html") 
+
 
 @app.route("/reload-configs")
 def reload_configs():

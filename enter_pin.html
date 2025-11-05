@@ -4,7 +4,18 @@
   <meta charset="UTF-8">
   <title>DIMI Check</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="color-scheme" content="light dark" />
+  
+  <meta name="theme-color" content="#0b0f14"/>
+  <meta name="application-name" content="DIMI Check"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <script defer src="/js/pwa.js"></script>
+<meta name="color-scheme" content="light dark" />
+  <link rel="apple-touch-icon" sizes="180x180" href="src/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="src/favicon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="src/favicon/favicon-16x16.png">
   <style>
     :root {
       --bg: #0b0f14;
@@ -24,7 +35,8 @@
       background: var(--bg);
       display: grid;
       place-items: center;
-      height: 100vh;
+      height: 100dvh;
+      /* overflow: hidden; */ /* REMOVED */
     }
     .blob-container { position: fixed; inset:0; z-index:-1; overflow:hidden; }
     .blob { position:absolute; filter:blur(40px); opacity:.6; pointer-events:none; }
@@ -34,6 +46,10 @@
     @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-20px)} }
 
     .card {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       width: min(380px,92%);
       padding: 28px;
       border-radius: var(--radius);
@@ -41,21 +57,126 @@
       backdrop-filter: blur(14px);
       box-shadow: var(--shadow);
       text-align: center;
+      background-color: var(--bg); /* Ensure a solid background */
+      overflow: hidden;
     }
-    .card h2 { margin:0 0 12px; font-size:22px; font-weight:700; }
-    .error { color:#ff5c5c; margin-bottom:12px; font-size:14px; }
-    input {
-      width:100%; padding:12px; margin-bottom:14px;
-      border-radius:12px; border:1px solid rgba(255,255,255,.2);
-      background: rgba(255,255,255,.1); color: var(--text); font-size:15px;
+    .card h2 { margin:0 0 20px; font-size:22px; font-weight:700; }
+    .error { color:#ff5c5c; margin-bottom:12px; font-size:14px; display: none; }
+    
+    .pin-container {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      cursor: pointer;
     }
-    input::placeholder { color: var(--muted); }
-    button {
-      width:100%; padding:12px; border:none; border-radius:12px;
-      font-weight:600; cursor:pointer; color:#fff;
-      background: linear-gradient(135deg,var(--primary),var(--primary-2));
+    .pin-box {
+      width: 50px;
+      height: 60px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.2);
+      display: grid;
+      place-items: center;
+      font-size: 24px;
+      font-weight: 600;
+      transition: all .2s;
     }
-    button:active { transform:translateY(1px); }
+    .pin-box.filled {
+      border-color: var(--primary);
+      box-shadow: 0 0 10px var(--primary-2);
+    }
+
+    #keyboard {
+      position: fixed;
+      width: min(300px, 80%);
+      background: linear-gradient(180deg,var(--card),var(--card-2));
+      backdrop-filter: blur(20px);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      z-index: 100;
+      display: none; /* 기본적으로 숨김 */
+      touch-action: none;
+      animation: slideUp .4s ease-out;
+    }
+    @keyframes slideUp {
+      from { transform: translate(-50%, 100px); opacity: 0; }
+      to { transform: translate(-50%, 0); opacity: 1; }
+    }
+
+    #keyboard-header {
+      padding: 0 10px 15px;
+      text-align: center;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: move;
+    }
+    .keyboard-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .key {
+      height: 50px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.1);
+      border: 1px solid transparent;
+      color: var(--text);
+      font-size: 20px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color .2s;
+      display: grid;
+      place-items: center;
+    }
+    .key.pressed {
+      animation: bounce 0.3s ease;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: scale(1); background-color: rgba(255,255,255,.1); }
+      50% { transform: scale(0.9); background-color: var(--primary); color: #fff; box-shadow: 0 0 15px var(--primary-2); }
+    }
+
+    #loading-overlay {
+      position: absolute; /* Changed from fixed */
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7); /* Keep background */
+      display: none; /* Hidden by default */
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+      font-size: 1.05em;
+      z-index: 50; /* Increased z-index */
+      border-radius: inherit; /* Match card radius */
+      pointer-events: auto; 
+      gap: .6rem;
+    }
+
+    .spinner {
+      border: 8px solid rgba(255, 255, 255, 0.3);
+      border-top: 8px solid var(--primary);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .hidden {
+      display: none !important;
+      opacity: 0;
+  visibility: hidden;
+    }
+
   </style>
 </head>
 <body>
@@ -67,19 +188,159 @@
 
   <div class="card">
     <h2 id="title">학년 반 칠판 PIN 입력</h2>
-    <div class="error" id="errorMsg" style="display:none"></div>
-    <form method="POST"> <input type="password" name="pin" placeholder="PIN 입력" required> <button type="submit">확인</button> </form>
+    <div class="error" id="errorMsg"></div>
+    <div class="pin-container" id="pin-container">
+      <div class="pin-box"></div>
+      <div class="pin-box"></div>
+      <div class="pin-box"></div>
+      <div class="pin-box"></div>
+    </div>
+    <p id="pin-description" style="color: var(--muted); font-size: 14px;">PIN을 입력하려면 위 박스를 터치하세요.</p>
+    <div id="loading-overlay">
+      <div class="spinner"></div>
+      <p>PIN을 확인하는 중...</p>
+    </div>
+  </div>
+
+  <div id="keyboard">
+    <div id="keyboard-header">PIN 입력</div>
+    <div class="keyboard-grid">
+      <div class="key">1</div>
+      <div class="key">2</div>
+      <div class="key">3</div>
+      <div class="key">4</div>
+      <div class="key">5</div>
+      <div class="key">6</div>
+      <div class="key">7</div>
+      <div class="key">8</div>
+      <div class="key">9</div>
+      <div class="key" style="grid-column: 2;">0</div>
+      <div class="key" id="backspace">⌫</div>
+    </div>
   </div>
 
   <script>
-    // URL에서 grade, section 가져오기
     const params = new URLSearchParams(window.location.search);
     const grade = params.get("grade") || "?";
     const section = params.get("section") || "?";
-
-    // 제목 업데이트
     document.getElementById("title").textContent = `${grade}학년 ${section}반 칠판 PIN 입력`;
-  
+
+    const pinContainer = document.getElementById('pin-container');
+    const pinBoxes = document.querySelectorAll('.pin-box');
+    const keyboard = document.getElementById('keyboard');
+    const keys = document.querySelectorAll('.key');
+    const errorMsg = document.getElementById('errorMsg');
+    const pinDescription = document.getElementById('pin-description');
+
+    let pin = "";
+
+    pinContainer.addEventListener('click', () => {
+      if (keyboard.style.display === 'block') return;
+      keyboard.style.display = 'block';
+      keyboard.style.bottom = '20px';
+      keyboard.style.left = '50%';
+      keyboard.style.top = 'auto';
+      keyboard.style.transform = 'translateX(-50%)';
+    });
+
+    keys.forEach(key => {
+      key.addEventListener('click', () => {
+        key.classList.add('pressed');
+        key.addEventListener('animationend', () => key.classList.remove('pressed'), { once: true });
+
+        const num = key.textContent;
+        if (num === '⌫') {
+          pin = pin.slice(0, -1);
+        } else if (pin.length < 4) {
+          pin += num;
+        }
+        updatePinDisplay();
+        if (pin.length === 4) {
+          setTimeout(submitPin, 200);
+        }
+      });
+    });
+
+    function updatePinDisplay() {
+      pinBoxes.forEach((box, index) => {
+        if (index < pin.length) {
+          box.classList.add('filled');
+          if (index === pin.length - 1) {
+            box.textContent = pin[index];
+            setTimeout(() => {
+              if (box.textContent !== '') box.textContent = '●';
+            }, 300);
+          } else {
+            box.textContent = '●';
+          }
+        } else {
+          box.classList.remove('filled');
+          box.textContent = '';
+        }
+      });
+    }
+
+    function submitPin() {
+      // Hide PIN input UI and show loading overlay
+      //pinContainer.classList.add('hidden');
+      //pinDescription.classList.add('hidden');
+      document.getElementById('loading-overlay').style.display = 'flex';
+
+      const form = document.createElement('form');
+      form.method = 'POST';
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'pin';
+      input.value = pin;
+      form.appendChild(input);
+      document.body.appendChild(form);
+      form.submit();
+    }
+
+    const keyboardHeader = document.getElementById('keyboard-header');
+    let isDragging = false;
+    let offsetX, offsetY;
+
+    const move = (e) => {
+      if (!isDragging) return;
+      let newX = (e.touches ? e.touches[0].clientX : e.clientX) - offsetX;
+      let newY = (e.touches ? e.touches[0].clientY : e.clientY) - offsetY;
+      keyboard.style.left = `${newX}px`;
+      keyboard.style.top = `${newY}px`;
+    };
+
+    const startDrag = (e) => {
+      isDragging = true;
+      const rect = keyboard.getBoundingClientRect();
+      keyboard.style.bottom = 'auto';
+      keyboard.style.transform = 'none';
+      keyboard.style.top = `${rect.top}px`;
+      keyboard.style.left = `${rect.left}px`;
+      
+      offsetX = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      offsetY = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+
+      document.addEventListener('mousemove', move);
+      document.addEventListener('touchmove', move);
+      document.addEventListener('mouseup', stopDrag);
+      document.addEventListener('touchend', stopDrag);
+    };
+
+    const stopDrag = () => {
+      isDragging = false;
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('touchmove', move);
+    };
+    
+    keyboardHeader.addEventListener('mousedown', startDrag);
+    keyboardHeader.addEventListener('touchstart', startDrag);
+
+    document.addEventListener('click', (e) => {
+      if (!keyboard.contains(e.target) && !pinContainer.contains(e.target)) {
+        keyboard.style.display = 'none';
+      }
+    });
+
   </script>
 </body>
 </html>

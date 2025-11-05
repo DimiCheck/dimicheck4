@@ -3,14 +3,33 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <meta name="theme-color" content="#0b0f14"/>
+  <meta name="application-name" content="DIMI Check"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <script defer src="/js/pwa.js"></script>
   <title>DimiCheck 학년 현황</title>
+  <script defer data-domain="chec.kro.kr" src="https://plausible.io/js/script.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body {
       background:#0b0f14;
       min-height:100vh;
       font-family:"Pretendard",system-ui,-apple-system,Segoe UI,Roboto,Noto Sans KR,sans-serif;
-      color:#e9eef6; display:flex; justify-content:center; align-items:center; padding:40px;
+      color:#e9eef6;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      padding:40px;
+    }
+    @media (max-width:1024px){
+      body{align-items:flex-start;padding:32px 24px;}
+    }
+    @media (max-width:640px){
+      body{padding:24px 16px;}
     }
     .blob-container{position:fixed;inset:0;z-index:-1;overflow:hidden;}
     .blob{position:absolute;filter:blur(40px);opacity:.5;pointer-events:none;}
@@ -18,16 +37,22 @@
     .b2{width:38vw;height:38vw;background:radial-gradient(circle,#4f6aff40,transparent 70%);bottom:-10vh;right:-10vw;animation:float 24s ease-in-out infinite reverse;}
     @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-20px)}}
 
-    .main-container{width:100%;max-width:1200px;}
+    .main-container{width:100%;max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:20px;}
+    @media (max-width:1024px){
+      .main-container{gap:16px;}
+    }
 
     /* Header */
     .header{
       background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1);
       border-radius:18px; padding:20px 28px; display:flex; justify-content:space-between; align-items:center;
-      backdrop-filter:blur(12px); margin-bottom:24px;
+      backdrop-filter:blur(12px);
+      margin-bottom:24px;
+      gap:16px;
     }
-    .header-left{display:flex;align-items:center;gap:20px;}
+    .header-left{display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
     .header-title{font-size:26px;font-weight:700;}
+    .grade-buttons{display:flex;gap:12px;flex-wrap:wrap;}
     .grade-btn{
       background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15);
       padding:8px 16px; border-radius:10px; font-weight:500; color:#fff; cursor:pointer; transition:.25s;
@@ -35,7 +60,7 @@
     .grade-btn:hover{background:rgba(255,255,255,.15);}
     .grade-btn.active{background:linear-gradient(135deg,#7a4fff,#a679ff); border:none;}
 
-    .header-right{display:flex;gap:10px;align-items:center;}
+    .header-right{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
     .check-label{
       padding:8px 16px; border-radius:10px; font-weight:600; font-size:15px;
       background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15);
@@ -49,14 +74,14 @@
     .main-title{text-align:center;font-size:30px;font-weight:700;letter-spacing:4px;margin-bottom:28px;}
 
     /* Cards */
-    .class-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;}
+    .class-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;}
     .class-card{
       background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1);
       border-radius:18px; padding:20px; transition:.25s; backdrop-filter:blur(10px);
     }
     .class-card:hover{transform:translateY(-2px);}
     .class-header{font-size:20px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.15);}
-    .student-slots{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
+    .student-slots{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;width:100%;}
     .student-name{font-weight:600;}
     .student-slot { cursor: pointer; padding: 2px 6px; border-radius: 8px; transition: background .2s; }
     .student-slot:hover { background: rgba(255,255,255,.06); }
@@ -87,9 +112,21 @@
     .chip:active{transform:scale(0.95);}
 
     /* 모바일 */
+    @media (max-width:900px){
+      .header{flex-direction:column;align-items:flex-start;padding:18px 22px;}
+      .header-right{width:100%;}
+      .check-label{flex:1;text-align:center;}
+      .main-title{font-size:26px;}
+    }
     @media (max-width:640px){
+      .main-container{gap:14px;}
+      .header{padding:16px 18px;}
+      .main-title{font-size:24px;letter-spacing:2px;}
+      .class-grid{gap:16px;}
+      .class-card{padding:18px;}
+      .student-slot{padding:4px 8px;}
       .chip{font-size:15px;padding:12px 18px;}
-      .class-footer{gap:14px;padding:18px;}
+      .class-footer{gap:12px;padding:16px;}
     }
 
     /* 모달 */
@@ -121,26 +158,21 @@
     }
     .status-btn {
       background: rgba(255,255,255,.08);
-      border: 1px solid rgba(255,255,255,.15);
-      border-radius: 10px;
-      padding: 12px;
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 12px;
+      padding: 12px 10px;
       color: #fff;
       font-size: 15px;
-      font-weight: 500;
       cursor: pointer;
-      transition: background .2s, transform .1s;
+      transition: background .2s;
     }
-    .status-btn:hover { background: rgba(255,255,255,.18); transform: translateY(-1px); }
-    .status-btn:active { transform: translateY(0); }
-    .input {
-      width: 100%; height: 42px;
-      padding: 0 12px; border-radius: 10px;
-      background: rgba(255,255,255,.08);
-      border: 1px solid rgba(255,255,255,.15);
-      color: #fff; font-size: 14px;
-    }
+    .status-btn:hover { background: rgba(255,255,255,.2); }
+    .status-btn:active { transform: translateY(1px); }
+
     .modal-footer {
-      margin-top: 20px; text-align: center;
+      margin-top: 18px;
+      display: flex;
+      justify-content: center;
     }
     .btn-cancel {
       background: rgba(255,255,255,.1);
@@ -351,10 +383,15 @@ function setActiveSlot(card, which /* 'total' | 'away' | 'present' */) {
 
   function setActiveGrade(g){ currentGrade=g; gradeButtons.forEach(b=>b.classList.toggle('active',Number(b.dataset.grade)===g)); }
   function updateMainTitle(g){ document.getElementById('gradeLabel').textContent=g; }
-  function formatTime(d){ return d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+
+  function formatTime(date){
+    const h=String(date.getHours()).padStart(2,'0');
+    const m=String(date.getMinutes()).padStart(2,'0');
+    return `${h}:${m}`;
+  }
 
   async function loadClassState(grade){
-    let totalG = 0, absG = 0, presG = 0;
+    let totalG=0,absG=0,presG=0;
 
     for (let section = 1; section <= 6; section++) {
       try {
