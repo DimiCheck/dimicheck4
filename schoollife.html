@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
+  <meta name="theme-color" content="#0b0f14"/>
+  <meta name="application-name" content="DIMI Check"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <script defer src="/js/pwa.js"></script>
+  <title>학교 생활 | Today</title>
+  <meta name="color-scheme" content="light dark" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="apple-touch-icon" sizes="180x180" href="src/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="src/favicon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="src/favicon/favicon-16x16.png">
+  <style>
+    :root{
+      --bg: #0b0f14;
+      --bg-2: #0e1218;
+      --card: rgba(255,255,255,.08);
+      --card-2: rgba(255,255,255,.06);
+      --text: #e9eef6;
+      --muted: #a7b0c0;
+      --primary: #d04fff;
+      --primary-2: #ff6ad0;
+      --ring: 0 0 0 8px color-mix(in oklab, var(--primary) 30%, transparent);
+      --shadow: 0 10px 30px rgba(0, 0, 0, .45);
+      --radius: 20px;
+      --ok: #38d67a;
+      --warn: #ffb020;
+      --err: #ff5c5c;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f6f8fb;
+        --bg-2: #eef2f8;
+        --card: rgba(255,255,255,.75);
+        --card-2: rgba(255,255,255,.6);
+        --text: #0f172a;
+        --muted: #5b6475;
+        --primary: #d04fff;
+        --primary-2: #ff6ad0;
+        --shadow: 0 10px 30px rgba(57,72,103,.15);
+      }
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:"Pretendard",system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;
+      color:var(--text); background:var(--bg);
+      display:block; overflow:auto;
+    }
+
+    /* background blobs */
+    .blob-container{
+      position:fixed; inset:0; overflow:hidden; z-index:-1;
+      background: radial-gradient(1200px 800px at 10% -10%, #5a6cff20, transparent 60%),
+                  radial-gradient(1200px 800px at 110% 10%, #ff009025, transparent 60%),
+                  radial-gradient(1000px 700px at 50% 120%, #ff00b325, transparent 60%);
+    }
+    .blob{position:absolute; filter:blur(40px); opacity:.6; pointer-events:none}
+    .b1{width:48vw;height:48vw;background:radial-gradient(circle,#ff6a6a60,transparent 70%); top:-10vh; left:-10vw; animation:float 18s ease-in-out infinite}
+    .b2{width:42vw;height:42vw;background:radial-gradient(circle,#e100ff50,transparent 70%); bottom:-15vh; right:-10vw; animation:float 22s ease-in-out infinite reverse}
+    .b3{width:36vw;height:36vw;background:radial-gradient(circle,#ff6ae950,transparent 70%); top:40vh; left:10vw; animation:float 26s ease-in-out infinite}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-20px)}}
+
+    /* shell */
+    header{
+      position:sticky; top:0; z-index:5;
+      padding:16px clamp(12px,3vw,24px);
+      backdrop-filter:saturate(140%) blur(12px);
+      background:linear-gradient(180deg,var(--card),transparent);
+      border-bottom:1px solid color-mix(in oklab, var(--text) 10%, transparent);
+    }
+    .toolbar{display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:wrap}
+    .title{font-weight:800; letter-spacing:.2px; display:flex; gap:10px; align-items:center}
+    .title .dot{width:12px;height:12px;border-radius:999px; background:var(--primary); box-shadow:0 0 10px color-mix(in oklab,var(--primary) 50%, transparent)}
+    .controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    select,button{
+      height:40px; padding:0 12px; border-radius:12px; border:1px solid color-mix(in oklab, var(--text) 15%, transparent);
+      background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      color:var(--text); font-weight:600; cursor:pointer;
+    }
+    button.cta{background:linear-gradient(135deg,var(--primary),var(--primary-2)); color:#fff; border:0}
+    button.ghost{background:transparent}
+
+    main{
+      width:min(1100px,92vw); margin:18px auto 28px; display:grid; gap:18px;
+      grid-template-columns:1fr 1fr;
+      grid-template-areas:"left right";
+    }
+    @media (max-width: 980px){ main{grid-template-columns:1fr; grid-template-areas:"left" "right"} }
+
+    .panel{
+      grid-area:var(--area);
+      position:relative; overflow:clip; border-radius:var(--radius);
+      background:linear-gradient(180deg,var(--card),var(--card-2));
+      backdrop-filter:saturate(140%) blur(14px); box-shadow:var(--shadow);
+      padding:20px;
+    }
+    .head{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px}
+    .head h2{margin:0; font-size:18px}
+    .sub{color:var(--muted); font-size:13px}
+
+    .list{display:grid; gap:8px}
+    .row{
+      display:grid; grid-template-columns:64px 1fr; gap:10px; align-items:start;
+      padding:12px; border:1px solid color-mix(in oklab, var(--text) 12%, transparent); border-radius:14px;
+      background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+    }
+    .period{font-weight:800; text-align:center; border-right:1px dashed color-mix(in oklab, var(--text) 20%, transparent)}
+    .subject{font-weight:700}
+    .empty{padding:14px; border:1px dashed color-mix(in oklab, var(--text) 18%, transparent); border-radius:12px; color:var(--muted)}
+
+    .meal-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+    @media (max-width:700px){ .meal-grid{grid-template-columns:1fr} }
+    .meal-card{
+      padding:14px; border-radius:16px; border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+    }
+    .meal-card h3{margin:0 0 8px; font-size:16px}
+    .meal-card ul{margin:0; padding-left:18px}
+    .meal-card li{margin:2px 0}
+
+    .time{position:absolute; top:16px; right:16px; font-size:12px; color:var(--muted)}
+
+    /* modal for weekly timetable + meal from etc.js style */
+    .modal-overlay{
+      position:fixed; inset:0; background:rgba(0,0,0,.35); backdrop-filter:blur(6px);
+      display:grid; place-items:center; opacity:0; pointer-events:none; transition:.2s ease;
+      z-index:50;
+    }
+    .modal-overlay.visible{opacity:1; pointer-events:auto}
+    .modal{
+      width:min(920px,92vw); max-height:80vh; overflow:auto;
+      background:linear-gradient(180deg,var(--card),var(--card-2)); border:1px solid color-mix(in oklab, var(--text) 14%, transparent);
+      border-radius:18px; box-shadow:var(--shadow); padding:18px;
+    }
+    .modal .modal-head{display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:12px}
+    .modal .modal-title{margin:0; font-size:18px}
+    .modal .modal-close{height:36px; aspect-ratio:1/1; border-radius:10px; border:1px solid color-mix(in oklab, var(--text) 12%, transparent); background:transparent; color:var(--text); font-size:20px}
+    .modal table{width:100%; border-collapse:collapse; font-size:14px}
+    .modal th,.modal td{border:1px solid color-mix(in oklab, var(--text) 14%, transparent); padding:8px 10px; text-align:center}
+    .modal thead th{position:sticky; top:0; background:color-mix(in oklab, var(--card) 80%, rgba(255,255,255,.1));}
+
+    .fade-up{opacity:0; transform:translateY(10px); animation:rise .6s ease forwards}
+    @keyframes rise{to{opacity:1; transform:none}}
+
+    .spacer {
+      height: calc(60px + env(safe-area-inset-bottom));
+    }
+
+    /* Bottom Navigation */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: calc(60px + env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+      display: flex;
+      background: var(--card);
+      backdrop-filter: saturate(140%) blur(14px);
+      border-top: 1px solid color-mix(in oklab, var(--text) 10%, transparent);
+      box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+      z-index: 1000;
+    }
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 500;
+      transition: color .2s ease;
+    }
+    .nav-item:hover {
+      color: var(--text);
+    }
+    .nav-item.active {
+      color: var(--primary);
+    }
+    .nav-item svg {
+      width: 24px;
+      height: 24px;
+    }
+  </style>
+</head>
+<body>
+<div class="blob-container" aria-hidden="true">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+</div>
+
+<header>
+  <div class="toolbar">
+    <!--      <div class="title"><span class="dot" aria-hidden="true"></span>학교 생활</div>-->
+    <div class="controls">
+      <label for="gradeSel" class="sr-only">학년</label>
+      <select id="gradeSel" aria-label="학년 선택"></select>
+      <label for="classSel" class="sr-only">반</label>
+      <select id="classSel" aria-label="반 선택"></select>
+      <button id="refreshBtn" class="ghost" type="button">↻</button>
+      <button id="weeklyBtn" class="cta" type="button">주간</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- 왼쪽: 오늘 시간표 -->
+  <section class="panel fade-up" style="--area:left" aria-labelledby="tt-h">
+    <!-- <div class="time" id="nowClock">&#45;&#45;:&#45;&#45;:&#45;&#45;</div> -->
+    <div class="head">
+      <h2 id="tt-h">오늘 시간표</h2>
+      <div class="sub" id="tt-sub"></div>
+    </div>
+    <div id="timetableToday" class="list" role="list"></div>
+  </section>
+
+  <!-- 오른쪽: 오늘 급식 -->
+  <section class="panel fade-up" style="--area:right" aria-labelledby="meal-h">
+    <div class="head">
+      <h2 id="meal-h">오늘 급식</h2>
+      <div class="sub" id="meal-sub"></div>
+    </div>
+    <div class="meal-grid" id="mealGrid">
+      <div class="meal-card"><h3>아침</h3><div class="empty">불러오는 중…</div></div>
+      <div class="meal-card"><h3>점심</h3><div class="empty">불러오는 중…</div></div>
+      <div class="meal-card"><h3>저녁</h3><div class="empty">불러오는 중…</div></div>
+    </div>
+  </section>
+  <div class="spacer"></div>
+</main>
+
+<!-- 주간 시간표 모달 -->
+<div class="modal-overlay" id="weeklyOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="weeklyTitle">
+    <div class="modal-head">
+      <h3 class="modal-title" id="weeklyTitle">주간 시간표</h3>
+      <button class="modal-close" id="weeklyClose" aria-label="닫기">×</button>
+    </div>
+    <div id="weeklyContainer">
+      <div class="sub" style="margin-bottom:8px">로딩 중…</div>
+    </div>
+  </div>
+</div>
+<script>
+  // -------- util: clock --------
+  // function updateClock(){
+  //   const now=new Date();
+  //   document.getElementById('nowClock').textContent =
+  //     now.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  // }
+  // updateClock(); setInterval(updateClock, 1000);
+
+  // -------- storage helpers (compat with etc.js keys) --------
+  function saveData(k,v){ try{localStorage.setItem(k, JSON.stringify(v))}catch(_){}}
+  function loadData(k){ try{const v=localStorage.getItem(k); return v?JSON.parse(v):null }catch(_){ return null } }
+
+  // -------- select init --------
+  const gradeSel = document.getElementById('gradeSel');
+  const classSel = document.getElementById('classSel');
+  (function initSelectors(){
+    for(let g=1; g<=3; g++){ const o=document.createElement('option'); o.value=String(g); o.textContent=`${g}학년`; gradeSel.appendChild(o); }
+    for(let c=1; c<=6; c++){ const o=document.createElement('option'); o.value=String(c); o.textContent=`${c}반`; classSel.appendChild(o); }
+    gradeSel.value = loadData('last_grade') || '1';
+    classSel.value  = loadData('last_class') || '3';
+    gradeSel.addEventListener('change', onSelChange);
+    classSel.addEventListener('change', onSelChange);
+  })();
+
+  function onSelChange(){
+    saveData('last_grade', gradeSel.value);
+    saveData('last_class', classSel.value);
+    loadTodayAll();
+  }
+
+  // -------- API Fetch with Retry --------
+  async function fetchJsonWithRetry(url, retries = 2, delay = 500) {
+    for (let i = 0; i <= retries; i++) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return await response.json();
+      } catch (error) {
+        console.warn(`[Attempt ${i + 1}/${retries + 1}] Fetch failed for ${url}. Retrying in ${delay}ms...`, error.message);
+        if (i === retries) {
+          console.error(`All fetch attempts failed for ${url}.`);
+          throw error; // Re-throw the last error to be caught by the caller
+        }
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  // -------- timetable (based on etc.js NEIS example) --------
+  const ATPT_OFCDC_SC_CODE='J10';     // 경기도교육청
+  const SD_SCHUL_CODE='7530560';      // 한국디지털미디어고
+  const API_KEY='da82433f0f3a4351bda4ca9a0f11fc7d'; // from etc.js sample
+
+  function fmtYYYYMMDD(date){
+    const y=date.getFullYear();
+    const m=String(date.getMonth()+1).padStart(2,'0');
+    const d=String(date.getDate()).padStart(2,'0');
+    return `${y}${m}${d}`;
+  }
+  function fmtYYYY_MM_DD(date){
+    const y=date.getFullYear();
+    const m=String(date.getMonth()+1).padStart(2,'0');
+    const d=String(date.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+  function weekMonToFri(date=new Date()){
+    const day = date.getDay(); // 0(일)~6(토)
+    const diff = date.getDate() - day + (day===0 ? -6 : 1); // 월요일
+    const monday = new Date(date); monday.setDate(diff); 
+    return Array.from({length:5},(_,i)=>{const t=new Date(monday); t.setDate(monday.getDate()+i); return t;});
+  }
+
+  function timetableCacheKey(g,c,weekStart){ return `timetable_${g}_${c}_${weekStart}` }
+
+  function normalizeSubject(r){
+    return r.ITRT_CNTNT || r.SUBJECT || r.SUB_NM || '';
+  }
+
+  async function fetchWeeklyTimetable(g,c){
+    const days = weekMonToFri();
+    const weekStart = fmtYYYYMMDD(days[0]);
+    const key = timetableCacheKey(g,c,weekStart);
+
+    const cached = loadData(key);
+    if (cached && cached.data && Array.isArray(cached.data) && cached.data.length===5) {
+      return cached; // 이미 캐시 있으면 바로 리턴
+    }
+
+    const qs = (params)=> Object.entries(params).map(([k,v])=>`${k}=${encodeURIComponent(v)}`).join('&');
+    const reqs = days.map(d => {
+      const url = `https://open.neis.go.kr/hub/hisTimetable?${qs({
+        KEY:API_KEY, Type:'json', ATPT_OFCDC_SC_CODE, SD_SCHUL_CODE,
+        GRADE:g, CLASS_NM:c, ALL_TI_YMD:fmtYYYYMMDD(d)
+      })}`;
+      return fetchJsonWithRetry(url).catch(() => ({}));
+    });
+
+    try {
+      const results = await Promise.all(reqs);
+      const weekly = results.map(obj => (obj.hisTimetable && obj.hisTimetable[1] && obj.hisTimetable[1].row) ? obj.hisTimetable[1].row : []);
+      const wrapped = { weekStart, savedAt:Date.now(), grade:g, classNum:c, data:weekly };
+
+      // 성공적으로 불러왔을 때만 캐시 저장
+      if (weekly.some(arr => arr.length > 0)) {
+        saveData(key, wrapped);
+      }
+      return wrapped;
+    } catch (e) {
+      console.error("fetchWeeklyTimetable error:", e);
+      if (cached) {
+        console.warn("API 실패 → 캐시 데이터 사용");
+        return cached;
+      }
+      throw e;
+    }
+  }
+  function renderTodayFromWeekly(wrapped){
+    const list = document.getElementById('timetableToday');
+    const sub  = document.getElementById('tt-sub');
+    list.innerHTML = '';
+
+    const today = new Date();
+    const yoil = ['일','월','화','수','목','금','토'][today.getDay()];
+    sub.textContent = `${today.getFullYear()}.${today.getMonth()+1}.${today.getDate()} (${yoil})`;
+
+    const dayIdx = ((today.getDay()+6)%7); // Mon=0..Sun=6
+    if (dayIdx>=5) {
+      list.innerHTML = `<div class="empty">주말에는 수업이 없습니다.</div>`;
+      return;
+    }
+
+    const rows = (wrapped.data[dayIdx]||[]).slice();
+    if (!rows.length){
+      list.innerHTML = `<div class="empty">오늘 시간표 정보가 없습니다.</div>`;
+      return;
+    }
+
+    // 그룹 분반/중복(같은 교시 여러 행) 합치기
+    const byPerio = new Map();
+    for (const r of rows){
+      const p = Number(r.PERIO)||0;
+      if (!byPerio.has(p)) byPerio.set(p, []);
+      byPerio.get(p).push(r);
+    }
+
+    const merged = [...byPerio.entries()].sort((a,b)=>a[0]-b[0]);
+    for (const [perio, arr] of merged){
+      const subjJoined = Array.from(new Set(arr.map(x=>normalizeSubject(x)).filter(Boolean))).join(' / ');
+      const rooms = Array.from(new Set(arr.map(x=>x.CLRM_NM).filter(Boolean)));
+      const teachers = Array.from(new Set(arr.map(x=>x.TEACHER_NM).filter(Boolean)));
+      const metaBits = [];
+      if (rooms.length) metaBits.push(rooms.join(', '));
+      if (teachers.length) metaBits.push(teachers.join(', '));
+
+      const div = document.createElement('div');
+      div.className='row';
+      div.innerHTML = `
+        <div class="period">${perio}교시</div>
+        <div>
+          <div class="subject">${subjJoined || '—'}</div>
+          <div class="sub">${metaBits.length ? ' · ' + metaBits.join(' · ') : ''}</div>
+        </div>`;
+      list.appendChild(div);
+    }
+  }
+
+  // -------- weekly modal render --------
+  function openWeekly(wrapped){
+    const ov = document.getElementById('weeklyOverlay');
+    const cont = document.getElementById('weeklyContainer');
+    ov.hidden=false; requestAnimationFrame(()=>ov.classList.add('visible'));
+
+    const days=['월','화','수','목','금'];
+    const maxP=7;
+
+    let html = '<table><thead><tr><th>교시</th>';
+    for(const d of days) html += `<th>${d}</th>`;
+    html += '</tr></thead><tbody>';
+
+    for(let p=1;p<=maxP;p++){
+      html += `<tr><td>${p}</td>`;
+      for(let di=0; di<5; di++){
+        const rowList = (wrapped.data[di]||[]).filter(x=>Number(x.PERIO)===p);
+        const cell = rowList.length
+          ? Array.from(new Set(rowList.map(x=>normalizeSubject(x)).filter(Boolean))).join('<br>')
+          : '';
+        html += `<td>${cell}</td>`;
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+
+    cont.innerHTML = html;
+  }
+  document.getElementById('weeklyClose').addEventListener('click', closeWeekly);
+  document.getElementById('weeklyOverlay').addEventListener('click', (e)=>{ if(e.target.id==='weeklyOverlay') closeWeekly(); });
+  function closeWeekly(){
+    const ov = document.getElementById('weeklyOverlay');
+    ov.classList.remove('visible');
+    ov.addEventListener('transitionend', ()=>{ ov.hidden=true; }, { once:true });
+  }
+
+  // -------- meal (based on etc.js example) --------
+  function getTodayDateStringDash(){ return fmtYYYY_MM_DD(new Date()); }
+  async function fetchMeal(){
+    const date = getTodayDateStringDash();
+    const url = `https://api.xn--299a1v27nvthhjj.com/meal/${date}`;
+    const sub = document.getElementById('meal-sub');
+    sub.textContent = date.replaceAll('-','.');
+    try{
+      const data = await fetchJsonWithRetry(url);
+      renderMeal(data);
+    }catch(e){
+      console.error("Failed to fetch meal data after retries:", e);
+      renderMeal(null);
+    }
+  }
+  function renderMeal(data){
+    const grid = document.getElementById('mealGrid');
+    const BK = (data && data.breakfast) ? data.breakfast.replaceAll('/','\n') : '';
+    const LU = (data && data.lunch) ? data.lunch.replaceAll('/','\n') : '';
+    const DN = (data && data.dinner) ? data.dinner.replaceAll('/','\n') : '';
+
+    const entries = [
+      {title:'아침', text:BK},
+      {title:'점심', text:LU},
+      {title:'저녁', text:DN},
+    ];
+    grid.innerHTML = '';
+    for(const {title,text} of entries){
+      const card = document.createElement('div');
+      card.className='meal-card';
+      card.innerHTML = `<h3>${title}</h3>` + (text
+        ? `<ul>${text.split('\n').filter(Boolean).map(s=>`<li>${s.trim()}</li>`).join('')}</ul>`
+        : `<div class="empty">정보 없음</div>`);
+      grid.appendChild(card);
+    }
+  }
+
+  // -------- load all --------
+  async function loadTodayAll(){
+    document.getElementById('timetableToday').innerHTML = '<div class="empty">시간표 불러오는 중…</div>';
+    const g = gradeSel.value, c = classSel.value;
+    try {
+      const wk = await fetchWeeklyTimetable(g,c);
+      renderTodayFromWeekly(wk);
+      document.getElementById('weeklyBtn').onclick = ()=>openWeekly(wk);
+    } catch(e) {
+      console.error("loadTodayAll error:", e);
+      document.getElementById('timetableToday').innerHTML = `<div class="empty">시간표를 불러오지 못했습니다.<br>네트워크 오류나 API 문제일 수 있습니다.</div>`;
+    }
+    fetchMeal();
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', loadTodayAll);
+
+  // initial kick
+  loadTodayAll();
+</script>
+
+<nav class="bottom-nav">
+  <a href="/routine.html" class="nav-item" aria-current="page">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1Zm13 8H4v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9ZM6 7h12V6H6v1Z"/></svg>
+    <span>루틴</span>
+  </a>
+  <a href="/user.html" class="nav-item">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5z"></path></svg>
+    <span>홈</span>
+  </a>
+  <a href="/schoollife.html" class="nav-item active" aria-current="page">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M12 3L1 9l4 2.18v6.32L12 21l7-3.5V11.18L23 9 12 3zm0 2.69L17.53 9 12 11.31 6.47 9 12 5.69zM18 17.18l-5 2.5v-5.81l5-2.5v5.81z"></path></svg>
+    <span>학교 생활</span>
+  </a>
+</nav>
+</body>
+</html>

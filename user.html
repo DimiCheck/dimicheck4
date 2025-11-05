@@ -3,13 +3,24 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
+  <meta name="theme-color" content="#0b0f14"/>
+  <meta name="application-name" content="DIMI Check"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <script defer src="/js/pwa.js"></script>
   <title>DIMI Check</title>
   <meta name="color-scheme" content="light dark" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-
-  <style>
+  <script defer data-domain="chec.kro.kr" src="https://plausible.io/js/script.js"></script>
+  <link rel="apple-touch-icon" sizes="180x180" href="src/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="src/favicon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="src/favicon/favicon-16x16.png">
+<style>
     :root{
       --bg: #0b0f14;
       --bg-2: #0e1218;
@@ -171,6 +182,78 @@
     }
 
     .submit-wrap{ margin-top:4px }
+    .thought-trigger{
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+    .thought-trigger .btn{
+      min-width:auto;
+      padding:10px 12px;
+    }
+    .thought-overlay{
+      position:fixed;
+      inset:0;
+      background:rgba(5,8,12,0.65);
+      backdrop-filter:blur(12px);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      z-index:2000;
+    }
+    .thought-overlay[hidden]{
+      display:none !important;
+    }
+    .thought-dialog{
+      width:min(420px, 100%);
+      background:linear-gradient(180deg, rgba(20,24,32,0.92), rgba(14,18,26,0.96));
+      border-radius:20px;
+      border:1px solid rgba(255,255,255,0.08);
+      box-shadow:0 20px 60px rgba(0,0,0,0.45);
+      color:#f4f7ff;
+      padding:24px;
+      display:flex;
+      flex-direction:column;
+      gap:16px;
+    }
+    .thought-dialog h2{
+      margin:0;
+      font-size:20px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .thought-close{
+      position:absolute;
+      top:16px;
+      right:16px;
+      background:transparent;
+      border:0;
+      color:inherit;
+      font-size:20px;
+      cursor:pointer;
+    }
+    .thought-input{
+      width:100%;
+      min-height:100px;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(12,16,24,0.65);
+      color:inherit;
+      font-size:14px;
+      resize:vertical;
+      font-family:inherit;
+      box-shadow:inset 0 2px 6px rgba(0,0,0,0.35);
+    }
+    .thought-input::placeholder{color:rgba(235,240,255,0.45)}
+    .thought-actions{display:flex; gap:10px; flex-wrap:wrap}
+    .thought-actions .btn{flex:1 1 auto}
+    .thought-hint{font-size:12px; color:rgba(235,240,255,0.55)}
+    .thought-feedback{min-height:1.2em; font-size:13px; color:rgba(235,240,255,0.55)}
+    .thought-feedback.success{color:#58e08a}
+    .thought-feedback.error{color:#ff8484}
     .footer{ text-align:center; color:var(--muted); font-size:12px; margin-top:10px }
 
     /* right: brand / time / illustration */
@@ -194,6 +277,50 @@
       position:absolute; right:-6%; bottom:-6%; width:min(520px,60%); opacity:.9;
       filter:drop-shadow(0 14px 30px rgba(0,0,0,.25)); pointer-events:none;
     }
+
+    /* Bottom Navigation */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: calc(60px + env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+      display: flex;
+      background: var(--card);
+      backdrop-filter: saturate(140%) blur(14px);
+      border-top: 1px solid color-mix(in oklab, var(--text) 10%, transparent);
+      box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+      z-index: 1000;
+    }
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 500;
+      transition: color .2s ease;
+    }
+    .nav-item:hover {
+      color: var(--text);
+    }
+    .nav-item.active {
+      color: var(--primary);
+    }
+    .nav-item svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .spacer {
+      height: calc(60px + env(safe-area-inset-bottom));
+    }
+
     @media (max-width:1024px){
       .illus{position:static; width:100%; margin-top:14px}
       .side{padding:20px}
@@ -232,12 +359,15 @@
             <div class="meta" id="userMeta">-학년 -반 -번</div>
           </div>
         </div>
-        <button class="btn ghost" type="button" id="logoutBtn" aria-label="로그아웃">로그아웃</button>
+        <div class="thought-trigger">
+          <button class="btn ghost" type="button" id="thoughtOpenBtn" aria-label="생각 올리기">💭</button>
+          <button class="btn ghost" type="button" id="logoutBtn" aria-label="로그아웃">로그아웃</button>
+        </div>
       </div>
 
       <!-- 현재 상태 표시 -->
       <div class="now" role="region" aria-labelledby="now-title">
-        <h3 id="now-title">현재 선택된 상태</h3>
+        <h3 id="now-title">현재 선택된 상태<span id="unsavedIndicator" style="font-size: 0.7em; color: #ff7a7a; margin-left: 8px; display: none;">(저장 안 됨)</span></h3>
         <div class="val" id="currentStatus">교실</div>
       </div>
 
@@ -334,13 +464,32 @@
         <circle cx="460" cy="110" r="10" fill="#fff" opacity=".4"/>
       </svg>
     </section>
+    <div class="spacer"></div>
   </main>
+
+  <div id="thoughtOverlay" class="thought-overlay" hidden>
+    <div class="thought-dialog" role="dialog" aria-modal="true" aria-labelledby="thoughtTitle">
+      <button class="thought-close" type="button" id="thoughtCloseBtn" aria-label="닫기">×</button>
+      <h2 id="thoughtTitle">💭 어떤 생각을 하고 있나요?</h2>
+      <textarea id="thoughtInput" class="thought-input" maxlength="140" placeholder="어떤 생각을 하고 있나요? 140자까지 입력 가능해요." aria-label="생각 입력"></textarea>
+      <div class="thought-actions">
+        <button class="btn cta" id="thoughtSendBtn" type="button">올리기</button>
+        <button class="btn ghost" id="thoughtClearBtn" type="button">지우기</button>
+      </div>
+      <p class="thought-hint">올리면 자기 번호 자석에 말풍선으로 약 5초간 표시돼요.</p>
+      <p class="thought-feedback" id="thoughtStatus" aria-live="polite"></p>
+    </div>
+  </div>
 
   <script>
     // ===== 글로벌 상태 =====
     let myGrade = null, mySection = null, myNumber = null;
     let selectedStatus = null;
+    let lastSavedStatus = null;
     const currentStatusDisplay = document.getElementById('currentStatus');
+
+    // Get the unsaved indicator element
+    const unsavedIndicator = document.getElementById('unsavedIndicator');
 
     // 기타 입력 관리
     const etcCard  = document.querySelector('.status-card[data-status="기타"]');
@@ -348,7 +497,15 @@
     const etcInput = document.getElementById('etcInput');
     const etcAddBtn= document.getElementById('etcAddBtn');
     const etcChips = document.getElementById('etcChips');
-    const etcItems = []; // 화면 표시용 단일 값 유지
+    const etcItems = []; // For single value display
+    const thoughtInput = document.getElementById('thoughtInput');
+    const thoughtSendBtn = document.getElementById('thoughtSendBtn');
+    const thoughtClearBtn = document.getElementById('thoughtClearBtn');
+    const thoughtStatus = document.getElementById('thoughtStatus');
+    const thoughtOverlay = document.getElementById('thoughtOverlay');
+    const thoughtOpenBtn = document.getElementById('thoughtOpenBtn');
+    const thoughtCloseBtn = document.getElementById('thoughtCloseBtn');
+    let isPostingThought = false;
 
     // 라벨 변환
     const categoryLabels = {
@@ -373,6 +530,123 @@
       document.getElementById('timeDisplay').textContent = s;
     }
     updateTime(); setInterval(updateTime, 1000);
+
+    function setThoughtFeedback(message, tone = 'info') {
+      if (!thoughtStatus) return;
+      thoughtStatus.textContent = message;
+      thoughtStatus.classList.remove('success', 'error');
+      if (tone !== 'info') {
+        thoughtStatus.classList.add(tone);
+      }
+    }
+
+    function setThoughtControlsDisabled(disabled) {
+      if (thoughtSendBtn) thoughtSendBtn.disabled = disabled;
+      if (thoughtClearBtn) thoughtClearBtn.disabled = disabled;
+    }
+
+    function updateThoughtStatusFromState(data) {
+      if (!thoughtStatus) return;
+      if (data && data.thought && data.thoughtExpiresAt) {
+        const expiresAtTime = Date.parse(data.thoughtExpiresAt);
+        if (!Number.isNaN(expiresAtTime) && expiresAtTime > Date.now()) {
+          setThoughtFeedback('말풍선이 잠시 표시 중이에요.', 'info');
+          return;
+        }
+      }
+      setThoughtFeedback('현재 말풍선이 없습니다.', 'info');
+    }
+
+    function openThoughtDialog() {
+      if (!thoughtOverlay) return;
+      thoughtOverlay.hidden = false;
+      setThoughtControlsDisabled(isPostingThought);
+      requestAnimationFrame(() => {
+        setTimeout(() => thoughtInput?.focus(), 0);
+      });
+    }
+
+    function closeThoughtDialog() {
+      if (!thoughtOverlay) return;
+      thoughtOverlay.hidden = true;
+    }
+
+    async function submitThoughtBubble() {
+      if (!thoughtInput || !thoughtSendBtn) return;
+      if (!myGrade || !mySection || !myNumber) {
+        alert('로그인 정보가 없습니다. 다시 로그인해주세요.');
+        return;
+      }
+      if (isPostingThought) return;
+
+      const text = thoughtInput.value.trim();
+      if (!text) {
+        setThoughtFeedback('생각을 입력해주세요.', 'error');
+        thoughtInput.focus();
+        return;
+      }
+
+      isPostingThought = true;
+      setThoughtControlsDisabled(true);
+      setThoughtFeedback('말풍선을 보내는 중...', 'info');
+
+      try {
+        const res = await fetch(`/api/classes/thought?grade=${myGrade}&section=${mySection}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ thought: text, duration: 5 })
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(errText || 'thought request failed');
+        }
+        const data = await res.json();
+        thoughtInput.value = '';
+        setThoughtFeedback('말풍선이 자석에 표시됐어요!', 'success');
+        updateThoughtStatusFromState(data);
+      } catch (err) {
+        console.error('submitThoughtBubble error:', err);
+        setThoughtFeedback('말풍선을 보내지 못했어요. 잠시 후 다시 시도해주세요.', 'error');
+      } finally {
+        isPostingThought = false;
+        setThoughtControlsDisabled(false);
+      }
+    }
+
+    async function clearThoughtBubble() {
+      if (!myGrade || !mySection || !myNumber) {
+        alert('로그인 정보가 없습니다. 다시 로그인해주세요.');
+        return;
+      }
+      if (isPostingThought) return;
+
+      isPostingThought = true;
+      setThoughtControlsDisabled(true);
+      setThoughtFeedback('말풍선을 지우는 중...', 'info');
+
+      try {
+        const res = await fetch(`/api/classes/thought?grade=${myGrade}&section=${mySection}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ thought: '' })
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(errText || 'thought clear failed');
+        }
+        await res.json();
+        setThoughtFeedback('말풍선을 지웠어요.', 'success');
+        updateThoughtStatusFromState(null);
+      } catch (err) {
+        console.error('clearThoughtBubble error:', err);
+        setThoughtFeedback('말풍선을 지우지 못했어요. 잠시 후 다시 시도해주세요.', 'error');
+      } finally {
+        isPostingThought = false;
+        setThoughtControlsDisabled(false);
+      }
+    }
+
+    updateThoughtStatusFromState(null);
 
     // ===== 로그인 체크 & 현재 상태 불러오기 =====
     async function checkLogin() {
@@ -405,26 +679,46 @@
         const magnets = parsed.magnets || {};
         const me = magnets[myNumber];
 
-        if (!me) { currentStatusDisplay.textContent = "교실"; return; }
+        if (!me) {
+          currentStatusDisplay.textContent = "교실";
+          lastSavedStatus = "교실";
+          updateThoughtStatusFromState(null);
+          return;
+        }
 
         if (me.attachedTo === "etc" && me.reason) {
           currentStatusDisplay.textContent = `기타 - ${me.reason}`;
+          lastSavedStatus = `기타 - ${me.reason}`;
         } else {
           const label = categoryLabels[me.attachedTo] || me.attachedTo;
           currentStatusDisplay.textContent = label || "교실";
+          lastSavedStatus = label || "교실";
         }
+        updateThoughtStatusFromState(me);
       } catch (e) {
         console.error("loadMyState error:", e);
         currentStatusDisplay.textContent = "교실";
+        updateThoughtStatusFromState(null);
       }
     }
 
     // ===== 상태 카드 선택 처리 =====
     function refreshCurrentStatus() {
+      let displayStatus = selectedStatus ?? '—';
+      let isUnsaved = false;
+
       if (selectedStatus === '기타' && etcItems.length > 0) {
-        currentStatusDisplay.textContent = `기타 - ${etcItems[0]}`;
-      } else {
-        currentStatusDisplay.textContent = selectedStatus ?? '—';
+        displayStatus = `기타 - ${etcItems[0]}`;
+      }
+
+      currentStatusDisplay.textContent = displayStatus;
+
+      // Determine if it's unsaved
+      if (selectedStatus && displayStatus !== lastSavedStatus) {
+        isUnsaved = true;
+      }
+      if (unsavedIndicator) {
+        unsavedIndicator.style.display = isUnsaved ? 'inline' : 'none';
       }
       currentStatusDisplay.style.animation = 'none';
       requestAnimationFrame(() => {
@@ -504,6 +798,40 @@
       refreshCurrentStatus();
     });
 
+    if (thoughtOpenBtn) {
+      thoughtOpenBtn.addEventListener('click', openThoughtDialog);
+    }
+    if (thoughtCloseBtn) {
+      thoughtCloseBtn.addEventListener('click', closeThoughtDialog);
+    }
+    if (thoughtOverlay) {
+      thoughtOverlay.addEventListener('mousedown', (e) => {
+        if (e.target === thoughtOverlay) {
+          closeThoughtDialog();
+        }
+      });
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && thoughtOverlay && !thoughtOverlay.hidden) {
+        closeThoughtDialog();
+      }
+    });
+
+    if (thoughtSendBtn) {
+      thoughtSendBtn.addEventListener('click', submitThoughtBubble);
+    }
+    if (thoughtClearBtn) {
+      thoughtClearBtn.addEventListener('click', clearThoughtBubble);
+    }
+    if (thoughtInput) {
+      thoughtInput.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          submitThoughtBubble();
+        }
+      });
+    }
+
     // ===== 저장 =====
     async function saveMyState(statusLabel, reason = null) {
       if (!myGrade || !mySection || !myNumber) { alert("로그인 정보가 없습니다."); return; }
@@ -522,6 +850,7 @@
         // 완료 비주얼
         const selected = document.querySelector('.status-card.selected');
         selected?.classList.add('completed');
+        lastSavedStatus = selectedStatus;
       } catch (e) {
         console.error("saveMyState failed:", e);
         alert("저장 실패: " + e.message);
@@ -532,6 +861,7 @@
       if (!selectedStatus) { alert("상태를 선택해주세요."); return; }
       const reason = (selectedStatus === "기타" && etcItems.length > 0) ? etcItems[0] : null;
       await saveMyState(selectedStatus, reason);
+      refreshCurrentStatus();
     });
 
     // ===== 로그아웃 (선택) =====
@@ -542,5 +872,19 @@
     // 진입 시 로그인 확인
     checkLogin();
   </script>
+  <nav class="bottom-nav">
+    <a href="/routine.html" class="nav-item" aria-current="page">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1Zm13 8H4v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9ZM6 7h12V6H6v1Z"/></svg>
+      <span>루틴</span>
+    </a>
+    <a href="/user.html" class="nav-item active" aria-current="page">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5z"></path></svg>
+      <span>홈</span>
+    </a>
+    <a href="/schoollife.html" class="nav-item">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M12 3L1 9l4 2.18v6.32L12 21l7-3.5V11.18L23 9 12 3zm0 2.69L17.53 9 12 11.31 6.47 9 12 5.69zM18 17.18l-5 2.5v-5.81l5-2.5v5.81z"></path></svg>
+      <span>학교 생활</span>
+    </a>
+  </nav>
 </body>
 </html>

@@ -3,16 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  
+  <meta name="theme-color" content="#0b0f14"/>
+  <meta name="application-name" content="DIMI Check"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <script defer src="/js/pwa.js"></script>
   <title>DIMI Check</title>
   <link rel="stylesheet" href="main.css">
   <script src="https://cdn.jsdelivr.net/npm/fireworks-js@2.x/dist/index.umd.js"></script>
-
-  <!-- 노이즈 미터와 버튼을 묶어서 오른쪽 위에 세로로 배치 -->
-
+  <script defer data-domain="chec.kro.kr" src="https://plausible.io/js/script.js"></script>
+  <link rel="apple-touch-icon" sizes="180x180" href="src/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="src/favicon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="src/favicon/favicon-16x16.png">
 </head>
 <body>
   <!-- Magnet Container -->
   <div class="magnet-container" id="magnetContainer"></div>
+  <div class="thought-layer" id="thoughtLayer"></div>
 
   <!-- 왼쪽 위: 기타 사유 패널 -->
   <div id="reasonPanel">
@@ -95,6 +105,7 @@
     <div><span class="label">총원</span><span class="number" id="total-count">30명</span></div>
     <div><span class="label">결원</span><span class="number absent-count" id="absent-count">0명</span></div>
     <div><span class="label">현원</span><span class="number" id="present-count">30명</span></div>
+    <div><span class="label">교실</span><span class="number" id="class-count">30명</span></div>
   </div>
 
   <!-- Fullscreen Buttons -->
@@ -141,6 +152,10 @@
 
     </progress>
     <span id = "end-time">1</span>
+  </div>
+
+  <div id="countdownOverlay" class="countdown-overlay" aria-hidden="true">
+    <span id="countdownNumber" class="countdown-number"></span>
   </div>
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
