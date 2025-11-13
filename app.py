@@ -187,6 +187,14 @@ def reload_configs():
     CLASS_CONFIGS = load_class_config()
     return jsonify({"status": "reloaded"})
 
+@app.route("/sitemap.xml")
+def sitemap():
+    return send_from_directory(".", "sitemap.xml", mimetype="application/xml")
+
+@app.route("/robots.txt")
+def robots():
+    return send_from_directory(".", "robots.txt", mimetype="text/plain")
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()

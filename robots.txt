@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Allow: /board
+Allow: /teacher
+Disallow: /api/
+Disallow: /auth/callback
+Disallow: /auth/logout
+Disallow: /metrics
+Disallow: /reload-configs
+
+Sitemap: https://chec.kro.kr/sitemap.xml
