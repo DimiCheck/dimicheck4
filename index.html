@@ -120,6 +120,7 @@
     <div id="infoMenu" class="fab-menu" role="menu">
       <button class="fab-item" role="menuitem" id="foodItem">오늘 급식 보기</button>
       <button class="fab-item" role="menuitem" id="timeItem">오늘 시간표</button>
+      <button class="fab-item" role="menuitem" id="scheduleChangeItem">시간표 변경</button>
     </div>
   </div>
 
@@ -158,18 +159,6 @@
     <span id="countdownNumber" class="countdown-number"></span>
   </div>
 
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-
-
-<script src="js/reset.js"></script>
-
-  <script src="js/storage.js"></script>
-  <script src="js/magnet.js"></script>
-  <script src="js/time.js"></script>
-  <script src="js/etc.js"></script>
-  <script src="js/info.js"></script>
-  <script src="js/reset.js"></script>
-
   <!-- 시간표임. -->
   <div id="timetableModal" class="modal-overlay" hidden>
     <div class="modal-content">
@@ -182,6 +171,40 @@
       <div id="timetableContainer"></div>
     </div>
   </div>
+
+  <!-- 시간표 변경 팝업 -->
+  <div id="scheduleModal" class="modal-overlay" hidden>
+    <div class="modal-content schedule-modal">
+      <span class="modal-close" id="scheduleModalClose">&times;</span>
+      <h2>시간표 변경</h2>
+      <div class="schedule-list">
+        <button class="schedule-item" data-schedule="weekday">
+          <div class="schedule-title">평일 시간표 (기본)</div>
+          <div class="schedule-desc">월~토 일반 수업 시간표</div>
+        </button>
+        <button class="schedule-item" data-schedule="sunday">
+          <div class="schedule-title">일요일 시간표</div>
+          <div class="schedule-desc">일요일 야자 시간표</div>
+        </button>
+        <button class="schedule-item" data-schedule="csat">
+          <div class="schedule-title">수능 시간표</div>
+          <div class="schedule-desc">수능 대비 특별 시간표</div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+
+
+<script src="js/reset.js"></script>
+
+  <script src="js/storage.js"></script>
+  <script src="js/magnet.js"></script>
+  <script src="js/time.js"></script>
+  <script src="js/etc.js"></script>
+  <script src="js/info.js"></script>
+  <script src="js/reset.js"></script>
 
 </body>
 

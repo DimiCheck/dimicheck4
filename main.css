@@ -1455,3 +1455,50 @@ body.fullscreen .fullscreen-btn {
     box-shadow: 0 4px 10px rgba(29, 78, 216, 0.25);
   }
 }
+
+/* ===== 시간표 변경 모달 ===== */
+.schedule-modal {
+  max-width: 600px;
+}
+
+.schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.schedule-item {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  color: #fff;
+  width: 100%;
+}
+
+.schedule-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.schedule-item:active {
+  transform: translateY(0);
+}
+
+.schedule-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.schedule-desc {
+  font-size: 14px;
+  opacity: 0.7;
+  line-height: 1.4;
+}
