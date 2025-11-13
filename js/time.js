@@ -24,11 +24,11 @@ const AUTO_RETURN_SCHEDULES = [
 const autoReturnState = Object.create(null);
 
 const ROUTINE_ALLOWED_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
-let routineData = { afterschool: {}, changdong: {} };
+let routineData = { afterschool: {}, club: {} };
 let routineLoaded = false;
 let routineLoading = false;
 const routinePromptState = Object.create(null);
-const ROUTINE_LABELS = { afterschool: '방과후', changdong: '창동' };
+const ROUTINE_LABELS = { afterschool: '방과후', club: '동아리' };
 
 const SUNEUNG_MONTH = 10; // 0-indexed (11월)
 const SUNEUNG_DAY = 13;
@@ -64,6 +64,21 @@ const SUNDAY_PHASES = Object.freeze([
   { label: '끝.',       startMin: 22*60 + 20,endMin: 24*60 }
 ]);
 
+const CSAT_PHASES = Object.freeze([
+  { label: '아침',              startMin: 0,              endMin: 9*60 },
+  { label: '오전 자율학습 1',    startMin: 9*60,          endMin: 10*60 + 20 },
+  { label: '휴식 시간',         startMin: 10*60 + 20,    endMin: 10*60 + 40 },
+  { label: '오전 자율학습 2',    startMin: 10*60 + 40,    endMin: 12*60 },
+  { label: '중식',              startMin: 12*60,         endMin: 14*60 },
+  { label: '오후 자율학습 1',    startMin: 14*60,         endMin: 16*60 },
+  { label: '휴식 시간',         startMin: 16*60,         endMin: 16*60 + 20 },
+  { label: '오후 자율학습 2',    startMin: 16*60 + 20,    endMin: 18*60 },
+  { label: '석식',              startMin: 18*60,         endMin: 20*60 },
+  { label: '야간 자율학습',      startMin: 20*60,         endMin: 22*60 + 30 },
+  { label: '끝',                startMin: 22*60 + 30,    endMin: 24*60 }
+]);
+
+
 const countdownOverlayEl = document.getElementById('countdownOverlay');
 const countdownNumberEl = document.getElementById('countdownNumber');
 
@@ -79,7 +94,43 @@ function isPostSuneungSpecialDay(now) {
   );
 }
 
+// 수동으로 선택된 시간표 저장
+let manualScheduleOverride = null;
+
+function setManualSchedule(scheduleType) {
+  if (scheduleType === null || scheduleType === 'auto') {
+    manualScheduleOverride = null;
+    localStorage.removeItem('manualSchedule');
+  } else {
+    manualScheduleOverride = scheduleType;
+    localStorage.setItem('manualSchedule', scheduleType);
+  }
+}
+
+function getManualSchedule() {
+  if (manualScheduleOverride !== null) {
+    return manualScheduleOverride;
+  }
+  const stored = localStorage.getItem('manualSchedule');
+  if (stored) {
+    manualScheduleOverride = stored;
+    return stored;
+  }
+  return null;
+}
+
 function getPhasesForDate(now) {
+  // 수동으로 설정된 시간표가 있으면 그것을 사용
+  const manual = getManualSchedule();
+  if (manual === 'weekday') {
+    return WEEKDAY_PHASES;
+  } else if (manual === 'sunday') {
+    return SUNDAY_PHASES;
+  } else if (manual === 'csat') {
+    return CSAT_PHASES;
+  }
+
+  // 자동 모드: 요일에 따라 선택
   const base = now.getDay() === 0 ? SUNDAY_PHASES : WEEKDAY_PHASES;
   if (!isPostSuneungPeriod(now)) {
     return base;
@@ -160,7 +211,7 @@ function getCountdownState(now, hourNumber, minuteNumber, secondNumber) {
 
 function normalizeRoutineData(value) {
   if (!value || typeof value !== 'object') {
-    return { afterschool: {}, changdong: {} };
+    return { afterschool: {}, club: {} };
   }
   const normalizeMap = (raw) => {
     if (!raw || typeof raw !== 'object') return {};
@@ -185,7 +236,7 @@ function normalizeRoutineData(value) {
   };
   return {
     afterschool: normalizeMap(value.afterschool),
-    changdong: normalizeMap(value.changdong)
+    club: normalizeMap(value.changdong || value.club)
   };
 }
 
@@ -588,7 +639,7 @@ function applyRoutineAssignment(category, participants) {
 
 const ROUTINE_PROMPTS = [
   { key: 'afterschool', category: 'afterschool', startMinutes: 17 * 60 + 5, endMinutes: 18 * 60 + 35 },
-  { key: 'changdong', category: 'changdong', startMinutes: 19 * 60 + 45, endMinutes: 22 * 60 + 50 }
+  { key: 'club', category: 'club', startMinutes: 19 * 60 + 45, endMinutes: 22 * 60 + 50 }
 ];
 
 function checkRoutinePrompts(now) {

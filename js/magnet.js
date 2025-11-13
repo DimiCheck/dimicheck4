@@ -107,7 +107,7 @@ function ensureThoughtBubble(magnet, text, expiresAtValue) {
     expiresAtMs = NaN;
   }
   if (Number.isNaN(expiresAtMs)) {
-    expiresAtMs = Date.now() + 5000;
+    expiresAtMs = Date.now() + 7500;
   }
 
   const now = Date.now();
