@@ -145,16 +145,26 @@ function getPhasesForDate(now) {
 }
 
 function getCountdownTarget(now) {
-  const isSunday = now.getDay() === 0;
-  const post = isPostSuneungPeriod(now);
-  if (post) {
+  // 현재 적용된 시간표의 "끝" 구간 시작 시간을 가져옴
+  const phases = getPhasesForDate(now);
+  const endPhase = phases.find(p => p.label === '끝.' || p.label === '끝');
+
+  if (!endPhase) {
+    // 기본값 (fallback)
+    const isSunday = now.getDay() === 0;
     return isSunday
-      ? { hour: 22, minute: 29 }
-      : { hour: 22, minute: 59 };
+      ? { hour: 22, minute: 19 }
+      : { hour: 22, minute: 49 };
   }
-  return isSunday
-    ? { hour: 22, minute: 19 }
-    : { hour: 22, minute: 49 };
+
+  // "끝" 구간 시작 시간 (분 단위)에서 1분을 빼서 카운트다운 시작 시간 계산
+  const endStartMin = endPhase.startMin;
+  const countdownMin = endStartMin - 1;
+
+  return {
+    hour: Math.floor(countdownMin / 60),
+    minute: countdownMin % 60
+  };
 }
 
 function setCountdownOverlay(content, { animate = true } = {}) {

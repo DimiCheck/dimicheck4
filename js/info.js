@@ -24,67 +24,62 @@
     });
 
     // --- 시간표 변경 모달 ---
-    console.log('info.js 로드됨');
     const scheduleModal = document.getElementById('scheduleModal');
     const scheduleModalClose = document.getElementById('scheduleModalClose');
     const scheduleChangeItem = document.getElementById('scheduleChangeItem');
 
-    console.log('scheduleModal:', scheduleModal);
-    console.log('scheduleModalClose:', scheduleModalClose);
-    console.log('scheduleChangeItem:', scheduleChangeItem);
+    function openScheduleModal() {
+      if (scheduleModal) {
+        scheduleModal.style.display = 'flex';
+      }
+    }
+
+    function closeScheduleModal() {
+      if (scheduleModal) {
+        scheduleModal.style.display = 'none';
+      }
+    }
 
     if (scheduleChangeItem && scheduleModal) {
-      console.log('시간표 변경 버튼 이벤트 리스너 등록');
-      scheduleChangeItem.addEventListener('click', (e) => {
-        console.log('시간표 변경 버튼 클릭됨!');
-        e.preventDefault();
-        e.stopPropagation();
+      scheduleChangeItem.addEventListener('click', function(e) {
+        if (e && e.preventDefault) e.preventDefault();
+        if (e && e.stopPropagation) e.stopPropagation();
         closeInfoMenu();
-        scheduleModal.hidden = false;
-        console.log('시간표 변경 모달 열림');
-      });
-    } else {
-      console.error('시간표 변경 요소를 찾을 수 없음:', {
-        scheduleChangeItem: !!scheduleChangeItem,
-        scheduleModal: !!scheduleModal
-      });
+        openScheduleModal();
+        return false;
+      }, false);
     }
 
     if (scheduleModalClose && scheduleModal) {
-      scheduleModalClose.addEventListener('click', () => {
-        scheduleModal.hidden = true;
-        console.log('시간표 변경 모달 닫힘');
-      });
+      scheduleModalClose.addEventListener('click', function() {
+        closeScheduleModal();
+      }, false);
     }
 
     // 모달 배경 클릭시 닫기
     if (scheduleModal) {
-      scheduleModal.addEventListener('click', (e) => {
+      scheduleModal.addEventListener('click', function(e) {
         if (e.target === scheduleModal) {
-          scheduleModal.hidden = true;
+          closeScheduleModal();
         }
-      });
+      }, false);
     }
 
     // 시간표 항목 클릭
     const scheduleItems = document.querySelectorAll('.schedule-item');
-    console.log('시간표 항목 개수:', scheduleItems.length);
-    scheduleItems.forEach(item => {
-      item.addEventListener('click', () => {
-        const scheduleType = item.getAttribute('data-schedule');
-        console.log('시간표 선택:', scheduleType);
+    for (var i = 0; i < scheduleItems.length; i++) {
+      scheduleItems[i].addEventListener('click', function() {
+        const scheduleType = this.getAttribute('data-schedule');
         if (typeof setManualSchedule === 'function') {
           setManualSchedule(scheduleType);
         }
-        if (scheduleModal) {
-          scheduleModal.hidden = true;
-        }
+        closeScheduleModal();
         // 즉시 시계 업데이트
         if (typeof updateClock === 'function') {
           updateClock();
         }
-      });
-    });
+      }, false);
+    }
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
