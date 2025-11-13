@@ -20,6 +20,9 @@
   <link rel="apple-touch-icon" sizes="180x180" href="src/favicon/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="src/favicon/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="src/favicon/favicon-16x16.png">
+  <script defer src="/js/chat.js"></script>
+  <script defer src="/js/voting.js"></script>
+  <script defer src="/js/reactions.js"></script>
 <style>
     :root{
       --bg: #0b0f14;
@@ -256,6 +259,245 @@
     .thought-feedback.error{color:#ff8484}
     .footer{ text-align:center; color:var(--muted); font-size:12px; margin-top:10px }
 
+    /* ===== 채팅 UI ===== */
+    .chat-container{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      height:400px;
+      max-height:60vh;
+    }
+    .chat-messages{
+      flex:1;
+      overflow-y:auto;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      padding:4px;
+    }
+    .chat-message{
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+    }
+    .chat-message.mine{
+      flex-direction:row-reverse;
+    }
+    .chat-avatar{
+      width:36px;
+      height:36px;
+      border-radius:50%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:13px;
+      font-weight:700;
+      color:#fff;
+      flex-shrink:0;
+    }
+    .chat-avatar.color-red{background:linear-gradient(135deg,#ff6b6b,#ff5252)}
+    .chat-avatar.color-orange{background:linear-gradient(135deg,#ffa559,#ff8333)}
+    .chat-avatar.color-yellow{background:linear-gradient(135deg,#ffd93d,#ffbb00)}
+    .chat-avatar.color-green{background:linear-gradient(135deg,#6bcf7f,#4caf50)}
+    .chat-avatar.color-teal{background:linear-gradient(135deg,#4dd4ac,#00bfa5)}
+    .chat-avatar.color-blue{background:linear-gradient(135deg,#4d9de0,#2979ff)}
+    .chat-avatar.color-purple{background:linear-gradient(135deg,#a78bfa,#8b5cf6)}
+    .chat-avatar.color-pink{background:linear-gradient(135deg,#f472b6,#ec4899)}
+    .chat-bubble{
+      background:rgba(255,255,255,0.08);
+      border-radius:12px;
+      padding:8px 12px;
+      max-width:70%;
+      word-wrap:break-word;
+    }
+    .chat-message.mine .chat-bubble{
+      background:linear-gradient(135deg,var(--primary),var(--primary-2));
+    }
+    .chat-number{
+      font-size:11px;
+      opacity:0.7;
+      margin-bottom:4px;
+    }
+    .chat-text{
+      font-size:14px;
+      line-height:1.4;
+    }
+    .chat-time{
+      font-size:10px;
+      opacity:0.5;
+      margin-top:4px;
+      text-align:right;
+    }
+    .chat-empty{
+      text-align:center;
+      color:var(--muted);
+      padding:40px 20px;
+      font-size:14px;
+    }
+    .chat-input-container{
+      display:flex;
+      gap:8px;
+      padding-top:8px;
+      border-top:1px solid rgba(255,255,255,0.1);
+    }
+    .chat-input{
+      flex:1;
+      height:44px;
+      padding:0 14px;
+      border-radius:12px;
+      outline:none;
+      font-size:14px;
+      color:var(--text);
+      background:rgba(12,16,24,0.65);
+      border:1px solid rgba(255,255,255,0.18);
+    }
+    .chat-input::placeholder{color:rgba(235,240,255,0.45)}
+    .chat-toolbar{
+      display:flex;
+      gap:8px;
+      padding-top:8px;
+    }
+    .chat-toolbar .btn{
+      flex:1;
+      padding:10px 14px;
+    }
+
+    /* ===== 채팅 토스트 & 배지 ===== */
+    .chat-toast{
+      position:fixed;
+      bottom:24px;
+      right:24px;
+      background:rgba(20,20,30,0.95);
+      color:#fff;
+      padding:14px 20px;
+      border-radius:12px;
+      box-shadow:0 4px 20px rgba(0,0,0,0.4);
+      border:1px solid rgba(255,255,255,0.1);
+      font-size:14px;
+      z-index:9998;
+      animation:slideInUp 0.3s ease;
+      max-width:300px;
+    }
+    @keyframes slideInUp{
+      from{transform:translateY(20px);opacity:0}
+      to{transform:translateY(0);opacity:1}
+    }
+    .chat-badge{
+      position:absolute;
+      top:0;
+      right:0;
+      width:10px;
+      height:10px;
+      background:#ff3b57;
+      border-radius:50%;
+      border:2px solid var(--card-bg);
+      box-shadow:0 0 8px rgba(255,59,87,0.6);
+    }
+
+    /* ===== 투표 UI ===== */
+    .vote-container{
+      margin-top:16px;
+      padding:16px;
+      border:1px solid rgba(255,255,255,0.15);
+      border-radius:14px;
+      background:linear-gradient(180deg,rgba(138,75,246,0.1),rgba(208,79,255,0.05));
+      display:none;
+    }
+    .vote-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:12px;
+    }
+    .vote-question{
+      font-size:16px;
+      font-weight:700;
+      margin:0 0 8px;
+    }
+    .vote-countdown{
+      font-size:14px;
+      color:var(--primary);
+      font-weight:600;
+    }
+    .vote-options{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      margin:12px 0;
+    }
+    .vote-option{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      border-radius:10px;
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.1);
+      transition:background .2s ease;
+    }
+    .vote-option:hover{
+      background:rgba(255,255,255,0.08);
+    }
+    .vote-option input{
+      margin:0;
+    }
+    .vote-option label{
+      flex:1;
+      cursor:pointer;
+    }
+    .vote-count{
+      font-size:13px;
+      color:var(--muted);
+    }
+    .vote-create-btn{
+      margin-top:8px;
+    }
+
+    /* ===== 반응 UI ===== */
+    .reaction-picker{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      justify-content:center;
+      padding:16px 0;
+    }
+    .reaction-emoji-btn{
+      width:54px;
+      height:54px;
+      font-size:28px;
+      border:2px solid rgba(255,255,255,0.15);
+      border-radius:14px;
+      background:rgba(255,255,255,0.05);
+      cursor:pointer;
+      transition:all .2s ease;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .reaction-emoji-btn:hover{
+      transform:scale(1.1);
+      background:rgba(255,255,255,0.1);
+      border-color:var(--primary);
+    }
+    .reaction-emoji-btn:active{
+      transform:scale(0.95);
+    }
+    .reaction-cooldown{
+      text-align:center;
+      font-size:13px;
+      color:var(--muted);
+      margin-top:8px;
+      display:none;
+    }
+    .reaction-feedback{
+      text-align:center;
+      font-size:13px;
+      color:rgba(235,240,255,0.55);
+      min-height:1.2em;
+    }
+    .reaction-feedback.success{color:#58e08a}
+    .reaction-feedback.error{color:#ff8484}
+
     /* right: brand / time / illustration */
     .side{grid-area:side; display:grid; grid-template-rows:auto 1fr auto; padding:24px}
     .brand{display:flex; align-items:center; gap:12px; font-weight:800; letter-spacing:.2px}
@@ -360,7 +602,10 @@
           </div>
         </div>
         <div class="thought-trigger">
-          <button class="btn ghost" type="button" id="thoughtOpenBtn" aria-label="생각 올리기">💭</button>
+          <button class="btn ghost" type="button" id="thoughtOpenBtn" aria-label="생각 올리기" style="position:relative">
+            💬
+            <span id="chatBadge" class="chat-badge" style="display:none"></span>
+          </button>
           <button class="btn ghost" type="button" id="logoutBtn" aria-label="로그아웃">로그아웃</button>
         </div>
       </div>
@@ -467,19 +712,85 @@
     <div class="spacer"></div>
   </main>
 
+  <!-- 채팅/투표/반응 통합 모달 -->
   <div id="thoughtOverlay" class="thought-overlay" hidden>
-    <div class="thought-dialog" role="dialog" aria-modal="true" aria-labelledby="thoughtTitle">
+    <div class="thought-dialog" role="dialog" aria-modal="true" aria-labelledby="thoughtTitle" style="max-width:680px;width:90vw;max-height:88vh;overflow-y:auto">
       <button class="thought-close" type="button" id="thoughtCloseBtn" aria-label="닫기">×</button>
-      <h2 id="thoughtTitle">💭 어떤 생각을 하고 있나요?</h2>
-      <textarea id="thoughtInput" class="thought-input" maxlength="140" placeholder="어떤 생각을 하고 있나요? 140자까지 입력 가능해요." aria-label="생각 입력"></textarea>
-      <div class="thought-actions">
-        <button class="btn cta" id="thoughtSendBtn" type="button">올리기</button>
-        <button class="btn ghost" id="thoughtClearBtn" type="button">지우기</button>
+      <h2 id="thoughtTitle">💬 채팅</h2>
+
+      <!-- 채팅 영역 -->
+      <div class="chat-container">
+        <div class="chat-messages" id="chatMessages"></div>
+
+        <div class="chat-input-container">
+          <input type="text" id="chatInput" class="chat-input" maxlength="140" placeholder="메시지 입력 (140자)" />
+          <button class="btn cta" id="chatSendBtn" type="button" style="max-width:44px;padding:0 12px;font-size:20px">↑</button>
+        </div>
+
+        <div class="chat-toolbar">
+          <button class="btn ghost" id="voteCreateBtn" type="button">📊 투표 만들기</button>
+          <button class="btn ghost" id="reactionBtn" type="button">😊 반응</button>
+        </div>
       </div>
-      <p class="thought-hint">올리면 자기 번호 자석에 말풍선으로 약 5초간 표시돼요.</p>
-      <p class="thought-feedback" id="thoughtStatus" aria-live="polite"></p>
+
+      <!-- 투표 영역 (활성 투표 있을 때만 표시) -->
+      <div id="voteContainer" class="vote-container">
+        <div class="vote-header">
+          <h3 class="vote-question" id="voteQuestion">투표 질문</h3>
+          <div class="vote-countdown" id="voteCountdown">2:00</div>
+        </div>
+        <div class="vote-options" id="voteOptions"></div>
+        <button class="btn cta" id="voteSubmitBtn" type="button">투표하기</button>
+      </div>
+
+      <p class="thought-hint">메시지는 당일만 보관되며, 전자칠판에 5초간 말풍선으로 표시됩니다.</p>
     </div>
   </div>
+
+  <!-- 투표 생성 모달 -->
+  <div id="voteCreateOverlay" class="thought-overlay" hidden>
+    <div class="thought-dialog" role="dialog" aria-modal="true">
+      <button class="thought-close" type="button" id="voteCreateCloseBtn">×</button>
+      <h2>📊 투표 만들기</h2>
+
+      <input type="text" id="voteQuestionInput" class="input" placeholder="질문을 입력하세요 (최대 200자)" maxlength="200" style="margin-bottom:12px" />
+
+      <div style="margin-bottom:12px">
+        <label style="font-size:13px;color:var(--muted);margin-bottom:6px;display:block">투표 옵션 (2~10개)</label>
+        <div id="voteOptionsList" style="display:flex;flex-direction:column;gap:8px"></div>
+        <button class="btn ghost" id="voteAddOptionBtn" type="button" style="margin-top:8px;width:100%">+ 옵션 추가</button>
+      </div>
+
+      <div style="margin-bottom:16px">
+        <label style="font-size:13px;color:var(--muted);margin-bottom:6px;display:block">최대 선택 가능 개수</label>
+        <input type="number" id="voteMaxChoices" class="input" value="1" min="1" max="10" />
+      </div>
+
+      <div class="thought-actions">
+        <button class="btn cta" id="voteCreateSubmitBtn" type="button">투표 생성</button>
+        <button class="btn ghost" id="voteCreateCancelBtn" type="button">취소</button>
+      </div>
+
+      <p class="thought-feedback" id="voteCreateFeedback"></p>
+    </div>
+  </div>
+
+  <!-- 반응 모달 -->
+  <div id="reactionModal" class="thought-overlay" hidden>
+    <div class="thought-dialog" role="dialog" aria-modal="true">
+      <button class="thought-close" type="button" id="reactionCloseBtn">×</button>
+      <h2>😊 반응 선택</h2>
+
+      <div class="reaction-picker" id="reactionPicker"></div>
+
+      <p class="reaction-cooldown" id="reactionCooldown"></p>
+      <p class="reaction-feedback" id="reactionFeedback"></p>
+      <p class="thought-hint">반응은 5초간 전자칠판의 자석에 표시됩니다.</p>
+    </div>
+  </div>
+
+  <!-- 새 메시지 토스트 알림 -->
+  <div id="chatToast" class="chat-toast" style="display:none"></div>
 
   <script>
     // ===== 글로벌 상태 =====
@@ -498,14 +809,11 @@
     const etcAddBtn= document.getElementById('etcAddBtn');
     const etcChips = document.getElementById('etcChips');
     const etcItems = []; // For single value display
-    const thoughtInput = document.getElementById('thoughtInput');
-    const thoughtSendBtn = document.getElementById('thoughtSendBtn');
-    const thoughtClearBtn = document.getElementById('thoughtClearBtn');
-    const thoughtStatus = document.getElementById('thoughtStatus');
+
+    // 채팅/투표/반응 관련
     const thoughtOverlay = document.getElementById('thoughtOverlay');
     const thoughtOpenBtn = document.getElementById('thoughtOpenBtn');
     const thoughtCloseBtn = document.getElementById('thoughtCloseBtn');
-    let isPostingThought = false;
 
     // 라벨 변환
     const categoryLabels = {
@@ -531,122 +839,32 @@
     }
     updateTime(); setInterval(updateTime, 1000);
 
-    function setThoughtFeedback(message, tone = 'info') {
-      if (!thoughtStatus) return;
-      thoughtStatus.textContent = message;
-      thoughtStatus.classList.remove('success', 'error');
-      if (tone !== 'info') {
-        thoughtStatus.classList.add(tone);
-      }
-    }
-
-    function setThoughtControlsDisabled(disabled) {
-      if (thoughtSendBtn) thoughtSendBtn.disabled = disabled;
-      if (thoughtClearBtn) thoughtClearBtn.disabled = disabled;
-    }
-
-    function updateThoughtStatusFromState(data) {
-      if (!thoughtStatus) return;
-      if (data && data.thought && data.thoughtExpiresAt) {
-        const expiresAtTime = Date.parse(data.thoughtExpiresAt);
-        if (!Number.isNaN(expiresAtTime) && expiresAtTime > Date.now()) {
-          setThoughtFeedback('말풍선이 잠시 표시 중이에요.', 'info');
-          return;
-        }
-      }
-      setThoughtFeedback('현재 말풍선이 없습니다.', 'info');
-    }
-
-    function openThoughtDialog() {
+    // 채팅 다이얼로그 열기/닫기
+    function openChatDialog() {
       if (!thoughtOverlay) return;
       thoughtOverlay.hidden = false;
-      setThoughtControlsDisabled(isPostingThought);
-      requestAnimationFrame(() => {
-        setTimeout(() => thoughtInput?.focus(), 0);
-      });
+      // 채팅 매니저 열기
+      if (window.chatManager) {
+        window.chatManager.open();
+      }
+      // 투표 매니저 초기화
+      if (window.votingManager) {
+        window.votingManager.init(myGrade, mySection, myNumber);
+      }
+      // 반응 매니저 초기화
+      if (window.reactionsManager) {
+        window.reactionsManager.init(myGrade, mySection, myNumber);
+      }
     }
 
-    function closeThoughtDialog() {
+    function closeChatDialog() {
       if (!thoughtOverlay) return;
       thoughtOverlay.hidden = true;
-    }
-
-    async function submitThoughtBubble() {
-      if (!thoughtInput || !thoughtSendBtn) return;
-      if (!myGrade || !mySection || !myNumber) {
-        alert('로그인 정보가 없습니다. 다시 로그인해주세요.');
-        return;
-      }
-      if (isPostingThought) return;
-
-      const text = thoughtInput.value.trim();
-      if (!text) {
-        setThoughtFeedback('생각을 입력해주세요.', 'error');
-        thoughtInput.focus();
-        return;
-      }
-
-      isPostingThought = true;
-      setThoughtControlsDisabled(true);
-      setThoughtFeedback('말풍선을 보내는 중...', 'info');
-
-      try {
-        const res = await fetch(`/api/classes/thought?grade=${myGrade}&section=${mySection}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ thought: text, duration: 5 })
-        });
-        if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(errText || 'thought request failed');
-        }
-        const data = await res.json();
-        thoughtInput.value = '';
-        setThoughtFeedback('말풍선이 자석에 표시됐어요!', 'success');
-        updateThoughtStatusFromState(data);
-      } catch (err) {
-        console.error('submitThoughtBubble error:', err);
-        setThoughtFeedback('말풍선을 보내지 못했어요. 잠시 후 다시 시도해주세요.', 'error');
-      } finally {
-        isPostingThought = false;
-        setThoughtControlsDisabled(false);
+      // 채팅 폴링 중지
+      if (window.chatManager) {
+        window.chatManager.close();
       }
     }
-
-    async function clearThoughtBubble() {
-      if (!myGrade || !mySection || !myNumber) {
-        alert('로그인 정보가 없습니다. 다시 로그인해주세요.');
-        return;
-      }
-      if (isPostingThought) return;
-
-      isPostingThought = true;
-      setThoughtControlsDisabled(true);
-      setThoughtFeedback('말풍선을 지우는 중...', 'info');
-
-      try {
-        const res = await fetch(`/api/classes/thought?grade=${myGrade}&section=${mySection}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ thought: '' })
-        });
-        if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(errText || 'thought clear failed');
-        }
-        await res.json();
-        setThoughtFeedback('말풍선을 지웠어요.', 'success');
-        updateThoughtStatusFromState(null);
-      } catch (err) {
-        console.error('clearThoughtBubble error:', err);
-        setThoughtFeedback('말풍선을 지우지 못했어요. 잠시 후 다시 시도해주세요.', 'error');
-      } finally {
-        isPostingThought = false;
-        setThoughtControlsDisabled(false);
-      }
-    }
-
-    updateThoughtStatusFromState(null);
 
     // ===== 로그인 체크 & 현재 상태 불러오기 =====
     async function checkLogin() {
@@ -663,6 +881,11 @@
 
         document.getElementById("userMeta").textContent =
           `${myGrade}학년 ${mySection}반 ${myNumber}번`;
+
+        // 채팅 매니저 초기화 (백그라운드 폴링 시작)
+        if (window.chatManager) {
+          window.chatManager.init(myGrade, mySection, myNumber);
+        }
 
         await loadMyState();
       } catch (e) {
@@ -682,7 +905,6 @@
         if (!me) {
           currentStatusDisplay.textContent = "교실";
           lastSavedStatus = "교실";
-          updateThoughtStatusFromState(null);
           return;
         }
 
@@ -694,11 +916,9 @@
           currentStatusDisplay.textContent = label || "교실";
           lastSavedStatus = label || "교실";
         }
-        updateThoughtStatusFromState(me);
       } catch (e) {
         console.error("loadMyState error:", e);
         currentStatusDisplay.textContent = "교실";
-        updateThoughtStatusFromState(null);
       }
     }
 
@@ -798,37 +1018,183 @@
       refreshCurrentStatus();
     });
 
+    // 채팅 다이얼로그 이벤트
     if (thoughtOpenBtn) {
-      thoughtOpenBtn.addEventListener('click', openThoughtDialog);
+      thoughtOpenBtn.addEventListener('click', openChatDialog);
     }
     if (thoughtCloseBtn) {
-      thoughtCloseBtn.addEventListener('click', closeThoughtDialog);
+      thoughtCloseBtn.addEventListener('click', closeChatDialog);
     }
     if (thoughtOverlay) {
       thoughtOverlay.addEventListener('mousedown', (e) => {
         if (e.target === thoughtOverlay) {
-          closeThoughtDialog();
+          closeChatDialog();
         }
       });
     }
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && thoughtOverlay && !thoughtOverlay.hidden) {
-        closeThoughtDialog();
+      if (e.key === 'Escape') {
+        if (thoughtOverlay && !thoughtOverlay.hidden) closeChatDialog();
+        const voteCreateOverlay = document.getElementById('voteCreateOverlay');
+        const reactionModal = document.getElementById('reactionModal');
+        if (voteCreateOverlay && !voteCreateOverlay.hidden) voteCreateOverlay.hidden = true;
+        if (reactionModal && !reactionModal.hidden) reactionModal.hidden = true;
       }
     });
 
-    if (thoughtSendBtn) {
-      thoughtSendBtn.addEventListener('click', submitThoughtBubble);
-    }
-    if (thoughtClearBtn) {
-      thoughtClearBtn.addEventListener('click', clearThoughtBubble);
-    }
-    if (thoughtInput) {
-      thoughtInput.addEventListener('keydown', (e) => {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-          e.preventDefault();
-          submitThoughtBubble();
+    // 채팅 전송
+    const chatSendBtn = document.getElementById('chatSendBtn');
+    const chatInput = document.getElementById('chatInput');
+    if (chatSendBtn) {
+      chatSendBtn.addEventListener('click', async () => {
+        const text = chatInput?.value;
+        if (!text) return;
+        const result = await window.chatManager.sendMessage(text);
+        if (result.success) {
+          chatInput.value = '';
+        } else {
+          alert(result.error || '메시지를 보내지 못했어요.');
         }
+      });
+    }
+    if (chatInput) {
+      chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          chatSendBtn?.click();
+        }
+      });
+    }
+
+    // 투표 생성 버튼
+    const voteCreateBtn = document.getElementById('voteCreateBtn');
+    if (voteCreateBtn) {
+      voteCreateBtn.addEventListener('click', () => {
+        const overlay = document.getElementById('voteCreateOverlay');
+        if (overlay) overlay.hidden = false;
+        initVoteCreateModal();
+      });
+    }
+
+    // 투표 제출
+    const voteSubmitBtn = document.getElementById('voteSubmitBtn');
+    if (voteSubmitBtn) {
+      voteSubmitBtn.addEventListener('click', async () => {
+        const result = await window.votingManager.submitVote();
+        if (!result.success) {
+          alert(result.error || '투표를 제출하지 못했어요.');
+        }
+      });
+    }
+
+    // 반응 버튼
+    const reactionBtn = document.getElementById('reactionBtn');
+    if (reactionBtn) {
+      reactionBtn.addEventListener('click', () => {
+        window.reactionsManager.openPicker();
+      });
+    }
+
+    const reactionCloseBtn = document.getElementById('reactionCloseBtn');
+    if (reactionCloseBtn) {
+      reactionCloseBtn.addEventListener('click', () => {
+        window.reactionsManager.closePicker();
+      });
+    }
+
+    // 투표 생성 모달 초기화
+    function initVoteCreateModal() {
+      const optionsList = document.getElementById('voteOptionsList');
+      if (!optionsList) return;
+
+      optionsList.innerHTML = '';
+      // 기본 2개 옵션
+      addVoteOption();
+      addVoteOption();
+    }
+
+    function addVoteOption() {
+      const optionsList = document.getElementById('voteOptionsList');
+      if (!optionsList) return;
+
+      const count = optionsList.children.length;
+      if (count >= 10) {
+        alert('옵션은 최대 10개까지 추가할 수 있습니다.');
+        return;
+      }
+
+      const optionDiv = document.createElement('div');
+      optionDiv.style.cssText = 'display:flex;gap:8px';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'input';
+      input.placeholder = `옵션 ${count + 1}`;
+      input.maxLength = 100;
+      input.style.flex = '1';
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn ghost';
+      delBtn.textContent = '×';
+      delBtn.type = 'button';
+      delBtn.style.minWidth = '44px';
+      delBtn.style.padding = '10px';
+      delBtn.addEventListener('click', () => {
+        optionDiv.remove();
+      });
+
+      optionDiv.appendChild(input);
+      optionDiv.appendChild(delBtn);
+      optionsList.appendChild(optionDiv);
+    }
+
+    const voteAddOptionBtn = document.getElementById('voteAddOptionBtn');
+    if (voteAddOptionBtn) {
+      voteAddOptionBtn.addEventListener('click', addVoteOption);
+    }
+
+    const voteCreateSubmitBtn = document.getElementById('voteCreateSubmitBtn');
+    const voteCreateCancelBtn = document.getElementById('voteCreateCancelBtn');
+    const voteCreateCloseBtn = document.getElementById('voteCreateCloseBtn');
+
+    if (voteCreateSubmitBtn) {
+      voteCreateSubmitBtn.addEventListener('click', async () => {
+        const question = document.getElementById('voteQuestionInput')?.value;
+        const optionsList = document.getElementById('voteOptionsList');
+        const options = Array.from(optionsList?.querySelectorAll('input') || [])
+          .map(input => input.value.trim())
+          .filter(v => v);
+        const maxChoices = parseInt(document.getElementById('voteMaxChoices')?.value || '1');
+
+        const feedback = document.getElementById('voteCreateFeedback');
+        const result = await window.votingManager.createVote(question, options, maxChoices);
+
+        if (result.success) {
+          if (feedback) {
+            feedback.textContent = '투표가 생성되었습니다!';
+            feedback.className = 'thought-feedback success';
+          }
+          setTimeout(() => {
+            document.getElementById('voteCreateOverlay').hidden = true;
+          }, 1000);
+        } else {
+          if (feedback) {
+            feedback.textContent = result.error || '투표를 생성하지 못했어요.';
+            feedback.className = 'thought-feedback error';
+          }
+        }
+      });
+    }
+
+    if (voteCreateCancelBtn) {
+      voteCreateCancelBtn.addEventListener('click', () => {
+        document.getElementById('voteCreateOverlay').hidden = true;
+      });
+    }
+
+    if (voteCreateCloseBtn) {
+      voteCreateCloseBtn.addEventListener('click', () => {
+        document.getElementById('voteCreateOverlay').hidden = true;
       });
     }
 
