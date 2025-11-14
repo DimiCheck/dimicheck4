@@ -182,3 +182,50 @@ class ClassPin(db.Model):
     # grade+section은 고유 조합
     __table_args__ = (db.UniqueConstraint("grade", "section", name="uq_class_section"),)
 
+
+class ChatMessage(db.Model):
+    __tablename__ = "chat_messages"
+
+    id = db.Column(db.Integer, primary_key=True)
+    grade = db.Column(db.Integer, nullable=False)
+    section = db.Column(db.Integer, nullable=False)
+    student_number = db.Column(db.Integer, nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index("idx_chat_grade_section_created", "grade", "section", "created_at"),
+    )
+
+
+class Vote(db.Model):
+    __tablename__ = "votes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    grade = db.Column(db.Integer, nullable=False)
+    section = db.Column(db.Integer, nullable=False)
+    question = db.Column(db.Text, nullable=False)
+    options = db.Column(db.Text, nullable=False)  # JSON array of options
+    created_by = db.Column(db.Integer, nullable=False)  # student number who created
+    expires_at = db.Column(db.DateTime, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index("idx_vote_grade_section_active", "grade", "section", "is_active"),
+    )
+
+
+class VoteResponse(db.Model):
+    __tablename__ = "vote_responses"
+
+    id = db.Column(db.Integer, primary_key=True)
+    vote_id = db.Column(db.Integer, db.ForeignKey("votes.id"), nullable=False)
+    student_number = db.Column(db.Integer, nullable=False)
+    option_index = db.Column(db.Integer, nullable=False)  # Index of the chosen option
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("vote_id", "student_number", name="uq_vote_response"),
+    )
+

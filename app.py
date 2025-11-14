@@ -13,6 +13,8 @@ from flask_socketio import SocketIO
 from auth import blueprint as auth_bp
 from class_routes import blueprint as class_bp
 from exports_routes import blueprint as export_bp
+from chat_routes import blueprint as chat_bp
+from vote_routes import blueprint as vote_bp
 from config import config
 from extensions import db
 from models import ClassConfig, ClassPin
@@ -37,6 +39,8 @@ setup_logging(config.LOG_LEVEL)
 app.register_blueprint(auth_bp)
 app.register_blueprint(class_bp)
 app.register_blueprint(export_bp)
+app.register_blueprint(chat_bp)
+app.register_blueprint(vote_bp)
 app.add_url_rule("/metrics", "metrics", metrics)
 
 db.init_app(app)
@@ -59,10 +63,10 @@ def handle_error(err):
 
     # JSON 요청 (예: fetch, axios) → JSON 반환
     if request.accept_mimetypes.best == "application/json" or request.is_json:
-        return jsonify({"error": {"code": str(code), "message": message}})
+        return jsonify({"error": {"code": str(code), "message": message}}), code
 
     # 일반 브라우저 접근 → HTML 페이지
-    return send_from_directory(".", "404.html", code=code, message=message)
+    return send_from_directory(".", "404.html"), code
 
 @app.get("/healthz")
 def health() -> Any:

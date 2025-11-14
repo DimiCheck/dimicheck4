@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from flask import Blueprint, jsonify, request, session
 
 from extensions import db
-from models import ClassState, ClassRoutine
+from models import ClassState, ClassRoutine, ChatMessage
 from config_loader import load_class_config
 from utils import is_board_session_active, is_teacher_session_active
 
@@ -202,15 +202,16 @@ def upsert_thought():
     session_grade, session_section, session_number = _get_student_session_info()
     is_teacher = is_teacher_session_active()
 
-    if session_grade != grade or session_section != section or session_number is None:
-        if not is_teacher:
-            return jsonify({"error": "forbidden"}), 403
-
-    target_number = session_number
+    # For students, use their own number; for teachers, require number parameter
     if is_teacher:
         target_number = request.args.get("number", type=int)
-    if target_number is None:
-        return jsonify({"error": "missing target number"}), 400
+        if target_number is None:
+            return jsonify({"error": "missing target number"}), 400
+    else:
+        # Student must be from the same class
+        if session_grade != grade or session_section != section or session_number is None:
+            return jsonify({"error": "forbidden"}), 403
+        target_number = session_number
 
     payload = request.get_json(silent=True) or {}
     thought_text = (payload.get("thought") or "").strip()
@@ -262,6 +263,17 @@ def upsert_thought():
 
     magnets[key] = current
     state.data = json.dumps({"magnets": magnets})
+
+    # Also save to ChatMessage table for persistent chat
+    if thought_text:
+        chat_message = ChatMessage(
+            grade=grade,
+            section=section,
+            student_number=target_number,
+            message=thought_text
+        )
+        db.session.add(chat_message)
+
     db.session.commit()
 
     if created_state:
