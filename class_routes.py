@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from flask import Blueprint, jsonify, request, session
 
 from extensions import db
+from config import config
 from models import ClassState, ClassRoutine, ChatMessage
 from config_loader import load_class_config
 from utils import is_board_session_active, is_teacher_session_active
@@ -538,3 +539,181 @@ def class_config():
         "end": config["end"],
         "skipNumbers": config["skip_numbers"]
     })
+import requests
+
+# ----------------- Global caching for schoollife data -----------------
+_SCHOOLLIFE_CACHE = {
+    "weather": {"data": None, "timestamp": None},
+    "meal": {"data": None, "timestamp": None},
+    "timetable": {},  # keyed by (grade, section)
+}
+
+def _is_same_day(ts1: datetime | None, ts2: datetime | None) -> bool:
+    if not ts1 or not ts2:
+        return False
+    return ts1.strftime('%Y%m%d') == ts2.strftime('%Y%m%d')
+
+def _get_today_start() -> datetime:
+    now = datetime.now(timezone.utc)
+    return datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+
+def _fetch_weather_from_api():
+    # Placeholder: replace with actual weather API
+    # Using open-meteo sample to avoid secrets
+    params = {
+        "latitude": 37.3405,
+        "longitude": 126.7338,
+        "current_weather": True,
+        "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+        "timezone": "Asia/Seoul"
+    }
+    res = requests.get("https://api.open-meteo.com/v1/forecast", params=params, timeout=5)
+    res.raise_for_status()
+    data = res.json()
+    current = data.get("current_weather", {})
+    daily = data.get("daily", {})
+    weather = {
+        "temperature": current.get("temperature"),
+        "desc": f"{current.get('weathercode','')}",
+        "high": daily.get("temperature_2m_max", [None])[0],
+        "low": daily.get("temperature_2m_min", [None])[0],
+        "rain": daily.get("precipitation_probability_max", [None])[0],
+    }
+    return weather
+
+def _fetch_meal_from_api():
+    # Placeholder NEIS API call
+    params = {
+        "Type": "json",
+        "ATPT_OFCDC_SC_CODE": "J10",
+        "SD_SCHUL_CODE": "7530560",
+    }
+    if config.NEIS_API_KEY:
+        params["KEY"] = config.NEIS_API_KEY
+    today = datetime.now().strftime('%Y%m%d')
+    params["MLSV_YMD"] = today
+    res = requests.get("https://open.neis.go.kr/hub/mealServiceDietInfo", params=params, timeout=5)
+    res.raise_for_status()
+    data = res.json()
+    cards = {
+        "breakfast": None,
+        "lunch": None,
+        "dinner": None,
+        "date": today,
+    }
+    try:
+        rows = data['mealServiceDietInfo'][1]['row']
+        for row in rows:
+            meal = row.get('MMEAL_SC_NM')
+            items = row.get('DDISH_NM')
+            if not meal or not items:
+                continue
+            clean = items.replace('<br/>', '\n').replace('&amp;', '&')
+            if '조식' in meal:
+                cards['breakfast'] = clean
+            elif '중식' in meal:
+                cards['lunch'] = clean
+            elif '석식' in meal:
+                cards['dinner'] = clean
+    except Exception:
+        pass
+    return cards
+
+def _fetch_timetable_from_api(grade: int, section: int):
+    params = {
+        "Type": "json",
+        "ATPT_OFCDC_SC_CODE": "J10",
+        "SD_SCHUL_CODE": "7530560",
+        "GRADE": grade,
+        "CLASS_NM": section,
+        "ALL_TI_YMD": datetime.now().strftime('%Y%m%d'),
+    }
+    if config.NEIS_API_KEY:
+        params["KEY"] = config.NEIS_API_KEY
+    res = requests.get("https://open.neis.go.kr/hub/hisTimetable", params=params, timeout=5)
+    res.raise_for_status()
+    data = res.json()
+    lessons = []
+    try:
+        rows = data['hisTimetable'][1]['row']
+        for row in rows:
+            period = row.get('PERIO') or row.get('PERIOD') or row.get('ITRT_CNTNTSEQ')
+            subject = row.get('ITRT_CNTNT') or row.get('SUBJECT') or row.get('SUB_NM')
+            if not subject:
+                continue
+            lessons.append({
+                "period": period,
+                "subject": subject
+            })
+    except Exception:
+        pass
+    return lessons
+
+
+@blueprint.get('/schoollife/weather')
+def get_schoollife_weather():
+    now = datetime.now(timezone.utc)
+    cache_entry = _SCHOOLLIFE_CACHE["weather"]
+    if cache_entry["data"] and _is_same_day(cache_entry["timestamp"], now):
+        return jsonify(cache_entry["data"])
+
+    try:
+        data = _fetch_weather_from_api()
+        cache_entry["data"] = data
+        cache_entry["timestamp"] = now
+    except Exception as e:
+        if cache_entry["data"]:
+            return jsonify(cache_entry["data"])
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify(data)
+
+
+@blueprint.get('/schoollife/meal')
+def get_schoollife_meal():
+    now = datetime.now(timezone.utc)
+    cache_entry = _SCHOOLLIFE_CACHE["meal"]
+    if cache_entry["data"] and _is_same_day(cache_entry["timestamp"], now):
+        return jsonify(cache_entry["data"])
+
+    try:
+        data = _fetch_meal_from_api()
+        cache_entry["data"] = data
+        cache_entry["timestamp"] = now
+    except Exception as e:
+        if cache_entry["data"]:
+            return jsonify(cache_entry["data"])
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify(data)
+
+
+@blueprint.get('/schoollife/timetable')
+def get_schoollife_timetable():
+    grade = request.args.get('grade', type=int)
+    section = request.args.get('section', type=int)
+    if not grade or not section:
+        return jsonify({"error": "missing grade or section"}), 400
+
+    now = datetime.now(timezone.utc)
+    key = (grade, section)
+    cache_entry = _SCHOOLLIFE_CACHE["timetable"].get(key)
+    if cache_entry and _is_same_day(cache_entry["timestamp"], now):
+        return jsonify(cache_entry["data"])
+
+    try:
+        lessons = _fetch_timetable_from_api(grade, section)
+        payload = {
+            "lessons": lessons,
+            "date": datetime.now().strftime('%Y-%m-%d')
+        }
+        _SCHOOLLIFE_CACHE["timetable"][key] = {
+            "data": payload,
+            "timestamp": now
+        }
+    except Exception as e:
+        if cache_entry:
+            return jsonify(cache_entry["data"])
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify(payload)

@@ -42,4 +42,9 @@ class Config:
     TEACHER_SESSION_DURATION_SECONDS = int(os.getenv("TEACHER_SESSION_DURATION_SECONDS", str(12 * 60 * 60)))
     TEACHER_SESSION_REMEMBER_SECONDS = int(os.getenv("TEACHER_SESSION_REMEMBER_SECONDS", str(30 * 24 * 60 * 60)))
 
+    # External APIs
+    NEIS_API_KEY: str | None = os.getenv("NEIS_API_KEY", "da82433f0f3a4351bda4ca9a0f11fc7d")
+
+    # Weather
+
 config = Config()
