@@ -235,6 +235,77 @@
       width: 24px;
       height: 24px;
     }
+
+    .weather-card{
+      grid-column: 1 / -1;
+      padding: 20px;
+      border-radius: 20px;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: linear-gradient(145deg, #667aff, #5ad4ff);
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      transition: background .4s ease;
+      width:min(1100px,92vw); 
+      margin:18px auto 28px;
+    }
+
+    .wc-top{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+    }
+
+    .wc-temp{
+      font-size:48px;
+      font-weight:800;
+    }
+
+    .wc-desc{
+      font-size:18px;
+      font-weight:600;
+      opacity:.9;
+    }
+
+    .wc-bottom{
+      display:flex;
+      justify-content:flex-start;
+      gap:20px;
+      font-size:15px;
+      font-weight:600;
+      margin-top:5px;
+    }
+
+    .wc-item{
+      opacity:.9;
+    }
+
+    .wc-comment{
+      margin-top:10px;
+      font-size:14px;
+      line-height:1.4;
+      opacity:.95;
+    }
+
+    /* 그라디언트 테마 프리셋 */
+    .weather-clear{
+      background: linear-gradient(145deg, #ffb75e, #ff7c7c);
+    }
+
+    .weather-cloudy{
+      background: linear-gradient(145deg, #8e9eab, #eef2f3);
+      color:#0b0f14;
+    }
+
+    .weather-rain{
+      background: linear-gradient(145deg, #4e54c8, #8f94fb);
+    }
+
+    .weather-snow{
+      background: linear-gradient(145deg, #b6fbff, #83a4d4);
+      color:#0b0f14;
+    }
   </style>
 </head>
 <body>
@@ -257,6 +328,19 @@
     </div>
   </div>
 </header>
+
+<!-- 오늘 날씨 카드 -->
+<section class="weather-card fade-up" id="weatherCard">
+  <div class="wc-top">
+    <div class="wc-temp" id="wcTemp">--°</div>
+    <div class="wc-desc" id="wcDesc">날씨 불러오는 중…</div>
+  </div>
+  <div class="wc-bottom">
+    <div class="wc-item"><span id="wcHigh">--°</span> / <span id="wcLow">--°</span></div>
+    <div class="wc-item" id="wcRain">강수확률 --%</div>
+  </div>
+  <div class="wc-comment" id="wcComment">오늘 날씨 정보를 불러오는 중…</div>
+</section>
 
 <main>
   <!-- 왼쪽: 오늘 시간표 -->
@@ -327,22 +411,59 @@
     loadTodayAll();
   }
 
-  // -------- API Fetch with Retry --------
-  async function fetchJsonWithRetry(url, retries = 2, delay = 500) {
-    for (let i = 0; i <= retries; i++) {
-      try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return await response.json();
-      } catch (error) {
-        console.warn(`[Attempt ${i + 1}/${retries + 1}] Fetch failed for ${url}. Retrying in ${delay}ms...`, error.message);
-        if (i === retries) {
-          console.error(`All fetch attempts failed for ${url}.`);
-          throw error; // Re-throw the last error to be caught by the caller
-        }
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
+  // -------- API helpers --------
+  async function fetchJson(url) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return await response.json();
+  }
+
+  function applyWeatherGradient(desc){
+    const card = document.getElementById('weatherCard');
+    if (!card) return;
+    const lower = (desc || '').toLowerCase();
+    card.classList.remove('weather-clear','weather-cloudy','weather-rain','weather-snow');
+    if (lower.includes('비') || lower.includes('rain')) {
+      card.classList.add('weather-rain');
+    } else if (lower.includes('눈') || lower.includes('snow')) {
+      card.classList.add('weather-snow');
+    } else if (lower.includes('구름') || lower.includes('cloud') || lower.includes('흐림')) {
+      card.classList.add('weather-cloudy');
+    } else {
+      card.classList.add('weather-clear');
     }
+  }
+
+  function applyWeatherGradient(desc){
+    const card = document.getElementById('weatherCard');
+    if (!card) return;
+    const lower = (desc || '').toLowerCase();
+    card.classList.remove('weather-clear','weather-cloudy','weather-rain','weather-snow');
+    if (lower.includes('비')) {
+      card.classList.add('weather-rain');
+    } else if (lower.includes('눈')) {
+      card.classList.add('weather-snow');
+    } else if (lower.includes('구름') || lower.includes('흐림') || lower.includes('cloud')) {
+      card.classList.add('weather-cloudy');
+    } else {
+      card.classList.add('weather-clear');
+    }
+  }
+
+  function renderWeather(data){
+    const tempEl = document.getElementById('wcTemp');
+    const descEl = document.getElementById('wcDesc');
+    const highEl = document.getElementById('wcHigh');
+    const lowEl = document.getElementById('wcLow');
+    const rainEl = document.getElementById('wcRain');
+    const temp = data?.temperature;
+    const desc = data?.desc || '날씨 정보를 불러올 수 없습니다.';
+    if (tempEl) tempEl.textContent = temp != null ? `${Math.round(temp)}°` : '--°';
+    if (descEl) descEl.textContent = desc;
+    if (highEl) highEl.textContent = data?.high != null ? `${Math.round(data.high)}°` : '--°';
+    if (lowEl) lowEl.textContent = data?.low != null ? `${Math.round(data.low)}°` : '--°';
+    if (rainEl) rainEl.textContent = `강수확률 ${data?.rain != null ? data.rain : '--'}%`;
+    applyWeatherGradient(desc);
   }
 
   // -------- timetable (based on etc.js NEIS example) --------
@@ -375,92 +496,91 @@
     return r.ITRT_CNTNT || r.SUBJECT || r.SUB_NM || '';
   }
 
-  async function fetchWeeklyTimetable(g,c){
-    const days = weekMonToFri();
-    const weekStart = fmtYYYYMMDD(days[0]);
-    const key = timetableCacheKey(g,c,weekStart);
-
-    const cached = loadData(key);
-    if (cached && cached.data && Array.isArray(cached.data) && cached.data.length===5) {
-      return cached; // 이미 캐시 있으면 바로 리턴
-    }
-
-    const qs = (params)=> Object.entries(params).map(([k,v])=>`${k}=${encodeURIComponent(v)}`).join('&');
-    const reqs = days.map(d => {
-      const url = `https://open.neis.go.kr/hub/hisTimetable?${qs({
-        KEY:API_KEY, Type:'json', ATPT_OFCDC_SC_CODE, SD_SCHUL_CODE,
-        GRADE:g, CLASS_NM:c, ALL_TI_YMD:fmtYYYYMMDD(d)
-      })}`;
-      return fetchJsonWithRetry(url).catch(() => ({}));
-    });
-
-    try {
-      const results = await Promise.all(reqs);
-      const weekly = results.map(obj => (obj.hisTimetable && obj.hisTimetable[1] && obj.hisTimetable[1].row) ? obj.hisTimetable[1].row : []);
-      const wrapped = { weekStart, savedAt:Date.now(), grade:g, classNum:c, data:weekly };
-
-      // 성공적으로 불러왔을 때만 캐시 저장
-      if (weekly.some(arr => arr.length > 0)) {
-        saveData(key, wrapped);
-      }
-      return wrapped;
-    } catch (e) {
-      console.error("fetchWeeklyTimetable error:", e);
-      if (cached) {
-        console.warn("API 실패 → 캐시 데이터 사용");
-        return cached;
-      }
-      throw e;
-    }
+  function fmtDateKR(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    if (Number.isNaN(date.getTime())) return dateStr;
+    const yoil = ['일','월','화','수','목','금','토'][date.getDay()];
+    return `${date.getFullYear()}.${date.getMonth()+1}.${date.getDate()} (${yoil})`;
   }
-  function renderTodayFromWeekly(wrapped){
+
+  function buildWeatherComment(data){
+    const temp = Number(data?.temperature);
+    const high = Number(data?.high);
+    const low = Number(data?.low);
+    const rain = Number(data?.rain);
+    const comments = [];
+
+    if (!Number.isNaN(temp)) {
+      if (temp <= -3) comments.push('두꺼운 외투와 장갑이 필요해요.');
+      else if (temp <= 5) comments.push('찬바람이 불어요. 겹겹이 입으세요.');
+      else if (temp >= 28) comments.push('무더운 날씨, 수분 보충 잊지 마세요!');
+      else if (temp >= 22) comments.push('한여름 같은 더위입니다. 시원한 옷차림 추천!');
+    }
+
+    if (!Number.isNaN(rain)) {
+      if (rain >= 70) comments.push('우산 필수! 비 올 확률이 높아요.');
+      else if (rain >= 40) comments.push('소나기가 올 수도 있으니 우산 확인!');
+      else if (rain <= 10) comments.push('비 소식은 거의 없어요.');
+    }
+
+    if (!comments.length) {
+      if (!Number.isNaN(high) && !Number.isNaN(low)) {
+        comments.push(`오늘 기온 ${Math.round(low)}° ~ ${Math.round(high)}° 예정입니다.`);
+      } else {
+        comments.push('쾌적한 하루 보내세요!');
+      }
+    }
+
+    return comments.join(' ');
+  }
+
+  function renderWeather(data){
+    const tempEl = document.getElementById('wcTemp');
+    const descEl = document.getElementById('wcDesc');
+    const highEl = document.getElementById('wcHigh');
+    const lowEl = document.getElementById('wcLow');
+    const rainEl = document.getElementById('wcRain');
+    const commentEl = document.getElementById('wcComment');
+    const temp = data?.temperature;
+    const desc = data?.desc || '날씨 정보를 불러올 수 없습니다.';
+    if (tempEl) tempEl.textContent = temp != null ? `${Math.round(temp)}°` : '--°';
+    if (descEl) descEl.textContent = desc;
+    if (highEl) highEl.textContent = data?.high != null ? `${Math.round(data.high)}°` : '--°';
+    if (lowEl) lowEl.textContent = data?.low != null ? `${Math.round(data.low)}°` : '--°';
+    if (rainEl) rainEl.textContent = `강수확률 ${data?.rain != null ? data.rain : '--'}%`;
+    if (commentEl) commentEl.textContent = buildWeatherComment(data);
+    applyWeatherGradient(desc);
+  }
+
+  // Remove old timetable fetching logic; server supplies data
+  function renderTimetable(payload){
     const list = document.getElementById('timetableToday');
     const sub  = document.getElementById('tt-sub');
     list.innerHTML = '';
 
-    const today = new Date();
-    const yoil = ['일','월','화','수','목','금','토'][today.getDay()];
-    sub.textContent = `${today.getFullYear()}.${today.getMonth()+1}.${today.getDate()} (${yoil})`;
+    const lessons = payload?.lessons || [];
+    sub.textContent = fmtDateKR(payload?.date) || '오늘 시간표';
 
-    const dayIdx = ((today.getDay()+6)%7); // Mon=0..Sun=6
-    if (dayIdx>=5) {
-      list.innerHTML = `<div class="empty">주말에는 수업이 없습니다.</div>`;
+    if (!lessons.length) {
+      list.innerHTML = `<div class="empty">시간표를 불러오지 못했습니다.</div>`;
       return;
     }
 
-    const rows = (wrapped.data[dayIdx]||[]).slice();
-    if (!rows.length){
-      list.innerHTML = `<div class="empty">오늘 시간표 정보가 없습니다.</div>`;
-      return;
-    }
-
-    // 그룹 분반/중복(같은 교시 여러 행) 합치기
-    const byPerio = new Map();
-    for (const r of rows){
-      const p = Number(r.PERIO)||0;
-      if (!byPerio.has(p)) byPerio.set(p, []);
-      byPerio.get(p).push(r);
-    }
-
-    const merged = [...byPerio.entries()].sort((a,b)=>a[0]-b[0]);
-    for (const [perio, arr] of merged){
-      const subjJoined = Array.from(new Set(arr.map(x=>normalizeSubject(x)).filter(Boolean))).join(' / ');
-      const rooms = Array.from(new Set(arr.map(x=>x.CLRM_NM).filter(Boolean)));
-      const teachers = Array.from(new Set(arr.map(x=>x.TEACHER_NM).filter(Boolean)));
-      const metaBits = [];
-      if (rooms.length) metaBits.push(rooms.join(', '));
-      if (teachers.length) metaBits.push(teachers.join(', '));
-
+    lessons.forEach(item => {
+      const period = item.period ? `${item.period}교시` : '수업';
+      const subject = item.subject || '미상';
+      const teacher = item.teacher ? `(${item.teacher})` : '';
       const div = document.createElement('div');
       div.className='row';
       div.innerHTML = `
-        <div class="period">${perio}교시</div>
+        <div class="period">${period}</div>
         <div>
-          <div class="subject">${subjJoined || '—'}</div>
-          <div class="sub">${metaBits.length ? ' · ' + metaBits.join(' · ') : ''}</div>
+          <div class="subject">${subject}</div>
+          <div class="sub">${teacher}</div>
         </div>`;
       list.appendChild(div);
-    }
+    });
   }
 
   // -------- weekly modal render --------
@@ -501,54 +621,49 @@
 
   // -------- meal (based on etc.js example) --------
   function getTodayDateStringDash(){ return fmtYYYY_MM_DD(new Date()); }
-  async function fetchMeal(){
-    const date = getTodayDateStringDash();
-    const url = `https://api.xn--299a1v27nvthhjj.com/meal/${date}`;
-    const sub = document.getElementById('meal-sub');
-    sub.textContent = date.replaceAll('-','.');
-    try{
-      const data = await fetchJsonWithRetry(url);
-      renderMeal(data);
-    }catch(e){
-      console.error("Failed to fetch meal data after retries:", e);
-      renderMeal(null);
-    }
-  }
+  // Remove old external meal fetcher
   function renderMeal(data){
     const grid = document.getElementById('mealGrid');
-    const BK = (data && data.breakfast) ? data.breakfast.replaceAll('/','\n') : '';
-    const LU = (data && data.lunch) ? data.lunch.replaceAll('/','\n') : '';
-    const DN = (data && data.dinner) ? data.dinner.replaceAll('/','\n') : '';
+    const sub = document.getElementById('meal-sub');
+    if (sub) sub.textContent = (data?.date || '').replace(/-/g,'.');
 
     const entries = [
-      {title:'아침', text:BK},
-      {title:'점심', text:LU},
-      {title:'저녁', text:DN},
+      {title:'아침', text:data?.breakfast},
+      {title:'점심', text:data?.lunch},
+      {title:'저녁', text:data?.dinner},
     ];
     grid.innerHTML = '';
     for(const {title,text} of entries){
       const card = document.createElement('div');
       card.className='meal-card';
-      card.innerHTML = `<h3>${title}</h3>` + (text
-        ? `<ul>${text.split('\n').filter(Boolean).map(s=>`<li>${s.trim()}</li>`).join('')}</ul>`
-        : `<div class="empty">정보 없음</div>`);
+      if (text) {
+        const items = text.split('\n').filter(Boolean).map(s=>`<li>${s.replace(/\*|\./g,'').trim()}</li>`).join('');
+        card.innerHTML = `<h3>${title}</h3><ul>${items}</ul>`;
+      } else {
+        card.innerHTML = `<h3>${title}</h3><div class="empty">정보 없음</div>`;
+      }
       grid.appendChild(card);
     }
   }
 
   // -------- load all --------
   async function loadTodayAll(){
-    document.getElementById('timetableToday').innerHTML = '<div class="empty">시간표 불러오는 중…</div>';
+    const list = document.getElementById('timetableToday');
+    list.innerHTML = '<div class="empty">시간표 불러오는 중…</div>';
     const g = gradeSel.value, c = classSel.value;
     try {
-      const wk = await fetchWeeklyTimetable(g,c);
-      renderTodayFromWeekly(wk);
-      document.getElementById('weeklyBtn').onclick = ()=>openWeekly(wk);
+      const [weather, meal, timetable] = await Promise.all([
+        fetchJson('/api/classes/schoollife/weather'),
+        fetchJson('/api/classes/schoollife/meal'),
+        fetchJson(`/api/classes/schoollife/timetable?grade=${g}&section=${c}`)
+      ]);
+      renderWeather(weather);
+      renderMeal(meal);
+      renderTimetable(timetable);
     } catch(e) {
       console.error("loadTodayAll error:", e);
-      document.getElementById('timetableToday').innerHTML = `<div class="empty">시간표를 불러오지 못했습니다.<br>네트워크 오류나 API 문제일 수 있습니다.</div>`;
+      list.innerHTML = `<div class="empty">시간표를 불러오지 못했습니다.<br>서버 오류일 수 있습니다.</div>`;
     }
-    fetchMeal();
   }
 
   document.getElementById('refreshBtn').addEventListener('click', loadTodayAll);
