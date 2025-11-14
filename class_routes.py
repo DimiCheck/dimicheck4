@@ -156,7 +156,15 @@ def save_state():
         magnets = {}
 
     # ✅ 기존 + 새로운 데이터 병합
+    # Preserve special fields (reaction, thought, etc.) when updating magnet position
     for num, data in new_magnets.items():
+        existing = magnets.get(str(num), {})
+        # Preserve ephemeral fields that shouldn't be overwritten by position updates
+        preserve_fields = ['reaction', 'reactionPostedAt', 'reactionExpiresAt',
+                          'thought', 'thoughtPostedAt', 'thoughtExpiresAt']
+        for field in preserve_fields:
+            if field in existing and field not in data:
+                data[field] = existing[field]
         magnets[str(num)] = data   # 같은 번호면 갱신, 없으면 추가
 
     if not state:
@@ -444,6 +452,71 @@ def save_routine():
     db.session.commit()
 
     return jsonify(routine.to_dict())
+
+@blueprint.post("/reaction")
+def send_reaction():
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+    if grade is None or section is None:
+        return jsonify({"error": "missing grade or section"}), 400
+
+    session_grade, session_section, session_number = _get_student_session_info()
+    is_teacher = is_teacher_session_active()
+
+    # Only students can send reactions (not teachers)
+    if is_teacher:
+        return jsonify({"error": "teachers cannot send reactions"}), 403
+
+    # Student must be from the same class
+    if session_grade != grade or session_section != section or session_number is None:
+        return jsonify({"error": "forbidden"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    emoji = (payload.get("emoji") or "").strip()
+
+    # Validate emoji
+    allowed_emojis = ["❤️", "😂", "😮", "😢", "🔥", "👍"]
+    if not emoji or emoji not in allowed_emojis:
+        return jsonify({"error": "invalid emoji"}), 400
+
+    # Get or create ClassState
+    state = ClassState.query.filter_by(grade=grade, section=section).first()
+    if not state:
+        state = ClassState(grade=grade, section=section, data=json.dumps({"magnets": {}}))
+        db.session.add(state)
+
+    # Load existing state
+    state_payload = _load_state_payload(state)
+    magnets = state_payload["magnets"]
+    key = str(session_number)
+    current = magnets.get(key)
+    if not isinstance(current, dict):
+        current = {}
+
+    # Set reaction with 5-second expiry
+    now = datetime.now(timezone.utc)
+    posted_at = now.isoformat()
+    expires_at = (now + timedelta(seconds=5)).isoformat()
+
+    current.update({
+        "reaction": emoji,
+        "reactionPostedAt": posted_at,
+        "reactionExpiresAt": expires_at,
+    })
+
+    magnets[key] = current
+    state.data = json.dumps({"magnets": magnets})
+
+    db.session.commit()
+
+    return jsonify({
+        "ok": True,
+        "number": session_number,
+        "reaction": emoji,
+        "reactionPostedAt": posted_at,
+        "reactionExpiresAt": expires_at,
+    })
+
 
 @blueprint.get("/config")
 def class_config():

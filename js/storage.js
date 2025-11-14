@@ -113,6 +113,11 @@ async function loadState(grade, section) {
       if (typeof window.updateMagnetThoughtBubble === 'function') {
         window.updateMagnetThoughtBubble(el, magnetData);
       }
+
+      // Update reaction badge
+      if (typeof window.updateMagnetReaction === 'function') {
+        window.updateMagnetReaction(el, magnetData);
+      }
     });
 
     if (typeof window.updateMagnetThoughtBubble === 'function') {
@@ -120,6 +125,16 @@ async function loadState(grade, section) {
         const num = magnet.dataset.number || '';
         if (!thoughtProcessed.has(num)) {
           window.updateMagnetThoughtBubble(magnet, null);
+        }
+      });
+    }
+
+    // Clear reactions for magnets not in the loaded state
+    if (typeof window.updateMagnetReaction === 'function') {
+      document.querySelectorAll('.magnet:not(.placeholder)').forEach(magnet => {
+        const num = magnet.dataset.number || '';
+        if (!thoughtProcessed.has(num)) {
+          window.updateMagnetReaction(magnet, null);
         }
       });
     }
