@@ -22,6 +22,7 @@ const MAGNET_MENU_OPTIONS = [
 ];
 
 const thoughtBubbleRegistry = new Map(); // number -> { element, timeoutId, expiresAt, text }
+const reactionBadgeRegistry = new Map(); // number -> { element, timeoutId, expiresAt, emoji }
 
 function ensureThoughtLayer() {
   let layer = document.getElementById('thoughtLayer');
@@ -163,6 +164,92 @@ function updateMagnetThoughtBubble(magnet, data) {
 
 window.updateMagnetThoughtBubble = updateMagnetThoughtBubble;
 window.updateThoughtBubblePositionForMagnet = updateThoughtBubblePositionForMagnet;
+
+/* ===================== Reaction Badge System ===================== */
+
+function removeReactionBadgeForNumber(number) {
+  const entry = reactionBadgeRegistry.get(number);
+  if (!entry) return;
+  reactionBadgeRegistry.delete(number);
+  if (entry.timeoutId) {
+    clearTimeout(entry.timeoutId);
+  }
+
+  // Restore original number text
+  const magnet = document.querySelector(`.magnet[data-number="${number}"]`);
+  if (magnet && entry.originalText !== undefined) {
+    magnet.textContent = entry.originalText;
+  }
+}
+
+function ensureReactionBadge(magnet, emoji, expiresAtValue) {
+  if (!magnet) return;
+  const number = magnet.dataset.number;
+  if (!number) return;
+
+  const sanitized = String(emoji || '').trim();
+  if (!sanitized) {
+    removeReactionBadgeForNumber(number);
+    return;
+  }
+
+  let expiresAtMs;
+  if (typeof expiresAtValue === 'number') {
+    expiresAtMs = expiresAtValue;
+  } else if (expiresAtValue) {
+    expiresAtMs = Date.parse(expiresAtValue);
+  } else {
+    expiresAtMs = NaN;
+  }
+  if (Number.isNaN(expiresAtMs)) {
+    expiresAtMs = Date.now() + 5000; // Default 5 seconds
+  }
+
+  const now = Date.now();
+  if (expiresAtMs <= now) {
+    removeReactionBadgeForNumber(number);
+    return;
+  }
+
+  let entry = reactionBadgeRegistry.get(number);
+  if (!entry) {
+    // Save original number text
+    const originalText = magnet.textContent;
+    entry = { originalText: originalText, timeoutId: null, expiresAt: 0, emoji: '' };
+    reactionBadgeRegistry.set(number, entry);
+  }
+
+  // Replace magnet text with emoji
+  if (entry.emoji !== sanitized) {
+    magnet.textContent = sanitized;
+    entry.emoji = sanitized;
+  }
+
+  entry.expiresAt = expiresAtMs;
+  if (entry.timeoutId) {
+    clearTimeout(entry.timeoutId);
+  }
+  entry.timeoutId = window.setTimeout(() => {
+    removeReactionBadgeForNumber(number);
+  }, Math.max(0, expiresAtMs - now));
+}
+
+function updateMagnetReaction(magnet, data) {
+  if (!magnet) return;
+  const number = magnet.dataset.number;
+  if (!number) return;
+
+  const payload = (data && typeof data === 'object') ? data : null;
+  const emoji = payload ? payload.reaction : null;
+  if (!emoji) {
+    removeReactionBadgeForNumber(number);
+    return;
+  }
+
+  ensureReactionBadge(magnet, emoji, payload ? payload.reactionExpiresAt : undefined);
+}
+
+window.updateMagnetReaction = updateMagnetReaction;
 
 let magnetMenuOverlay = null;
 let magnetMenuPanel = null;
