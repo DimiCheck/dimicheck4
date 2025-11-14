@@ -16,8 +16,6 @@ class ChatPageManager {
     this.grade = null;
     this.section = null;
     this.studentNumber = null;
-    this.nickname = null;
-
     this.messages = [];
     this.lastMessageId = 0;
     this.pollingInterval = null;
@@ -34,10 +32,8 @@ class ChatPageManager {
     this.chatInput = null;
     this.sendBtn = null;
     this.imageUrlBtn = null;
-    this.settingsBtn = null;
 
     // Modals
-    this.settingsModal = null;
     this.imageUrlModal = null;
     this.imageViewModal = null;
 
@@ -52,12 +48,6 @@ class ChatPageManager {
     this.imageConfirmBtn = null;
     this.imageCancelBtn = null;
 
-    // Settings elements
-    this.nicknameInput = null;
-    this.notificationsToggle = null;
-    this.saveSettingsBtn = null;
-    this.closeSettingsBtn = null;
-
     // Toast
     this.toast = null;
   }
@@ -65,7 +55,6 @@ class ChatPageManager {
   init() {
     this.initElements();
     this.loadAuthStatus();
-    this.loadNickname();
     this.attachEventListeners();
     this.startPolling();
   }
@@ -77,10 +66,8 @@ class ChatPageManager {
     this.chatInput = document.getElementById('chatInput');
     this.sendBtn = document.getElementById('sendBtn');
     this.imageUrlBtn = document.getElementById('imageUrlBtn');
-    this.settingsBtn = document.getElementById('chatSettingsBtn');
 
     // Modals
-    this.settingsModal = document.getElementById('chatSettingsModal');
     this.imageUrlModal = document.getElementById('imageUrlModal');
     this.imageViewModal = document.getElementById('imageViewModal');
 
@@ -94,12 +81,6 @@ class ChatPageManager {
     this.imagePreviewContainer = document.getElementById('imagePreviewContainer');
     this.imageConfirmBtn = document.getElementById('imageConfirmBtn');
     this.imageCancelBtn = document.getElementById('imageCancelBtn');
-
-    // Settings
-    this.nicknameInput = document.getElementById('nicknameInput');
-    this.notificationsToggle = document.getElementById('notificationsToggle');
-    this.saveSettingsBtn = document.getElementById('saveSettingsBtn');
-    this.closeSettingsBtn = document.getElementById('closeSettingsBtn');
 
     // Toast
     this.toast = document.getElementById('chatToast');
@@ -136,12 +117,6 @@ class ChatPageManager {
     // Reply
     this.cancelReplyBtn?.addEventListener('click', () => this.cancelReply());
 
-    // Settings
-    this.settingsBtn?.addEventListener('click', () => this.openSettings());
-    this.saveSettingsBtn?.addEventListener('click', () => this.saveSettings());
-    this.closeSettingsBtn?.addEventListener('click', () => this.closeSettings());
-    document.getElementById('settingsOverlay')?.addEventListener('click', () => this.closeSettings());
-
     // Image view modal
     document.getElementById('closeImageViewBtn')?.addEventListener('click', () => this.closeImageView());
     document.getElementById('imageViewOverlay')?.addEventListener('click', () => this.closeImageView());
@@ -157,6 +132,12 @@ class ChatPageManager {
 
       const data = await res.json();
       this.resolveClassContext(data);
+      if (window.votingManager && this.grade && this.section) {
+        window.votingManager.init(this.grade, this.section, this.studentNumber);
+      }
+      if (window.reactionsManager && this.grade && this.section) {
+        window.reactionsManager.init(this.grade, this.section, this.studentNumber);
+      }
       this.loadMessages();
     } catch (err) {
       console.error('Failed to load auth status:', err);
@@ -181,27 +162,6 @@ class ChatPageManager {
       } else {
         this.studentNumber = num;
       }
-    }
-  }
-
-  async loadNickname() {
-    if (!this.grade || !this.section || !this.studentNumber) return;
-
-    try {
-      const res = await fetch(
-        `/api/classes/chat/nickname?grade=${this.grade}&section=${this.section}&student_number=${this.studentNumber}`,
-        { credentials: 'include' }
-      );
-
-      if (res.ok) {
-        const data = await res.json();
-        this.nickname = data.nickname || null;
-        if (this.nicknameInput && this.nickname) {
-          this.nicknameInput.value = this.nickname;
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load nickname:', err);
     }
   }
 
@@ -232,13 +192,26 @@ class ChatPageManager {
 
       const data = await res.json();
       const newMessages = data.messages || [];
+      const previousLastId = this.lastMessageId;
 
       // Check for new messages
       const hasNew = newMessages.some(msg => msg.id > this.lastMessageId);
       if (hasNew || this.messages.length !== newMessages.length) {
+        const freshMessages = newMessages.filter(
+          (msg) =>
+            msg.id > previousLastId &&
+            msg.studentNumber !== this.studentNumber &&
+            !msg.deletedAt
+        );
         this.messages = newMessages;
         if (this.messages.length > 0) {
           this.lastMessageId = Math.max(...this.messages.map(m => m.id));
+        } else {
+          this.lastMessageId = 0;
+        }
+
+        if (freshMessages.length) {
+          window.notificationManager?.notifyChatMessages?.(freshMessages);
         }
         this.renderMessages();
       }
@@ -289,6 +262,10 @@ class ChatPageManager {
       msgEl.classList.add('message-deleted');
     }
 
+    if (msg.studentNumber === this.studentNumber) {
+      msgEl.classList.add('own');
+    }
+
     // Avatar
     const avatar = document.createElement('div');
     avatar.className = `message-avatar avatar-color-${msg.studentNumber % 10}`;
@@ -311,7 +288,8 @@ class ChatPageManager {
 
     const time = document.createElement('span');
     time.className = 'message-time';
-    time.textContent = this.formatTime(msg.postedAt);
+    const timestamp = msg.timestamp || msg.postedAt || msg.createdAt;
+    time.textContent = this.formatTime(timestamp);
 
     header.appendChild(author);
     header.appendChild(time);
@@ -322,10 +300,17 @@ class ChatPageManager {
       if (replyTo) {
         const replyDiv = document.createElement('div');
         replyDiv.className = 'message-reply-to';
+        const replyText = replyTo.message || (replyTo.imageUrl ? '[이미지]' : '');
+        const safeText = this.escapeHtml(replyText);
         replyDiv.innerHTML = `
-          <span class="reply-author">${replyTo.studentNumber}번</span>: ${this.escapeHtml(replyTo.message).substring(0, 50)}${replyTo.message.length > 50 ? '...' : ''}
+          <span class="reply-author">${replyTo.studentNumber}번</span>: ${safeText.substring(0, 50)}${replyText && replyText.length > 50 ? '...' : ''}
         `;
         replyDiv.addEventListener('click', () => this.scrollToMessage(msg.replyToId));
+        content.appendChild(replyDiv);
+      } else {
+        const replyDiv = document.createElement('div');
+        replyDiv.className = 'message-reply-to';
+        replyDiv.textContent = '원본 메시지를 불러올 수 없습니다.';
         content.appendChild(replyDiv);
       }
     }
@@ -336,7 +321,11 @@ class ChatPageManager {
 
     const text = document.createElement('p');
     text.className = 'message-text';
-    text.textContent = msg.deletedAt ? '(삭제된 메시지)' : msg.message;
+    if (msg.deletedAt) {
+      text.textContent = '(삭제된 메시지)';
+    } else {
+      text.textContent = msg.message || (msg.imageUrl ? '이미지를 공유했습니다.' : '');
+    }
 
     body.appendChild(text);
 
@@ -407,8 +396,8 @@ class ChatPageManager {
 
     const payload = {
       message: text || '',
-      image_url: this.pendingImageUrl || undefined,
-      reply_to_id: this.replyToMessage?.id || undefined
+      imageUrl: this.pendingImageUrl || undefined,
+      replyToId: this.replyToMessage?.id || undefined
     };
 
     try {
@@ -450,7 +439,9 @@ class ChatPageManager {
         const displayName = msg.nickname
           ? `${msg.nickname}(${msg.studentNumber}번)`
           : `${msg.studentNumber}번`;
-        replyText.textContent = `${displayName}에게 답장: ${msg.message.substring(0, 50)}${msg.message.length > 50 ? '...' : ''}`;
+        const replySource = msg.message || (msg.imageUrl ? '이미지 메시지' : '');
+        const trimmed = replySource.length > 50 ? `${replySource.substring(0, 50)}...` : replySource;
+        replyText.textContent = `${displayName}에게 답장: ${trimmed}`;
       }
       this.replyIndicator.style.display = 'flex';
     }
@@ -494,7 +485,9 @@ class ChatPageManager {
     if (this.imageUrlModal) {
       this.imageUrlModal.hidden = false;
       this.imageUrlInput.value = '';
-      this.imagePreviewContainer.style.display = 'none';
+      if (this.imagePreviewContainer) {
+        this.imagePreviewContainer.style.display = 'none';
+      }
       this.imageConfirmBtn.disabled = true;
       this.imageUrlInput.focus();
     }
@@ -504,7 +497,9 @@ class ChatPageManager {
     if (this.imageUrlModal) {
       this.imageUrlModal.hidden = true;
       this.imageUrlInput.value = '';
-      this.imagePreviewContainer.style.display = 'none';
+      if (this.imagePreviewContainer) {
+        this.imagePreviewContainer.style.display = 'none';
+      }
     }
   }
 
@@ -516,11 +511,17 @@ class ChatPageManager {
 
     if (url && urlPattern.test(url)) {
       // Show preview
-      this.imagePreview.src = url;
-      this.imagePreviewContainer.style.display = 'block';
+      if (this.imagePreview) {
+        this.imagePreview.src = url;
+      }
+      if (this.imagePreviewContainer) {
+        this.imagePreviewContainer.style.display = 'block';
+      }
       // Confirm button enabled after image loads successfully
     } else {
-      this.imagePreviewContainer.style.display = 'none';
+      if (this.imagePreviewContainer) {
+        this.imagePreviewContainer.style.display = 'none';
+      }
       this.imageConfirmBtn.disabled = true;
     }
   }
@@ -547,66 +548,6 @@ class ChatPageManager {
     if (this.imageViewModal) {
       this.imageViewModal.hidden = true;
     }
-  }
-
-  openSettings() {
-    if (this.settingsModal) {
-      this.settingsModal.hidden = false;
-
-      // Load current settings
-      if (this.nicknameInput && this.nickname) {
-        this.nicknameInput.value = this.nickname;
-      }
-
-      // Load notification preference from localStorage
-      const notifEnabled = localStorage.getItem('chat_notifications_enabled') === 'true';
-      if (this.notificationsToggle) {
-        this.notificationsToggle.checked = notifEnabled;
-      }
-    }
-  }
-
-  closeSettings() {
-    if (this.settingsModal) {
-      this.settingsModal.hidden = true;
-    }
-  }
-
-  async saveSettings() {
-    const newNickname = this.nicknameInput?.value?.trim() || '';
-    const notifEnabled = this.notificationsToggle?.checked || false;
-
-    // Save nickname to server
-    if (newNickname && newNickname !== this.nickname) {
-      try {
-        const res = await fetch(
-          `/api/classes/chat/nickname?grade=${this.grade}&section=${this.section}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ nickname: newNickname })
-          }
-        );
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({ error: 'Failed to save' }));
-          throw new Error(errData.error || 'Failed to save nickname');
-        }
-
-        this.nickname = newNickname;
-        this.showToast('닉네임이 저장되었습니다');
-      } catch (err) {
-        console.error('Failed to save nickname:', err);
-        this.showToast(err.message || '닉네임 저장 실패');
-        return;
-      }
-    }
-
-    // Save notification preference to localStorage
-    localStorage.setItem('chat_notifications_enabled', notifEnabled ? 'true' : 'false');
-
-    this.closeSettings();
   }
 
   scrollToMessage(messageId) {
@@ -646,6 +587,7 @@ class ChatPageManager {
 
   formatTime(isoString) {
     try {
+      if (!isoString) return '';
       const date = new Date(isoString);
       const hours = date.getHours().toString().padStart(2, '0');
       const minutes = date.getMinutes().toString().padStart(2, '0');
@@ -657,7 +599,7 @@ class ChatPageManager {
 
   escapeHtml(text) {
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = text ?? '';
     return div.innerHTML;
   }
 }
@@ -668,12 +610,6 @@ document.addEventListener('DOMContentLoaded', () => {
   chatPage.init();
 
   // Initialize voting and reactions managers
-  if (window.votingManager) {
-    window.votingManager.init();
-  }
-  if (window.reactionsManager) {
-    window.reactionsManager.init();
-  }
 
   // Voting event listeners
   const voteCreateBtn = document.getElementById('voteCreateBtn');

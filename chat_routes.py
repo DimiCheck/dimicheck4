@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
+import json
 
 from flask import Blueprint, jsonify, request, session
 
 from extensions import db
-from models import ChatMessage, UserNickname
+from models import ChatMessage, UserNickname, ClassState
 from utils import is_board_session_active, is_teacher_session_active
 import re
 
@@ -106,9 +107,102 @@ def _is_authorized(grade: int | None, section: int | None) -> bool:
     )
 
 
+THOUGHT_PREVIEW_MAX_LENGTH = 140
+THOUGHT_PREVIEW_DURATION_SECONDS = 10
+
+
+def _get_kst_now() -> datetime:
+    return datetime.utcnow() + timedelta(hours=9)
+
+
+def _academic_year_start_utc() -> datetime:
+    kst_now = _get_kst_now()
+    year = kst_now.year if kst_now.month >= 3 else kst_now.year - 1
+    start_kst = datetime(year, 3, 1)
+    # Convert back to UTC
+    start_utc = start_kst - timedelta(hours=9)
+    return start_utc
+
+
+def _cleanup_expired_messages():
+    cutoff = _academic_year_start_utc()
+    deleted = (
+        db.session.query(ChatMessage)
+        .filter(ChatMessage.created_at < cutoff)
+        .delete(synchronize_session=False)
+    )
+    if deleted:
+        db.session.commit()
+
+
+def _load_state_blob(state: ClassState | None) -> dict:
+    if not state or not state.data:
+        return {"magnets": {}}
+    try:
+        data = json.loads(state.data)
+    except (TypeError, json.JSONDecodeError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    magnets = data.get("magnets")
+    if not isinstance(magnets, dict):
+        magnets = {}
+    data["magnets"] = magnets
+    return data
+
+
+def _ensure_class_state(grade: int, section: int) -> tuple[ClassState, dict]:
+    state = ClassState.query.filter_by(grade=grade, section=section).first()
+    if not state:
+        state = ClassState(grade=grade, section=section, data=json.dumps({"magnets": {}}))
+        db.session.add(state)
+        return state, {"magnets": {}}
+    return state, _load_state_blob(state)
+
+
+def _apply_thought_preview(grade: int, section: int, number: int, text: str | None, duration_seconds: int = THOUGHT_PREVIEW_DURATION_SECONDS) -> None:
+    if not text:
+        return
+
+    preview = text.strip()
+    if not preview:
+        return
+
+    if len(preview) > THOUGHT_PREVIEW_MAX_LENGTH:
+        preview = preview[:THOUGHT_PREVIEW_MAX_LENGTH]
+
+    try:
+        duration = int(duration_seconds)
+    except (TypeError, ValueError):
+        duration = THOUGHT_PREVIEW_DURATION_SECONDS
+    duration = max(1, min(duration, 60))
+
+    state, payload = _ensure_class_state(grade, section)
+    magnets = payload.get("magnets", {})
+
+    key = str(number)
+    current = magnets.get(key)
+    if not isinstance(current, dict):
+        current = {}
+
+    now = datetime.now(timezone.utc)
+    posted_at = now.isoformat()
+    expires_at = (now + timedelta(seconds=duration)).isoformat()
+
+    current.update({
+        "thought": preview,
+        "thoughtPostedAt": posted_at,
+        "thoughtExpiresAt": expires_at,
+    })
+
+    magnets[key] = current
+    payload["magnets"] = magnets
+    state.data = json.dumps(payload, ensure_ascii=False)
+
+
 @blueprint.get("/today")
 def get_today_messages():
-    """Get today's chat messages for a specific class"""
+    """Get academic-year chat messages for a specific class"""
     grade = request.args.get("grade", type=int)
     section = request.args.get("section", type=int)
 
@@ -118,12 +212,8 @@ def get_today_messages():
     if not _is_authorized(grade, section):
         return jsonify({"error": "forbidden"}), 403
 
-    # Get messages from today (UTC, DB stores in UTC)
-    now_utc = datetime.utcnow()
-    # Calculate KST today start in UTC (KST is UTC+9, so subtract 9 hours)
-    kst_now = now_utc + timedelta(hours=9)
-    today_start_kst = datetime(kst_now.year, kst_now.month, kst_now.day, 0, 0, 0)
-    today_start_utc = today_start_kst - timedelta(hours=9)
+    # Get messages from current academic year start (UTC)
+    today_start_utc = _academic_year_start_utc()
 
     messages = ChatMessage.query.filter(
         ChatMessage.grade == grade,
@@ -165,8 +255,15 @@ def send_message():
 
     payload = request.get_json() or {}
     message_text = (payload.get("message") or "").strip()
-    image_url = (payload.get("imageUrl") or "").strip()
+
+    image_url = payload.get("imageUrl")
+    if not image_url:
+        image_url = payload.get("image_url")
+    image_url = (image_url or "").strip()
+
     reply_to_id = payload.get("replyToId")
+    if reply_to_id is None:
+        reply_to_id = payload.get("reply_to_id")
 
     # At least message or image URL is required
     if not message_text and not image_url:
@@ -212,14 +309,23 @@ def send_message():
         grade=grade,
         section=section,
         student_number=session_number,
-        message=message_text if message_text else None,
+        message=message_text if message_text else "",
         image_url=image_url if image_url else None,
         reply_to_id=reply_to_id,
         nickname=current_nickname
     )
 
+    preview_text = message_text or None
+    if not preview_text and image_url:
+        preview_text = "이미지를 보냈습니다."
+    if preview_text:
+        _apply_thought_preview(grade, section, session_number, preview_text)
+
     db.session.add(new_message)
     db.session.commit()
+
+    # Clean up messages from previous academic years
+    _cleanup_expired_messages()
 
     return jsonify({
         "ok": True,
