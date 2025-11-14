@@ -193,8 +193,30 @@ class ChatMessage(db.Model):
     message = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
+    # New fields for enhanced chat features
+    image_url = db.Column(db.String(500), nullable=True)  # Image URL only (no uploads)
+    reply_to_id = db.Column(db.Integer, db.ForeignKey("chat_messages.id"), nullable=True)  # Reply thread
+    nickname = db.Column(db.String(50), nullable=True)  # Cached nickname at send time
+    deleted_at = db.Column(db.DateTime, nullable=True)  # Soft delete
+
     __table_args__ = (
         db.Index("idx_chat_grade_section_created", "grade", "section", "created_at"),
+        db.Index("idx_chat_reply", "reply_to_id"),  # Index for reply queries
+    )
+
+
+class UserNickname(db.Model):
+    __tablename__ = "user_nicknames"
+
+    id = db.Column(db.Integer, primary_key=True)
+    grade = db.Column(db.Integer, nullable=False)
+    section = db.Column(db.Integer, nullable=False)
+    student_number = db.Column(db.Integer, nullable=False)
+    nickname = db.Column(db.String(50), nullable=False)  # Max 20 chars enforced in backend
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("grade", "section", "student_number", name="uq_user_nickname"),
     )
 
 
