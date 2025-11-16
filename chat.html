@@ -310,6 +310,123 @@
       background:rgba(255,92,92,.2);
     }
 
+    .vote-message{
+      width:100%;
+    }
+
+    .vote-card{
+      width:100%;
+      background:var(--card);
+      border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      border-radius:18px;
+      padding:16px;
+      box-shadow:var(--shadow);
+    }
+
+    .vote-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:12px;
+      margin-bottom:12px;
+    }
+
+    .vote-label{
+      margin:0;
+      font-size:12px;
+      color:var(--muted);
+      letter-spacing:0.2px;
+    }
+
+    .vote-card h3{
+      margin:4px 0 0;
+      font-size:16px;
+    }
+
+    .vote-countdown{
+      font-weight:700;
+      font-size:14px;
+      color:var(--muted);
+    }
+
+    .vote-options{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+
+    .vote-option{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      border-radius:12px;
+      background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+      border:1px solid color-mix(in oklab, var(--text) 10%, transparent);
+    }
+
+    .vote-option label{
+      flex:1;
+      cursor:pointer;
+    }
+
+    .vote-option input{
+      width:18px;
+      height:18px;
+    }
+
+    .vote-count{
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .vote-submit-btn{
+      width:100%;
+      margin-top:12px;
+    }
+
+    .vote-result-list{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      margin-top:8px;
+    }
+
+    .vote-result-row{
+      background:rgba(255,255,255,.05);
+      padding:8px 10px;
+      border-radius:10px;
+    }
+
+    .vote-result-meta{
+      display:flex;
+      justify-content:space-between;
+      font-size:12px;
+      color:var(--muted);
+      margin-bottom:4px;
+    }
+
+    .vote-result-bar-wrap{
+      width:100%;
+      height:6px;
+      border-radius:999px;
+      background:rgba(255,255,255,.08);
+      overflow:hidden;
+    }
+
+    .vote-result-bar{
+      height:100%;
+      border-radius:999px;
+      background:linear-gradient(90deg, var(--primary), var(--primary-2));
+      width:0;
+    }
+
+    .vote-result-summary{
+      margin-top:10px;
+      font-size:13px;
+      color:var(--muted);
+    }
+
     /* Reply Indicator */
     .reply-indicator{
       background:var(--bg-2);
@@ -683,7 +800,7 @@
       <div style="display:flex;gap:8px">
         <button id="voteCreateBtn" class="icon-btn" aria-label="투표 만들기" title="투표 만들기">📊</button>
         <button id="reactionBtn" class="icon-btn" aria-label="반응" title="반응 보내기">😊</button>
-        <a href="/my.html" class="icon-btn link-btn" aria-label="마이 페이지" title="마이 페이지">👤</a>
+        <!-- <a href="/my.html" class="icon-btn link-btn" aria-label="마이 페이지" title="마이 페이지">👤</a> -->
       </div>
     </div>
   </header>
@@ -707,7 +824,7 @@
 
     <!-- Input -->
     <div class="chat-input-container">
-      <button id="imageUrlBtn" class="icon-btn" aria-label="이미지 추가" title="이미지 URL 추가">🖼️</button>
+      <button id="imageUrlBtn" class="icon-btn" aria-label="이미지 추가" title="이미지 URL 추가">+</button>
       <input
         type="text"
         id="chatInput"
@@ -739,8 +856,8 @@
       </div>
 
       <div class="modal-actions">
-        <button id="imageConfirmBtn" class="btn-primary" disabled>추가</button>
         <button id="imageCancelBtn" class="btn-secondary">취소</button>
+        <button id="imageConfirmBtn" class="btn-primary" disabled>추가</button>
       </div>
     </div>
   </div>
@@ -775,8 +892,8 @@
       </div>
 
       <div class="modal-actions">
-        <button id="voteCreateSubmitBtn" class="btn-primary">투표 생성</button>
         <button id="voteCreateCancelBtn" class="btn-secondary">취소</button>
+        <button id="voteCreateSubmitBtn" class="btn-primary">투표 생성</button>
       </div>
 
       <p style="font-size:12px;color:var(--muted);margin-top:12px;text-align:center" id="voteCreateFeedback"></p>
@@ -800,14 +917,26 @@
     </div>
   </div>
 
-  <!-- Vote Container (in main chat) -->
-  <div id="voteContainer" style="display:none;padding:16px;background:var(--card);border-radius:12px;margin:16px clamp(12px,3vw,24px);margin-top:0">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <h3 id="voteQuestion" style="margin:0;font-size:16px;font-weight:600">투표 질문</h3>
-      <div id="voteCountdown" style="font-size:14px;color:var(--muted)">2:00</div>
+  <!-- Vote Bubble -->
+  <div id="voteBubble" class="chat-message vote-message" hidden>
+    <div class="vote-card">
+      <div class="vote-header">
+        <div>
+          <p class="vote-label" id="voteStateLabel">투표 진행 중</p>
+          <h3 id="voteQuestion">투표 질문</h3>
+        </div>
+        <div id="voteCountdown" class="vote-countdown">--:--</div>
+      </div>
+      <div id="voteFormSection">
+        <div id="voteOptions" class="vote-options"></div>
+        <button id="voteSubmitBtn" class="btn-primary vote-submit-btn">투표하기</button>
+      </div>
+      <div id="voteResultSection" hidden>
+        <p class="vote-label">투표 결과</p>
+        <div id="voteResultList" class="vote-result-list"></div>
+        <div id="voteResultSummary" class="vote-result-summary"></div>
+      </div>
     </div>
-    <div id="voteOptions" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
-    <button id="voteSubmitBtn" class="btn-primary" style="width:100%">투표하기</button>
   </div>
 
   <!-- Bottom Navigation -->

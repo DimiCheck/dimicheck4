@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DimiCheck Live Status</title>
+  <style>
+    html, body {
+      margin: 0;
+      font-family: "Pretendard", "Noto Sans KR", sans-serif;
+      background-color: #fff;
+      color: #111;
+      line-height: 1.6;
+    }
+
+    /* ===== 상단 헤더 ===== */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid #eee;
+      background-color: #fff;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header img.logo {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      object-fit: cover;
+      display: block;
+    }
+    header h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 0;
+      line-height: 1;
+      letter-spacing: -0.2px;
+    }
+
+    /* ===== 메인 ===== */
+    main {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+      padding: 2rem;
+    }
+    img.main-icon {
+      width: 240px;
+      margin-bottom: 32px;
+      opacity: 0.9;
+    }
+    h2 {
+      font-size: 1.3rem;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    p {
+      font-size: 1rem;
+      color: #333;
+      max-width: 400px;
+      margin: 0 auto 1rem;
+    }
+
+    /* ===== 섹션 ===== */
+    section {
+      max-width: 700px;
+      margin: 5rem auto;
+      padding: 0 1.5rem;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    li {
+      margin-bottom: 0.75rem;
+    }
+
+    /* ===== 상태표 ===== */
+    .status-table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 1rem;
+    }
+    .status-table th, .status-table td {
+      border: 1px solid #ccc;
+      padding: 0.8rem;
+      text-align: center;
+    }
+    .status-table th {
+      background: #f5f5f5;
+    }
+    .ok { color: #2ecc71; }
+    .warn { color: #f1c40f; }
+    .down { color: #e74c3c; }
+
+    /* ===== 푸터 ===== */
+    footer {
+      text-align: center;
+      font-size: 0.9rem;
+      color: #777;
+      margin: 3rem 0;
+    }
+    a.temp-link {
+      display: inline-block;
+      margin-top: 1.2rem;
+      padding: 0.8rem 1.2rem;
+      background: #0b0f14;
+      color: #fff;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      letter-spacing: -0.1px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="logo.png" alt="DimiCheck 로고" class="logo" />
+    <h1>DimiCheck Live Status</h1>
+  </header>
+
+  <main>
+    <img src="down.svg" alt="서비스 점검 아이콘" class="main-icon" />
+    <h2>서비스가 잠시 쉬는 중입니다</h2>
+    <p>
+      현재 일시적인 장애 또는 점검으로 인해 접속이 제한되고 있습니다.<br />
+      잠시 후 다시 시도해주세요.<br />
+      최대한 빠르게 정상화 중이에요.
+    </p>
+    <p style="color:#777; margin-top:1rem;">
+      불편을 드려 죄송합니다. 언제나 안정적인 서비스를 위해 노력하고 있습니다.
+    </p>
+    <a href="https://dimicheck.kro.kr" class="temp-link">
+      임시 디미체크 사이트 이용(전자칠판용)
+    </a>
+  </main>
+
+  <section>
+    <h2>가능한 원인</h2>
+    <ul>
+      <li>• 서버에 일시적인 과부하가 발생했을 수 있습니다.</li>
+      <li>• 내부 시스템 업데이트나 점검이 진행 중일 수 있습니다.</li>
+      <li>• 네트워크 연결이 불안정할 수 있습니다.</li>
+      <li>• 데이터베이스 응답 지연이 감지되었습니다.</li>
+      <li>• 라즈베리파이 장비의 전원이 꺼졌거나 연결이 끊긴 경우일 수 있습니다.</li>
+    </ul>
+  </section>
+<!-- 
+  <section>
+    <h2>실시간 상태표 (예시)</h2>
+    <table class="status-table">
+      <tr>
+        <th>서비스</th>
+        <th>상태</th>
+        <th>최근 점검</th>
+      </tr>
+      <tr>
+        <td>웹 서버</td>
+        <td class="down">다운됨</td>
+        <td>20:12 (약 3분 전)</td>
+      </tr>
+      <tr>
+        <td>API 서버</td>
+        <td class="warn">지연 중</td>
+        <td>20:11</td>
+      </tr>
+      <tr>
+        <td>데이터베이스</td>
+        <td class="ok">정상</td>
+        <td>20:10</td>
+      </tr>
+      <tr>
+        <td>이미지 서버</td>
+        <td class="ok">정상</td>
+        <td>20:09</td>
+      </tr>
+    </table>
+  </section> -->
+
+  <footer>
+    &copy; 2025 DimiCheck Team
+  </footer>
+</body>
+</html>

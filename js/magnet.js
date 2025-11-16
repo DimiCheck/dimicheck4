@@ -917,6 +917,10 @@ function updateEtcReasonPanel() {
       });
       groups.delete(reason);
     }
+
+    else if (reason === '!reload') {
+      window.location.reload();
+    }
   }
 
   if (shouldSaveState) {

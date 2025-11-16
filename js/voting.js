@@ -11,13 +11,54 @@ class VotingManager {
     this.activeVote = null;
     this.pollingInterval = null;
     this.countdownInterval = null;
+    this.bubble = null;
+    this.questionEl = null;
+    this.countdownEl = null;
+    this.optionsEl = null;
+    this.submitBtn = null;
+    this.formSection = null;
+    this.resultSection = null;
+    this.resultList = null;
+    this.resultSummary = null;
+    this.messagesList = null;
+    this.stateLabel = null;
+    this.pendingSelection = new Set();
+    this.currentVoteId = null;
   }
 
   init(grade, section, myNumber) {
     this.grade = grade;
     this.section = section;
     this.myNumber = myNumber;
+    this.cacheElements();
     this.startPolling();
+  }
+
+  cacheElements() {
+    if (!this.bubble) {
+      this.bubble = document.getElementById('voteBubble');
+      this.questionEl = document.getElementById('voteQuestion');
+      this.countdownEl = document.getElementById('voteCountdown');
+      this.optionsEl = document.getElementById('voteOptions');
+      this.submitBtn = document.getElementById('voteSubmitBtn');
+      this.formSection = document.getElementById('voteFormSection');
+      this.resultSection = document.getElementById('voteResultSection');
+      this.resultList = document.getElementById('voteResultList');
+      this.resultSummary = document.getElementById('voteResultSummary');
+      this.stateLabel = document.getElementById('voteStateLabel');
+    }
+    const list = document.getElementById('chatMessagesList');
+    if (list) {
+      this.messagesList = list;
+    }
+  }
+
+  attachBubble(container) {
+    this.cacheElements();
+    if (!this.bubble || !container) return;
+    if (this.bubble.parentElement !== container) {
+      container.appendChild(this.bubble);
+    }
   }
 
   startPolling() {
@@ -51,7 +92,11 @@ class VotingManager {
 
       if (!data.active) {
         this.activeVote = null;
-        this.hideVote();
+        if (data.lastResult) {
+          this.showVoteResult(data.lastResult);
+        } else {
+          this.hideVote();
+        }
         return;
       }
 
@@ -63,60 +108,152 @@ class VotingManager {
   }
 
   showVote(voteData) {
-    // user.html에 투표 UI 표시
-    const container = document.getElementById('voteContainer');
-    if (!container) return;
+    this.cacheElements();
+    if (!this.bubble) return;
+    if (!this.pendingSelection) {
+      this.pendingSelection = new Set();
+    }
 
-    container.style.display = 'block';
+    this.bubble.hidden = false;
+    this.bubble.style.display = '';
+    this.bubble.dataset.state = 'active';
+    if (this.messagesList) {
+      this.attachBubble(this.messagesList);
+    }
+    if (this.formSection) this.formSection.hidden = false;
+    if (this.resultSection) this.resultSection.hidden = true;
+    if (this.stateLabel) this.stateLabel.textContent = '투표 진행 중';
+    if (this.questionEl) this.questionEl.textContent = voteData.question;
+    if (this.countdownEl) this.countdownEl.textContent = '--:--';
 
-    const question = document.getElementById('voteQuestion');
-    const options = document.getElementById('voteOptions');
-    const countdown = document.getElementById('voteCountdown');
-
-    if (question) question.textContent = voteData.question;
-
-    // 카운트다운
     this.startCountdown(voteData.expiresAt);
 
-    // 옵션 렌더링
-    if (options) {
-      options.innerHTML = '';
+    if (this.optionsEl) {
+      const isSameVote = this.currentVoteId === voteData.voteId;
+      if (!isSameVote) {
+        this.pendingSelection = new Set(voteData.myVote || []);
+        this.currentVoteId = voteData.voteId;
+      }
 
+      const preserved = new Set();
+      if (this.optionsEl.children.length) {
+        this.optionsEl.querySelectorAll('input:checked').forEach(input => preserved.add(input.value));
+      }
+      if (preserved.size) {
+        this.pendingSelection = preserved;
+      }
+
+      this.optionsEl.innerHTML = '';
       voteData.options.forEach(option => {
-        const count = voteData.counts[option] || 0;
-
-        const optionEl = document.createElement('div');
+        const optionEl = document.createElement('label');
         optionEl.className = 'vote-option';
 
-        const checkbox = document.createElement('input');
-        checkbox.type = voteData.maxChoices > 1 ? 'checkbox' : 'radio';
-        checkbox.name = 'vote-option';
-        checkbox.value = option;
-        checkbox.id = `vote-${option}`;
+        const input = document.createElement('input');
+        input.type = voteData.maxChoices > 1 ? 'checkbox' : 'radio';
+        input.name = 'vote-option';
+        input.value = option;
 
-        // 이미 투표한 경우 체크
-        if (voteData.myVote && voteData.myVote.includes(option)) {
-          checkbox.checked = true;
+        if (this.pendingSelection.has(option)) {
+          input.checked = true;
+        } else if (voteData.myVote && voteData.myVote.includes(option)) {
+          input.checked = true;
         }
 
-        const label = document.createElement('label');
-        label.htmlFor = `vote-${option}`;
-        label.textContent = option;
+        input.addEventListener('change', () => {
+          if (voteData.maxChoices > 1) {
+            if (input.checked) {
+              this.pendingSelection.add(option);
+            } else {
+              this.pendingSelection.delete(option);
+            }
+          } else {
+    this.pendingSelection?.clear();
+            if (input.checked) {
+              this.pendingSelection.add(option);
+            }
+            // For radio, ensure others cleared visually
+            this.optionsEl.querySelectorAll('input[type="radio"]').forEach(r => {
+              if (r !== input) r.checked = false;
+            });
+          }
+        });
 
-        const countSpan = document.createElement('span');
-        countSpan.className = 'vote-count';
-        countSpan.textContent = `${count}표`;
+        const span = document.createElement('span');
+        span.textContent = option;
 
-        optionEl.appendChild(checkbox);
-        optionEl.appendChild(label);
-        optionEl.appendChild(countSpan);
-
-        options.appendChild(optionEl);
+        optionEl.appendChild(input);
+        optionEl.appendChild(span);
+        this.optionsEl.appendChild(optionEl);
       });
     }
 
-    // index.html에도 표시
     this.showIndexVote(voteData);
+  }
+
+  showVoteResult(resultData) {
+    this.cacheElements();
+    if (!this.bubble || !resultData) {
+      this.hideVote();
+      return;
+    }
+
+    this.bubble.hidden = false;
+    this.bubble.style.display = '';
+    this.bubble.dataset.state = 'result';
+    if (this.messagesList) {
+      this.attachBubble(this.messagesList);
+    }
+    if (this.formSection) this.formSection.hidden = true;
+    if (this.resultSection) this.resultSection.hidden = false;
+    if (this.stateLabel) this.stateLabel.textContent = '투표 종료';
+    if (this.questionEl) this.questionEl.textContent = resultData.question;
+    if (this.countdownEl) this.countdownEl.textContent = '종료';
+    this.currentVoteId = resultData.voteId ?? null;
+    this.renderResultList(resultData);
+
+    const overlay = document.getElementById('indexVoteOverlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
+  }
+
+  renderResultList(resultData) {
+    if (!this.resultList) return;
+    const counts = resultData.counts || {};
+    const options = resultData.options || Object.keys(counts);
+    const total = resultData.totalVotes ?? Object.values(counts).reduce((a, b) => a + b, 0);
+    this.resultList.innerHTML = '';
+
+    options.forEach(option => {
+      const count = counts[option] || 0;
+      const percent = total > 0 ? Math.round((count / total) * 100) : 0;
+      const row = document.createElement('div');
+      row.className = 'vote-result-row';
+      row.innerHTML = `
+        <div class="vote-result-meta">
+          <span>${option}</span>
+          <span>${count}표 ・ ${percent}%</span>
+        </div>
+        <div class="vote-result-bar-wrap">
+          <div class="vote-result-bar" style="width:${percent}%"></div>
+        </div>
+      `;
+      this.resultList.appendChild(row);
+    });
+
+    if (this.resultSummary) {
+      if (resultData.expiresAt) {
+        const ended = new Date(resultData.expiresAt);
+        const timeStr = Number.isNaN(ended.getTime())
+          ? ''
+          : ended.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+        this.resultSummary.textContent = timeStr
+          ? `총 ${total}표 · ${timeStr} 마감`
+          : `총 ${total}표 · 종료된 투표`;
+      } else {
+        this.resultSummary.textContent = `총 ${total}표 · 종료된 투표`;
+      }
+    }
   }
 
   showIndexVote(voteData) {
@@ -168,10 +305,14 @@ class VotingManager {
   }
 
   hideVote() {
-    const container = document.getElementById('voteContainer');
-    if (container) {
-      container.style.display = 'none';
+    this.cacheElements();
+    if (this.bubble) {
+      this.bubble.hidden = true;
+      this.bubble.style.display = 'none';
+      this.bubble.dataset.state = 'hidden';
     }
+    this.pendingSelection?.clear();
+    this.currentVoteId = null;
 
     const overlay = document.getElementById('indexVoteOverlay');
     if (overlay) {
@@ -202,6 +343,7 @@ class VotingManager {
       if (remaining <= 0) {
         clearInterval(this.countdownInterval);
         this.countdownInterval = null;
+        this.checkActiveVote();
       }
     };
 
@@ -242,6 +384,7 @@ class VotingManager {
 
       // 즉시 투표 현황 새로고침
       await this.checkActiveVote();
+      this.pendingSelection?.clear();
       return { success: true };
     } catch (err) {
       console.error('submitVote error:', err);
