@@ -251,6 +251,10 @@ class ChatPageManager {
     if (wasAtBottom) {
       this.scrollToBottom();
     }
+
+    if (window.votingManager?.attachBubble) {
+      window.votingManager.attachBubble(this.messagesList);
+    }
   }
 
   createMessageElement(msg) {

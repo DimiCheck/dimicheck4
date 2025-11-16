@@ -53,7 +53,7 @@ const WEEKDAY_PHASES = Object.freeze([
   { label: '야자 1타임',   startMin: 19*60 + 50,     endMin: 21*60 + 10 },
   { label: '쉬는 시간',    startMin: 21*60 + 10,     endMin: 21*60 + 30 },
   { label: '야자 2타임',   startMin: 21*60 + 30,     endMin: 22*60 + 50 },
-  { label: '끝.',         startMin: 22*60 + 50,     endMin: 24*60     }
+  { label: '끝.',         startMin: 23*60,     endMin: 24*60     }
 ]);
 
 const SUNDAY_PHASES = Object.freeze([
@@ -61,7 +61,7 @@ const SUNDAY_PHASES = Object.freeze([
   { label: '야자 1타임', startMin: 20*60,     endMin: 21*60 },
   { label: '쉬는 시간',  startMin: 21*60,     endMin: 21*60 + 20 },
   { label: '야자 2타임', startMin: 21*60 + 20,endMin: 22*60 + 20 },
-  { label: '끝.',       startMin: 22*60 + 20,endMin: 24*60 }
+  { label: '끝.',       startMin: 22*60 + 30,endMin: 24*60 }
 ]);
 
 const CSAT_PHASES = Object.freeze([

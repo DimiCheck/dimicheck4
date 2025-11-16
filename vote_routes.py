@@ -107,6 +107,45 @@ def _is_authorized(grade: int | None, section: int | None) -> bool:
     )
 
 
+def _load_vote_options(vote: Vote) -> list[str]:
+    try:
+        return json.loads(vote.options)
+    except (TypeError, json.JSONDecodeError):
+        return []
+
+
+def _build_vote_counts(vote: Vote, options: list[str]) -> tuple[dict[str, int], int]:
+    counts = {option: 0 for option in options}
+    rows = (
+        db.session.query(VoteResponse.option_index, func.count(VoteResponse.id))
+        .filter(VoteResponse.vote_id == vote.id)
+        .group_by(VoteResponse.option_index)
+        .all()
+    )
+    for option_index, count in rows:
+        if 0 <= option_index < len(options):
+            counts[options[option_index]] = count
+    total = sum(counts.values())
+    return counts, total
+
+
+def _serialize_vote_result(vote: Vote | None) -> dict | None:
+    if not vote:
+        return None
+    options = _load_vote_options(vote)
+    counts, total = _build_vote_counts(vote, options)
+    return {
+        "voteId": vote.id,
+        "question": vote.question,
+        "options": options,
+        "counts": counts,
+        "totalVotes": total,
+        "createdAt": vote.created_at.isoformat(),
+        "expiresAt": vote.expires_at.isoformat(),
+        "isActive": bool(vote.is_active and vote.expires_at > datetime.utcnow()),
+    }
+
+
 @blueprint.get("/active")
 def get_active_vote():
     """Get the currently active vote for a class"""
@@ -130,20 +169,18 @@ def get_active_vote():
     ).order_by(Vote.created_at.desc()).first()
 
     if not vote:
+        last_vote = (
+            Vote.query.filter_by(grade=grade, section=section)
+            .order_by(Vote.created_at.desc())
+            .first()
+        )
+        last_result = _serialize_vote_result(last_vote)
+        if last_result:
+            return jsonify({"active": False, "lastResult": last_result})
         return jsonify({"active": False})
 
-    # Parse options
-    try:
-        options = json.loads(vote.options)
-    except json.JSONDecodeError:
-        options = []
-
-    # Get vote counts for each option
-    responses = VoteResponse.query.filter_by(vote_id=vote.id).all()
-    counts = {}
-    for option_idx, option in enumerate(options):
-        count = sum(1 for r in responses if r.option_index == option_idx)
-        counts[option] = count
+    options = _load_vote_options(vote)
+    counts, total_votes = _build_vote_counts(vote, options)
 
     # Check if current student has voted
     session_grade, session_section, session_number = _get_student_session_info()
@@ -165,7 +202,8 @@ def get_active_vote():
         "counts": counts,
         "myVote": my_vote,
         "expiresAt": vote.expires_at.isoformat(),
-        "maxChoices": 1  # Currently only single choice is supported
+        "maxChoices": 1,  # Currently only single choice is supported
+        "totalVotes": total_votes
     })
 
 
