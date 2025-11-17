@@ -11,6 +11,12 @@ from models import ClassState, ClassRoutine, ChatMessage, MealVote, CalendarEven
 from config_loader import load_class_config
 from utils import is_board_session_active, is_teacher_session_active
 
+# Import socketio for broadcasting
+try:
+    from app import socketio
+except ImportError:
+    socketio = None
+
 blueprint = Blueprint("classes", __name__, url_prefix="/api/classes")
 
 
@@ -179,6 +185,18 @@ def save_state():
         state.data = json.dumps({"magnets": magnets})
 
     db.session.commit()
+
+    # Broadcast state update via WebSocket
+    if socketio:
+        try:
+            socketio.emit('state_updated', {
+                'grade': grade,
+                'section': section,
+                'magnets': magnets
+            }, namespace=f'/ws/classes/{grade}/{section}')
+        except Exception as e:
+            print(f"[WebSocket] Failed to broadcast state update: {e}")
+
     return jsonify({"ok": True, "magnets": magnets})
 
 
@@ -303,7 +321,31 @@ def load_class_state():
     state = ClassState.query.filter_by(grade=grade, section=section).first()
     if not state:
         return jsonify({"magnets": {}})
-    return jsonify(json.loads(state.data))
+
+    # Load class config to filter skip_numbers
+    class_config = load_class_config().get((grade, section))
+    skip_numbers = set(class_config.get("skip_numbers", [])) if class_config else set()
+
+    # Parse state data and filter out skip_numbers
+    try:
+        data = json.loads(state.data)
+        magnets = data.get("magnets", {})
+
+        # Filter out students in skip_numbers
+        filtered_magnets = {}
+        for num, value in magnets.items():
+            try:
+                # Try to convert to int for comparison
+                num_int = int(float(num))  # Handle "12.5" -> 12
+                if num_int not in skip_numbers:
+                    filtered_magnets[num] = value
+            except (ValueError, TypeError):
+                # Keep non-numeric keys
+                filtered_magnets[num] = value
+
+        return jsonify({"magnets": filtered_magnets})
+    except json.JSONDecodeError:
+        return jsonify({"magnets": {}})
 
 
 

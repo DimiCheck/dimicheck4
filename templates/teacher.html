@@ -548,11 +548,76 @@ function setActiveSlot(card, which /* 'total' | 'away' | 'present' */) {
     }catch(e){ alert("저장 실패: "+e.message); }
   }
 
+  // ===== WebSocket 실시간 동기화 =====
+  const sockets = {}; // Store multiple socket connections
+
+  function connectToGradeWebSockets(grade) {
+    // Disconnect previous sockets
+    Object.values(sockets).forEach(s => {
+      if (s && s.connected) s.disconnect();
+    });
+    Object.keys(sockets).forEach(k => delete sockets[k]);
+
+    // Connect to each class namespace
+    for (let section = 1; section <= 6; section++) {
+      const namespace = `/ws/classes/${grade}/${section}`;
+
+      const socket = io(namespace, {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: Infinity
+      });
+
+      socket.on('connect', () => {
+        console.log(`[Teacher] Connected to ${namespace}`);
+      });
+
+      socket.on('disconnect', () => {
+        console.log(`[Teacher] Disconnected from ${namespace}`);
+      });
+
+      socket.on('state_updated', (data) => {
+        console.log(`[Teacher] State updated in ${namespace}:`, data);
+
+        // Only reload if it's the current grade
+        if (Number(data.grade) === currentGrade) {
+          loadClassState(currentGrade);
+        }
+      });
+
+      socket.on('connect_error', (error) => {
+        console.error(`[Teacher] Connection error for ${namespace}:`, error);
+      });
+
+      sockets[`${grade}_${section}`] = socket;
+    }
+  }
+
   // 초기 실행
   updateMainTitle(currentGrade);
   updateClassDisplay(currentGrade);
-  setInterval(()=>loadClassState(currentGrade),5000);
+
+  // WebSocket 연결
+  connectToGradeWebSockets(currentGrade);
+
+  // Fallback polling (reduced frequency since we have WebSocket)
+  setInterval(() => loadClassState(currentGrade), 30000); // 30초로 늘림
+
+  // Update grade button handlers to reconnect WebSocket
+  const originalGradeHandlers = [];
+  gradeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const g = Number(btn.dataset.grade);
+      connectToGradeWebSockets(g); // WebSocket reconnect
+    });
+  });
 </script>
+
+<!-- Socket.IO Client Library -->
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
 
 
 </body>
