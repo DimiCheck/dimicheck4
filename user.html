@@ -171,18 +171,44 @@
       cursor:pointer; position:relative; padding:16px 16px 18px;
       border-radius:16px; border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
       background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
-      transition:all .25s cubic-bezier(0.4, 0, 0.2, 1);
+      transition:all .3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      overflow:hidden;
     }
-    .status-card:hover{transform:translateY(-1px)}
+    .status-card::before{
+      content:'';
+      position:absolute;
+      top:50%;
+      left:50%;
+      width:0;
+      height:0;
+      border-radius:50%;
+      background:rgba(255,255,255,.15);
+      transform:translate(-50%,-50%);
+      transition:width .6s ease, height .6s ease;
+    }
+    .status-card:active::before{
+      width:400px;
+      height:400px;
+    }
+    .status-card:hover{
+      transform:translateY(-4px) scale(1.02);
+      box-shadow:0 8px 24px rgba(0,0,0,.2);
+    }
     .status-card:active{
       transform:scale(0.97);
       box-shadow:0 0 0 4px color-mix(in oklab, var(--primary) 15%, transparent);
     }
     .status-card.selected{
-      transform:translateY(-2px);
+      transform:translateY(-2px) scale(1.02);
       box-shadow:var(--ring);
       border-color: color-mix(in oklab, var(--primary) 50%, transparent);
       background:linear-gradient(180deg, color-mix(in oklab, var(--primary) 10%, rgba(255,255,255,.1)), rgba(255,255,255,.05));
+      animation:bounce-in .4s cubic-bezier(0.34, 1.2, 0.64, 1);
+    }
+    @keyframes bounce-in{
+      0%{transform:translateY(-2px) scale(0.95)}
+      50%{transform:translateY(-2px) scale(1.04)}
+      100%{transform:translateY(-2px) scale(1.02)}
     }
     .status-card.selected:active{
       box-shadow:0 0 0 10px color-mix(in oklab, var(--primary) 35%, transparent);
@@ -190,6 +216,11 @@
     .status-card.selected.completed{
       box-shadow:0 0 0 8px color-mix(in oklab, #38d67a 28%, transparent);
       border-color: color-mix(in oklab, #38d67a 45%, transparent);
+      animation:success-pulse .5s ease;
+    }
+    @keyframes success-pulse{
+      0%, 100%{transform:translateY(-2px) scale(1.02)}
+      50%{transform:translateY(-2px) scale(1.05); box-shadow:0 0 0 10px color-mix(in oklab, #38d67a 32%, transparent)}
     }
     .status-label{font-weight:800; letter-spacing:.2px; margin-bottom:6px}
     .status-desc{color:var(--muted); font-size:13px}
@@ -220,6 +251,24 @@
       padding:12px 14px; border-radius:12px; font-weight:700;
       color:#0b0f14; background:#fff; box-shadow:0 2px 0 rgba(0,0,0,.05);
       transition:all .2s cubic-bezier(0.4, 0, 0.2, 1);
+      position:relative;
+      overflow:hidden;
+    }
+    .btn::before{
+      content:'';
+      position:absolute;
+      top:50%;
+      left:50%;
+      width:0;
+      height:0;
+      border-radius:50%;
+      background:rgba(208,79,255,.2);
+      transform:translate(-50%,-50%);
+      transition:width .6s ease, height .6s ease;
+    }
+    .btn:active::before{
+      width:300px;
+      height:300px;
     }
     .btn:active{
       transform:scale(0.96);
@@ -671,15 +720,30 @@
     }
 
     /* motion */
-    .fade-up{opacity:0; transform:translateY(10px); animation:rise .6s ease forwards}
-    .fade-up:nth-child(1){animation-delay:.05s}
-    .fade-up:nth-child(2){animation-delay:.12s}
-    .fade-up:nth-child(3){animation-delay:.20s}
-    .fade-up:nth-child(4){animation-delay:.28s}
-    @keyframes rise{to{opacity:1; transform:none}}
+    .fade-up{
+      opacity:0;
+      transform:translateY(20px) scale(0.95);
+      filter:blur(8px);
+      animation:rise .7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    .fade-up:nth-child(1){animation-delay:.1s}
+    .fade-up:nth-child(2){animation-delay:.18s}
+    .fade-up:nth-child(3){animation-delay:.26s}
+    .fade-up:nth-child(4){animation-delay:.34s}
+    .fade-up:nth-child(5){animation-delay:.42s}
+    @keyframes rise{
+      to{
+        opacity:1;
+        transform:translateY(0) scale(1);
+        filter:blur(0);
+      }
+    }
     @media (prefers-reduced-motion: reduce){
       .blob{animation:none}
-      .fade-up{opacity:1; transform:none; animation:none}
+      .fade-up{opacity:1; transform:none; filter:none; animation:none}
+      .status-card.selected{animation:none}
+      .status-card.selected.completed{animation:none}
+      .status-card:hover{transform:none}
     }
   </style>
 </head>
