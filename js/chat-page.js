@@ -17,6 +17,7 @@ class ChatPageManager {
     this.section = null;
     this.studentNumber = null;
     this.messages = [];
+    this.voteTimelineEvent = null;
     this.lastMessageId = 0;
     this.pollingInterval = null;
 
@@ -32,6 +33,7 @@ class ChatPageManager {
     this.chatInput = null;
     this.sendBtn = null;
     this.imageUrlBtn = null;
+    this.voteBubble = null;
 
     // Modals
     this.imageUrlModal = null;
@@ -70,6 +72,7 @@ class ChatPageManager {
     this.chatInput = document.getElementById('chatInput');
     this.sendBtn = document.getElementById('sendBtn');
     this.imageUrlBtn = document.getElementById('imageUrlBtn');
+    this.voteBubble = document.getElementById('voteBubble');
 
     // Modals
     this.imageUrlModal = document.getElementById('imageUrlModal');
@@ -198,9 +201,11 @@ class ChatPageManager {
       const newMessages = data.messages || [];
       const previousLastId = this.lastMessageId;
 
-      // Check for new messages
+      // Check for actual changes in messages
       const hasNew = newMessages.some(msg => msg.id > this.lastMessageId);
-      if (hasNew || this.messages.length !== newMessages.length) {
+      const hasChanges = this.hasMessageChanges(this.messages, newMessages);
+
+      if (hasNew || hasChanges) {
         const freshMessages = newMessages.filter(
           (msg) =>
             msg.id > previousLastId &&
@@ -226,6 +231,23 @@ class ChatPageManager {
     }
   }
 
+  hasMessageChanges(oldMessages, newMessages) {
+    // Check if messages actually changed (length, deletion status, etc.)
+    if (oldMessages.length !== newMessages.length) return true;
+
+    // Check for deletions or updates in existing messages
+    for (let i = 0; i < oldMessages.length; i++) {
+      const oldMsg = oldMessages[i];
+      const newMsg = newMessages.find(m => m.id === oldMsg.id);
+
+      if (!newMsg) return true; // Message removed
+      if (oldMsg.deletedAt !== newMsg.deletedAt) return true; // Deletion status changed
+      if (oldMsg.message !== newMsg.message) return true; // Content changed
+    }
+
+    return false;
+  }
+
   renderMessages() {
     if (!this.messagesList) return;
 
@@ -234,7 +256,20 @@ class ChatPageManager {
 
     this.messagesList.innerHTML = '';
 
-    if (this.messages.length === 0) {
+    const timeline = this.messages.map(msg => {
+      const timestamp = this.parseTimestamp(msg.timestamp || msg.postedAt || msg.createdAt);
+      return {
+        type: 'chat',
+        timestamp: timestamp ? timestamp.getTime() : 0,
+        payload: msg
+      };
+    });
+
+    if (this.voteTimelineEvent) {
+      timeline.push(this.voteTimelineEvent);
+    }
+
+    if (timeline.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'chat-message';
       empty.innerHTML = `
@@ -245,21 +280,31 @@ class ChatPageManager {
         </div>
       `;
       this.messagesList.appendChild(empty);
+      if (this.voteBubble) {
+        this.voteBubble.hidden = true;
+      }
       return;
     }
 
-    this.messages.forEach(msg => {
-      const msgEl = this.createMessageElement(msg);
-      this.messagesList.appendChild(msgEl);
+    timeline.sort((a, b) => a.timestamp - b.timestamp);
+
+    timeline.forEach(event => {
+      if (event.type === 'chat') {
+        const msgEl = this.createMessageElement(event.payload);
+        this.messagesList.appendChild(msgEl);
+        return;
+      }
+
+      if (event.type === 'vote' && this.voteBubble) {
+        this.voteBubble.hidden = false;
+        this.voteBubble.dataset.timelineState = event.state || this.voteBubble.dataset.timelineState || 'result';
+        this.messagesList.appendChild(this.voteBubble);
+      }
     });
 
     // Auto-scroll if was at bottom
     if (wasAtBottom) {
       this.scrollToBottom();
-    }
-
-    if (window.votingManager?.attachBubble) {
-      window.votingManager.attachBubble(this.messagesList);
     }
   }
 
@@ -334,7 +379,9 @@ class ChatPageManager {
     if (msg.deletedAt) {
       text.textContent = '(삭제된 메시지)';
     } else {
-      text.textContent = msg.message || (msg.imageUrl ? '이미지를 공유했습니다.' : '');
+      const messageText = msg.message || (msg.imageUrl ? '이미지를 공유했습니다.' : '');
+      // 마크다운 및 이펙트 처리
+      text.innerHTML = this.parseMessageMarkdown(messageText);
     }
 
     body.appendChild(text);
@@ -598,14 +645,89 @@ class ChatPageManager {
     }, 3000);
   }
 
+  parseTimestamp(value) {
+    if (!value && value !== 0) return null;
+
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+
+    if (typeof value === 'number') {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    const raw = String(value).trim();
+    if (!raw) return null;
+
+    // Treat timestamps without timezone info as UTC.
+    const hasTimezone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(raw);
+    const normalized = hasTimezone ? raw : `${raw}Z`;
+
+    const parsed = new Date(normalized);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  setVoteTimelineEvent(eventData) {
+    if (!eventData) {
+      this.voteTimelineEvent = null;
+      if (this.voteBubble) {
+        this.voteBubble.hidden = true;
+      }
+      this.renderMessages();
+      return;
+    }
+
+    const timestampSource = eventData.timestamp || eventData.expiresAt || eventData.createdAt;
+    const parsedTs = this.parseTimestamp(timestampSource);
+
+    this.voteTimelineEvent = {
+      type: 'vote',
+      timestamp: parsedTs ? parsedTs.getTime() : Date.now(),
+      state: eventData.state || 'result',
+      payload: eventData
+    };
+
+    if (this.voteBubble) {
+      this.voteBubble.hidden = false;
+      this.voteBubble.dataset.timelineState = eventData.state || 'result';
+    }
+
+    this.renderMessages();
+  }
+
   formatTime(isoString) {
+    const KST_OFFSET_MS = 9 * 60 * 60 * 1000; // UTC+9
+
     try {
-      if (!isoString) return '';
-      const date = new Date(isoString);
-      const hours = date.getHours().toString().padStart(2, '0');
-      const minutes = date.getMinutes().toString().padStart(2, '0');
-      return `${hours}:${minutes}`;
-    } catch {
+      const utcDate = this.parseTimestamp(isoString);
+      if (!utcDate) return '';
+
+      const kstDate = new Date(utcDate.getTime() + KST_OFFSET_MS);
+      const nowKst = new Date(Date.now() + KST_OFFSET_MS);
+
+      const messageDay = Date.UTC(
+        kstDate.getUTCFullYear(),
+        kstDate.getUTCMonth(),
+        kstDate.getUTCDate()
+      );
+      const todayDay = Date.UTC(
+        nowKst.getUTCFullYear(),
+        nowKst.getUTCMonth(),
+        nowKst.getUTCDate()
+      );
+      const daysDiff = Math.floor((todayDay - messageDay) / (1000 * 60 * 60 * 24));
+
+      const hours = String(kstDate.getUTCHours()).padStart(2, '0');
+      const minutes = String(kstDate.getUTCMinutes()).padStart(2, '0');
+      const timeStr = `${hours}:${minutes}`;
+
+      if (daysDiff === 0) return timeStr;
+      if (daysDiff === 1) return `1일 전 ${timeStr}`;
+      if (daysDiff > 1) return `${daysDiff}일 전 ${timeStr}`;
+      return timeStr;
+    } catch (error) {
+      console.warn('[ChatPage] Failed to format time', error);
       return '';
     }
   }
@@ -615,11 +737,64 @@ class ChatPageManager {
     div.textContent = text ?? '';
     return div.innerHTML;
   }
+
+  parseMessageMarkdown(text) {
+    if (!text) return '';
+
+    // Escape HTML first
+    let escaped = this.escapeHtml(text);
+
+    // 마크다운 문법 처리
+    // **굵게** -> <strong>굵게</strong>
+    escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+    // *기울임* -> <em>기울임</em>
+    escaped = escaped.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+    // __밑줄__ -> <u>밑줄</u>
+    escaped = escaped.replace(/__(.+?)__/g, '<u>$1</u>');
+
+    // ~~취소선~~ -> <s>취소선</s>
+    escaped = escaped.replace(/~~(.+?)~~/g, '<s>$1</s>');
+
+    // `코드` -> <code>코드</code>
+    escaped = escaped.replace(/`(.+?)`/g, '<code>$1</code>');
+
+    // 글자 이펙트 처리
+    // [rainbow:텍스트] -> 무지개 효과
+    escaped = escaped.replace(/\[rainbow:(.+?)\]/g, '<span class="effect-rainbow">$1</span>');
+
+    // [glow:텍스트] -> 글로우 효과
+    escaped = escaped.replace(/\[glow:(.+?)\]/g, '<span class="effect-glow">$1</span>');
+
+    // [shake:텍스트] -> 흔들림 효과
+    escaped = escaped.replace(/\[shake:(.+?)\]/g, '<span class="effect-shake">$1</span>');
+
+    // [bounce:텍스트] -> 바운스 효과
+    escaped = escaped.replace(/\[bounce:(.+?)\]/g, '<span class="effect-bounce">$1</span>');
+
+    // [fade:텍스트] -> 페이드 효과
+    escaped = escaped.replace(/\[fade:(.+?)\]/g, '<span class="effect-fade">$1</span>');
+
+    // [spin:텍스트] -> 회전 효과
+    escaped = escaped.replace(/\[spin:(.+?)\]/g, '<span class="effect-spin">$1</span>');
+
+    // [wave:텍스트] -> 물결 효과
+    escaped = escaped.replace(/\[wave:(.+?)\]/g, (match, content) => {
+      const letters = content.split('').map((char, i) =>
+        `<span class="wave-letter" style="animation-delay: ${i * 0.1}s">${char}</span>`
+      ).join('');
+      return `<span class="effect-wave">${letters}</span>`;
+    });
+
+    return escaped;
+  }
 }
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
   const chatPage = new ChatPageManager();
+  window.chatPage = chatPage;
   chatPage.init();
 
   // Initialize voting and reactions managers
@@ -644,10 +819,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (voteSubmitBtn) {
     voteSubmitBtn.addEventListener('click', async () => {
       if (!window.votingManager) return;
-      const result = await window.votingManager.submitVote();
-      if (!result.success) {
-        alert(result.error || '투표를 제출하지 못했어요.');
-      }
+      await window.votingManager.submitVote();
+      // submitVote 함수 내부에서 토스트 메시지를 표시하므로 여기서는 별도 처리 불필요
     });
   }
 

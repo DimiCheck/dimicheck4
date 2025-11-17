@@ -28,6 +28,7 @@
   </script>
   <script defer src="/js/pwa.js"></script>
   <script defer src="/js/preferences.js"></script>
+  <script defer src="/js/auth-guard.js"></script>
   <title>채팅 - DIMI Check</title>
   <meta name="color-scheme" content="light dark" />
 
@@ -803,9 +804,118 @@
       }
     }
 
+    /* 마크다운 스타일 */
+    .message-text strong{
+      font-weight:700;
+      color:var(--primary);
+    }
+    .message-text em{
+      font-style:italic;
+    }
+    .message-text u{
+      text-decoration:underline;
+    }
+    .message-text s{
+      text-decoration:line-through;
+      opacity:0.7;
+    }
+    .message-text code{
+      background:rgba(255,255,255,0.1);
+      padding:2px 6px;
+      border-radius:4px;
+      font-family:'Consolas','Monaco','Courier New',monospace;
+      font-size:0.9em;
+      color:var(--primary-2);
+    }
+
+    /* 글자 이펙트 */
+    .effect-rainbow{
+      background:linear-gradient(90deg,#ff0000,#ff7f00,#ffff00,#00ff00,#0000ff,#4b0082,#9400d3);
+      -webkit-background-clip:text;
+      background-clip:text;
+      -webkit-text-fill-color:transparent;
+      background-size:200% auto;
+      animation:rainbow-scroll 3s linear infinite;
+      font-weight:700;
+    }
+    @keyframes rainbow-scroll{
+      0%{background-position:0% center}
+      100%{background-position:200% center}
+    }
+
+    .effect-glow{
+      color:#fff;
+      text-shadow:0 0 10px var(--primary),0 0 20px var(--primary),0 0 30px var(--primary),0 0 40px var(--primary);
+      animation:glow-pulse 2s ease-in-out infinite;
+      font-weight:600;
+    }
+    @keyframes glow-pulse{
+      0%,100%{text-shadow:0 0 10px var(--primary),0 0 20px var(--primary)}
+      50%{text-shadow:0 0 20px var(--primary),0 0 30px var(--primary),0 0 40px var(--primary)}
+    }
+
+    .effect-shake{
+      display:inline-block;
+      animation:shake 0.5s ease-in-out infinite;
+    }
+    @keyframes shake{
+      0%,100%{transform:translateX(0)}
+      10%,30%,50%,70%,90%{transform:translateX(-2px)}
+      20%,40%,60%,80%{transform:translateX(2px)}
+    }
+
+    .effect-bounce{
+      display:inline-block;
+      animation:bounce 1s ease-in-out infinite;
+    }
+    @keyframes bounce{
+      0%,100%{transform:translateY(0)}
+      50%{transform:translateY(-10px)}
+    }
+
+    .effect-fade{
+      animation:fade 2s ease-in-out infinite;
+    }
+    @keyframes fade{
+      0%,100%{opacity:1}
+      50%{opacity:0.3}
+    }
+
+    .effect-spin{
+      display:inline-block;
+      animation:spin 2s linear infinite;
+    }
+    @keyframes spin{
+      0%{transform:rotate(0deg)}
+      100%{transform:rotate(360deg)}
+    }
+
+    .effect-wave{
+      display:inline-block;
+    }
+    .wave-letter{
+      display:inline-block;
+      animation:wave 1.5s ease-in-out infinite;
+    }
+    @keyframes wave{
+      0%,100%{transform:translateY(0)}
+      50%{transform:translateY(-8px)}
+    }
+
     @media (prefers-reduced-motion: reduce){
       .blob{animation:none}
       .chat-message{animation:none}
+      .effect-rainbow,.effect-glow,.effect-shake,.effect-bounce,.effect-fade,.effect-spin,.wave-letter{
+        animation:none!important;
+      }
+      .effect-rainbow{
+        background:var(--primary);
+        -webkit-text-fill-color:var(--primary);
+      }
+      .effect-glow{
+        text-shadow:none;
+        color:var(--primary);
+      }
     }
   </style>
 </head>
