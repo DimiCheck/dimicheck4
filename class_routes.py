@@ -7,7 +7,7 @@ from flask import Blueprint, jsonify, request, session
 
 from extensions import db
 from config import config
-from models import ClassState, ClassRoutine, ChatMessage
+from models import ClassState, ClassRoutine, ChatMessage, MealVote, CalendarEvent
 from config_loader import load_class_config
 from utils import is_board_session_active, is_teacher_session_active
 
@@ -762,3 +762,281 @@ def get_schoollife_timetable():
         print(f"[TIMETABLE] Endpoint error: {e}")
         print(f"[TIMETABLE] Full traceback: {traceback.format_exc()}")
         return jsonify({"error": str(e)}), 500
+
+
+# ==================== Meal Vote APIs ====================
+@blueprint.post('/schoollife/meal/vote')
+def vote_meal():
+    """Vote on today's meal (thumbs up or down)"""
+    grade = request.args.get('grade', type=int)
+    section = request.args.get('section', type=int)
+
+    if not grade or not section:
+        return jsonify({"error": "missing grade or section"}), 400
+
+    session_grade, session_section, session_number = _get_student_session_info()
+
+    # Only students from the same class can vote
+    if session_grade != grade or session_section != section or session_number is None:
+        return jsonify({"error": "forbidden"}), 403
+
+    payload = request.get_json() or {}
+    is_positive = payload.get('isPositive')
+
+    if is_positive is None:
+        return jsonify({"error": "isPositive required"}), 400
+
+    # Use KST for Korea
+    kst = _get_kst()
+    today = datetime.now(kst).date()
+
+    # Check if already voted today
+    existing_vote = MealVote.query.filter_by(
+        grade=grade,
+        section=section,
+        student_number=session_number,
+        date=today
+    ).first()
+
+    if existing_vote:
+        # Update existing vote
+        existing_vote.is_positive = bool(is_positive)
+    else:
+        # Create new vote
+        new_vote = MealVote(
+            grade=grade,
+            section=section,
+            student_number=session_number,
+            date=today,
+            is_positive=bool(is_positive)
+        )
+        db.session.add(new_vote)
+
+    db.session.commit()
+
+    return jsonify({"ok": True})
+
+
+@blueprint.get('/schoollife/meal/stats')
+def get_meal_stats():
+    """Get meal vote statistics for today"""
+    grade = request.args.get('grade', type=int)
+    section = request.args.get('section', type=int)
+
+    if not grade or not section:
+        return jsonify({"error": "missing grade or section"}), 400
+
+    if not _is_authorized(grade, section):
+        return jsonify({"error": "forbidden"}), 403
+
+    # Use KST for Korea
+    kst = _get_kst()
+    today = datetime.now(kst).date()
+
+    # Get all votes for today
+    votes = MealVote.query.filter_by(
+        grade=grade,
+        section=section,
+        date=today
+    ).all()
+
+    positive_count = sum(1 for v in votes if v.is_positive)
+    total_count = len(votes)
+
+    percentage = round((positive_count / total_count * 100)) if total_count > 0 else 0
+
+    # Check if current student voted
+    session_grade, session_section, session_number = _get_student_session_info()
+    my_vote = None
+    if session_number is not None:
+        my_vote_record = MealVote.query.filter_by(
+            grade=grade,
+            section=section,
+            student_number=session_number,
+            date=today
+        ).first()
+        if my_vote_record:
+            my_vote = my_vote_record.is_positive
+
+    return jsonify({
+        "positiveCount": positive_count,
+        "totalCount": total_count,
+        "percentage": percentage,
+        "myVote": my_vote
+    })
+
+
+# ==================== Calendar APIs ====================
+@blueprint.get('/calendar/events')
+def get_calendar_events():
+    """Get calendar events for a class"""
+    grade = request.args.get('grade', type=int)
+    section = request.args.get('section', type=int)
+    month = request.args.get('month', type=int)  # Optional: filter by month (1-12)
+    year = request.args.get('year', type=int)  # Optional: filter by year
+
+    if not grade or not section:
+        return jsonify({"error": "missing grade or section"}), 400
+
+    if not _is_authorized(grade, section):
+        return jsonify({"error": "forbidden"}), 403
+
+    query = CalendarEvent.query.filter_by(grade=grade, section=section)
+
+    # Filter by month/year if provided
+    if month and year:
+        from calendar import monthrange
+        _, last_day = monthrange(year, month)
+        start_date = datetime(year, month, 1).date()
+        end_date = datetime(year, month, last_day).date()
+        query = query.filter(CalendarEvent.event_date >= start_date, CalendarEvent.event_date <= end_date)
+
+    events = query.order_by(CalendarEvent.event_date).all()
+
+    result = []
+    for event in events:
+        result.append({
+            "id": event.id,
+            "title": event.title,
+            "description": event.description,
+            "date": event.event_date.isoformat(),
+            "createdBy": event.created_by,
+            "createdAt": event.created_at.isoformat(),
+            "updatedAt": event.updated_at.isoformat()
+        })
+
+    return jsonify({"events": result})
+
+
+@blueprint.post('/calendar/events')
+def create_calendar_event():
+    """Create a new calendar event"""
+    grade = request.args.get('grade', type=int)
+    section = request.args.get('section', type=int)
+
+    if not grade or not section:
+        return jsonify({"error": "missing grade or section"}), 400
+
+    session_grade, session_section, session_number = _get_student_session_info()
+    is_teacher = is_teacher_session_active()
+    is_board = is_board_session_active(grade, section)
+
+    # Students can only create events for their own class
+    if not is_teacher and not is_board:
+        if session_grade != grade or session_section != section or session_number is None:
+            return jsonify({"error": "forbidden"}), 403
+
+    payload = request.get_json() or {}
+    title = (payload.get('title') or '').strip()
+    description = (payload.get('description') or '').strip()
+    event_date_str = payload.get('date')
+
+    if not title:
+        return jsonify({"error": "title required"}), 400
+
+    if not event_date_str:
+        return jsonify({"error": "date required"}), 400
+
+    # Parse date
+    try:
+        event_date = datetime.fromisoformat(event_date_str.replace('Z', '+00:00')).date()
+    except (ValueError, AttributeError):
+        return jsonify({"error": "invalid date format"}), 400
+
+    created_by = session_number if session_number is not None else 0
+
+    new_event = CalendarEvent(
+        grade=grade,
+        section=section,
+        title=title,
+        description=description,
+        event_date=event_date,
+        created_by=created_by
+    )
+
+    db.session.add(new_event)
+    db.session.commit()
+
+    return jsonify({
+        "ok": True,
+        "event": {
+            "id": new_event.id,
+            "title": new_event.title,
+            "description": new_event.description,
+            "date": new_event.event_date.isoformat(),
+            "createdBy": new_event.created_by,
+            "createdAt": new_event.created_at.isoformat()
+        }
+    })
+
+
+@blueprint.put('/calendar/events/<int:event_id>')
+def update_calendar_event(event_id):
+    """Update an existing calendar event"""
+    event = CalendarEvent.query.get(event_id)
+
+    if not event:
+        return jsonify({"error": "event not found"}), 404
+
+    session_grade, session_section, session_number = _get_student_session_info()
+    is_teacher = is_teacher_session_active()
+    is_board = is_board_session_active(event.grade, event.section)
+
+    # Only the creator, teacher, or board can edit
+    if not is_teacher and not is_board:
+        if session_number != event.created_by:
+            return jsonify({"error": "forbidden"}), 403
+
+    payload = request.get_json() or {}
+
+    if 'title' in payload:
+        title = (payload['title'] or '').strip()
+        if not title:
+            return jsonify({"error": "title cannot be empty"}), 400
+        event.title = title
+
+    if 'description' in payload:
+        event.description = (payload['description'] or '').strip()
+
+    if 'date' in payload:
+        try:
+            event.event_date = datetime.fromisoformat(payload['date'].replace('Z', '+00:00')).date()
+        except (ValueError, AttributeError):
+            return jsonify({"error": "invalid date format"}), 400
+
+    db.session.commit()
+
+    return jsonify({
+        "ok": True,
+        "event": {
+            "id": event.id,
+            "title": event.title,
+            "description": event.description,
+            "date": event.event_date.isoformat(),
+            "createdBy": event.created_by,
+            "updatedAt": event.updated_at.isoformat()
+        }
+    })
+
+
+@blueprint.delete('/calendar/events/<int:event_id>')
+def delete_calendar_event(event_id):
+    """Delete a calendar event"""
+    event = CalendarEvent.query.get(event_id)
+
+    if not event:
+        return jsonify({"error": "event not found"}), 404
+
+    session_grade, session_section, session_number = _get_student_session_info()
+    is_teacher = is_teacher_session_active()
+    is_board = is_board_session_active(event.grade, event.section)
+
+    # Only the creator, teacher, or board can delete
+    if not is_teacher and not is_board:
+        if session_number != event.created_by:
+            return jsonify({"error": "forbidden"}), 403
+
+    db.session.delete(event)
+    db.session.commit()
+
+    return jsonify({"ok": True})
