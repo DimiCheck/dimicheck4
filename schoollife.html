@@ -127,9 +127,20 @@
       height:40px; padding:0 12px; border-radius:12px; border:1px solid color-mix(in oklab, var(--text) 15%, transparent);
       background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
       color:var(--text); font-weight:600; cursor:pointer;
+      transition:all .2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    button:active{
+      transform:scale(0.96);
+      box-shadow:0 0 0 4px color-mix(in oklab, var(--primary) 15%, transparent);
     }
     button.cta{background:linear-gradient(135deg,var(--primary),var(--primary-2)); color:#fff; border:0}
+    button.cta:active{
+      box-shadow:0 0 0 4px color-mix(in oklab, var(--primary) 20%, transparent), 0 4px 12px rgba(208, 79, 255, .3);
+    }
     button.ghost{background:transparent}
+    button.ghost:active{
+      box-shadow:0 0 0 4px color-mix(in oklab, var(--text) 10%, transparent);
+    }
 
     main{
       width:min(1100px,92vw); margin:18px auto 28px; display:grid; gap:18px;
@@ -194,22 +205,24 @@
     @keyframes rise{to{opacity:1; transform:none}}
 
     .spacer {
-      height: calc(60px + env(safe-area-inset-bottom));
+      height: calc(68px + 32px + env(safe-area-inset-bottom));
     }
 
-    /* Bottom Navigation */
+    /* Bottom Navigation - Floating Rounded Style */
     .bottom-nav {
       position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: calc(60px + env(safe-area-inset-bottom));
-      padding-bottom: env(safe-area-inset-bottom);
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(480px, calc(100% - 32px));
+      height: 68px;
+      padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
       display: flex;
-      background: var(--card);
-      backdrop-filter: saturate(140%) blur(14px);
-      border-top: 1px solid color-mix(in oklab, var(--text) 10%, transparent);
-      box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+      background: linear-gradient(180deg, var(--card), var(--card-2));
+      backdrop-filter: saturate(180%) blur(20px);
+      border-radius: 24px;
+      border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, .3), 0 0 0 1px rgba(255, 255, 255, .08) inset;
       z-index: 1000;
     }
     .nav-item {
@@ -221,19 +234,28 @@
       gap: 4px;
       color: var(--muted);
       text-decoration: none;
-      font-size: 12px;
-      font-weight: 500;
-      transition: color .2s ease;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 8px 4px;
+      border-radius: 16px;
+      transition: all .25s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
     }
     .nav-item:hover {
       color: var(--text);
+      background: rgba(255, 255, 255, .06);
     }
     .nav-item.active {
       color: var(--primary);
+      background: color-mix(in oklab, var(--primary) 12%, transparent);
     }
     .nav-item svg {
       width: 24px;
       height: 24px;
+      transition: transform .25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .nav-item:active svg {
+      transform: scale(0.85);
     }
 
     .weather-card{
@@ -553,6 +575,22 @@
     applyWeatherGradient(desc);
   }
 
+  function showWeatherError(message){
+    console.error('[Schoollife] weather load failed:', message);
+    const fallback = {
+      temperature: null,
+      desc: '날씨 정보를 불러올 수 없습니다.',
+      high: null,
+      low: null,
+      rain: null,
+    };
+    renderWeather(fallback);
+    const commentEl = document.getElementById('wcComment');
+    if (commentEl) {
+      commentEl.textContent = '날씨 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.';
+    }
+  }
+
   // Remove old timetable fetching logic; server supplies data
   function renderTimetable(payload){
     const list = document.getElementById('timetableToday');
@@ -646,23 +684,58 @@
     }
   }
 
+  function showMealError(message){
+    console.error('[Schoollife] meal load failed:', message);
+    const grid = document.getElementById('mealGrid');
+    const sub = document.getElementById('meal-sub');
+    if (sub) sub.textContent = '급식 정보를 불러올 수 없습니다.';
+    if (grid) {
+      grid.innerHTML = '<div class="meal-card"><h3>알림</h3><div class="empty">급식 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div></div>';
+    }
+  }
+
+  function showTimetableError(message){
+    console.error('[Schoollife] timetable load failed:', message);
+    const list = document.getElementById('timetableToday');
+    if (list) {
+      list.innerHTML = '<div class="empty">시간표를 불러오지 못했습니다.<br>잠시 후 다시 시도해 주세요.</div>';
+    }
+  }
+
   // -------- load all --------
   async function loadTodayAll(){
     const list = document.getElementById('timetableToday');
     list.innerHTML = '<div class="empty">시간표 불러오는 중…</div>';
     const g = gradeSel.value, c = classSel.value;
     try {
-      const [weather, meal, timetable] = await Promise.all([
+      const [weatherResult, mealResult, timetableResult] = await Promise.allSettled([
         fetchJson('/api/classes/schoollife/weather'),
         fetchJson('/api/classes/schoollife/meal'),
         fetchJson(`/api/classes/schoollife/timetable?grade=${g}&section=${c}`)
       ]);
-      renderWeather(weather);
-      renderMeal(meal);
-      renderTimetable(timetable);
+
+      if (weatherResult.status === 'fulfilled') {
+        renderWeather(weatherResult.value);
+      } else {
+        showWeatherError(weatherResult.reason);
+      }
+
+      if (mealResult.status === 'fulfilled') {
+        renderMeal(mealResult.value);
+      } else {
+        showMealError(mealResult.reason);
+      }
+
+      if (timetableResult.status === 'fulfilled') {
+        renderTimetable(timetableResult.value);
+      } else {
+        showTimetableError(timetableResult.reason);
+      }
     } catch(e) {
       console.error("loadTodayAll error:", e);
-      list.innerHTML = `<div class="empty">시간표를 불러오지 못했습니다.<br>서버 오류일 수 있습니다.</div>`;
+      showWeatherError(e);
+      showMealError(e);
+      showTimetableError(e);
     }
   }
 

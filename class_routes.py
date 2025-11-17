@@ -548,14 +548,24 @@ _SCHOOLLIFE_CACHE = {
     "timetable": {},  # keyed by (grade, section)
 }
 
+def _get_kst():
+    """Get KST timezone (UTC+9)"""
+    return timezone(timedelta(hours=9))
+
 def _is_same_day(ts1: datetime | None, ts2: datetime | None) -> bool:
     if not ts1 or not ts2:
         return False
-    return ts1.strftime('%Y%m%d') == ts2.strftime('%Y%m%d')
+    # Convert to KST for comparison
+    kst = _get_kst()
+    ts1_kst = ts1.astimezone(kst) if ts1.tzinfo else ts1.replace(tzinfo=timezone.utc).astimezone(kst)
+    ts2_kst = ts2.astimezone(kst) if ts2.tzinfo else ts2.replace(tzinfo=timezone.utc).astimezone(kst)
+    return ts1_kst.strftime('%Y%m%d') == ts2_kst.strftime('%Y%m%d')
 
 def _get_today_start() -> datetime:
-    now = datetime.now(timezone.utc)
-    return datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    # Use KST (UTC+9) for Korea
+    kst = _get_kst()
+    now = datetime.now(kst)
+    return datetime(now.year, now.month, now.day, tzinfo=kst)
 
 def _fetch_weather_from_api():
     # Placeholder: replace with actual weather API
@@ -590,9 +600,17 @@ def _fetch_meal_from_api():
     }
     if config.NEIS_API_KEY:
         params["KEY"] = config.NEIS_API_KEY
-    today = datetime.now().strftime('%Y%m%d')
+    # Use KST for Korea
+    print(f"[MEAL] Creating KST timezone...")
+    kst = _get_kst()
+    print(f"[MEAL] KST timezone created: {kst}")
+    now_kst = datetime.now(kst)
+    print(f"[MEAL] Current KST time: {now_kst}")
+    today = now_kst.strftime('%Y%m%d')
+    print(f"[MEAL] Today string: {today}")
     params["MLSV_YMD"] = today
-    res = requests.get("https://open.neis.go.kr/hub/mealServiceDietInfo", params=params, timeout=5)
+    print(f"[MEAL] Making request to NEIS API with params: {params}")
+    res = requests.get("https://open.neis.go.kr/hub/mealServiceDietInfo", params=params, timeout=15)
     res.raise_for_status()
     data = res.json()
     cards = {
@@ -620,17 +638,26 @@ def _fetch_meal_from_api():
     return cards
 
 def _fetch_timetable_from_api(grade: int, section: int):
+    # Use KST for Korea
+    print(f"[TIMETABLE] Creating KST timezone...")
+    kst = _get_kst()
+    print(f"[TIMETABLE] KST timezone created: {kst}")
+    now_kst = datetime.now(kst)
+    print(f"[TIMETABLE] Current KST time: {now_kst}")
+    today = now_kst.strftime('%Y%m%d')
+    print(f"[TIMETABLE] Today string: {today}")
     params = {
         "Type": "json",
         "ATPT_OFCDC_SC_CODE": "J10",
         "SD_SCHUL_CODE": "7530560",
         "GRADE": grade,
         "CLASS_NM": section,
-        "ALL_TI_YMD": datetime.now().strftime('%Y%m%d'),
+        "ALL_TI_YMD": today,
     }
     if config.NEIS_API_KEY:
         params["KEY"] = config.NEIS_API_KEY
-    res = requests.get("https://open.neis.go.kr/hub/hisTimetable", params=params, timeout=5)
+    print(f"[TIMETABLE] Making request to NEIS API with params: {params}")
+    res = requests.get("https://open.neis.go.kr/hub/hisTimetable", params=params, timeout=15)
     res.raise_for_status()
     data = res.json()
     lessons = []
@@ -652,7 +679,7 @@ def _fetch_timetable_from_api(grade: int, section: int):
 
 @blueprint.get('/schoollife/weather')
 def get_schoollife_weather():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(_get_kst())
     cache_entry = _SCHOOLLIFE_CACHE["weather"]
     if cache_entry["data"] and _is_same_day(cache_entry["timestamp"], now):
         return jsonify(cache_entry["data"])
@@ -671,49 +698,67 @@ def get_schoollife_weather():
 
 @blueprint.get('/schoollife/meal')
 def get_schoollife_meal():
-    now = datetime.now(timezone.utc)
-    cache_entry = _SCHOOLLIFE_CACHE["meal"]
-    if cache_entry["data"] and _is_same_day(cache_entry["timestamp"], now):
-        return jsonify(cache_entry["data"])
-
+    import traceback
     try:
-        data = _fetch_meal_from_api()
-        cache_entry["data"] = data
-        cache_entry["timestamp"] = now
-    except Exception as e:
-        if cache_entry["data"]:
+        now = datetime.now(_get_kst())
+        print(f"[MEAL] KST now: {now}")
+        cache_entry = _SCHOOLLIFE_CACHE["meal"]
+        if cache_entry["data"] and _is_same_day(cache_entry["timestamp"], now):
             return jsonify(cache_entry["data"])
-        return jsonify({"error": str(e)}), 500
 
-    return jsonify(data)
+        try:
+            data = _fetch_meal_from_api()
+            cache_entry["data"] = data
+            cache_entry["timestamp"] = now
+        except Exception as e:
+            print(f"[MEAL] API fetch error: {e}")
+            print(f"[MEAL] Traceback: {traceback.format_exc()}")
+            if cache_entry["data"]:
+                return jsonify(cache_entry["data"])
+            return jsonify({"error": str(e)}), 500
+
+        return jsonify(data)
+    except Exception as e:
+        print(f"[MEAL] Endpoint error: {e}")
+        print(f"[MEAL] Full traceback: {traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
 
 
 @blueprint.get('/schoollife/timetable')
 def get_schoollife_timetable():
-    grade = request.args.get('grade', type=int)
-    section = request.args.get('section', type=int)
-    if not grade or not section:
-        return jsonify({"error": "missing grade or section"}), 400
-
-    now = datetime.now(timezone.utc)
-    key = (grade, section)
-    cache_entry = _SCHOOLLIFE_CACHE["timetable"].get(key)
-    if cache_entry and _is_same_day(cache_entry["timestamp"], now):
-        return jsonify(cache_entry["data"])
-
+    import traceback
     try:
-        lessons = _fetch_timetable_from_api(grade, section)
-        payload = {
-            "lessons": lessons,
-            "date": datetime.now().strftime('%Y-%m-%d')
-        }
-        _SCHOOLLIFE_CACHE["timetable"][key] = {
-            "data": payload,
-            "timestamp": now
-        }
-    except Exception as e:
-        if cache_entry:
-            return jsonify(cache_entry["data"])
-        return jsonify({"error": str(e)}), 500
+        grade = request.args.get('grade', type=int)
+        section = request.args.get('section', type=int)
+        if not grade or not section:
+            return jsonify({"error": "missing grade or section"}), 400
 
-    return jsonify(payload)
+        now = datetime.now(_get_kst())
+        print(f"[TIMETABLE] KST now: {now}, grade: {grade}, section: {section}")
+        key = (grade, section)
+        cache_entry = _SCHOOLLIFE_CACHE["timetable"].get(key)
+        if cache_entry and _is_same_day(cache_entry["timestamp"], now):
+            return jsonify(cache_entry["data"])
+
+        try:
+            lessons = _fetch_timetable_from_api(grade, section)
+            payload = {
+                "lessons": lessons,
+                "date": datetime.now(_get_kst()).strftime('%Y-%m-%d')
+            }
+            _SCHOOLLIFE_CACHE["timetable"][key] = {
+                "data": payload,
+                "timestamp": now
+            }
+        except Exception as e:
+            print(f"[TIMETABLE] API fetch error: {e}")
+            print(f"[TIMETABLE] Traceback: {traceback.format_exc()}")
+            if cache_entry:
+                return jsonify(cache_entry["data"])
+            return jsonify({"error": str(e)}), 500
+
+        return jsonify(payload)
+    except Exception as e:
+        print(f"[TIMETABLE] Endpoint error: {e}")
+        print(f"[TIMETABLE] Full traceback: {traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500

@@ -50,6 +50,10 @@ class ChatPageManager {
 
     // Toast
     this.toast = null;
+
+    // Audio elements
+    this.sendAudio = new Audio('/src/send.mp3');
+    this.receiveAudio = new Audio('/src/recieve.mp3');
   }
 
   init() {
@@ -212,6 +216,8 @@ class ChatPageManager {
 
         if (freshMessages.length) {
           window.notificationManager?.notifyChatMessages?.(freshMessages);
+          // Play receive sound for new messages from others
+          this.receiveAudio.play().catch(err => console.log('Audio play failed:', err));
         }
         this.renderMessages();
       }
@@ -419,6 +425,9 @@ class ChatPageManager {
         const errData = await res.json().catch(() => ({ error: 'Failed to send' }));
         throw new Error(errData.error || 'Failed to send message');
       }
+
+      // Play send sound
+      this.sendAudio.play().catch(err => console.log('Audio play failed:', err));
 
       // Clear input and pending states
       if (this.chatInput) this.chatInput.value = '';

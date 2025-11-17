@@ -136,10 +136,13 @@
       height:40px; padding:0 16px; border-radius:12px; border:1px solid color-mix(in oklab, var(--text) 15%, transparent);
       background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
       color:var(--text); font-weight:600; cursor:pointer; font-family:inherit;
-      transition:transform .1s, background .2s;
+      transition:all .2s cubic-bezier(0.4, 0, 0.2, 1);
     }
     button:hover{background:linear-gradient(180deg, rgba(255,255,255,.15), rgba(255,255,255,.08));}
-    button:active{transform:scale(0.98)}
+    button:active{
+      transform:scale(0.96);
+      box-shadow:0 0 0 4px color-mix(in oklab, var(--primary) 15%, transparent);
+    }
     button.icon-btn,
     a.icon-btn{
       width:40px;
@@ -166,7 +169,7 @@
       flex-direction:column;
       overflow:hidden;
       position:relative;
-      margin-bottom:calc(60px + env(safe-area-inset-bottom));
+      margin-bottom:calc(100px + env(safe-area-inset-bottom));
     }
 
     .chat-messages-container{
@@ -508,13 +511,14 @@
       font-weight:600;
       font-size:15px;
       cursor:pointer;
-      transition:background .2s, transform .1s;
+      transition:all .2s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .btn-send:hover{
       background:#b830e0;
     }
     .btn-send:active{
       transform:scale(0.96);
+      box-shadow:0 0 0 6px color-mix(in oklab, var(--primary) 25%, transparent), 0 6px 16px rgba(208, 79, 255, .4);
     }
 
     /* Modals */
@@ -623,10 +627,14 @@
       font-size:15px;
       cursor:pointer;
       flex:1;
-      transition:background .2s;
+      transition:all .2s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .btn-primary:hover{
       background:#b830e0;
+    }
+    .btn-primary:active{
+      transform:scale(0.96);
+      box-shadow:0 0 0 4px color-mix(in oklab, var(--primary) 25%, transparent), 0 6px 16px rgba(208, 79, 255, .4);
     }
     .btn-primary:disabled{
       background:rgba(208,79,255,.5);
@@ -731,19 +739,21 @@
     .avatar-color-9{background:linear-gradient(135deg,#ffecd2 0%,#fcb69f 100%)}
     .avatar-color-0{background:linear-gradient(135deg,#ff6e7f 0%,#bfe9ff 100%)}
 
-    /* Bottom Navigation */
+    /* Bottom Navigation - Floating Rounded Style */
     .bottom-nav{
       position:fixed;
-      bottom:0;
-      left:0;
-      right:0;
-      height:calc(60px + env(safe-area-inset-bottom));
-      padding-bottom:env(safe-area-inset-bottom);
+      bottom:16px;
+      left:50%;
+      transform:translateX(-50%);
+      width:min(480px, calc(100% - 32px));
+      height:68px;
+      padding:8px 12px calc(8px + env(safe-area-inset-bottom));
       display:flex;
-      background:var(--card);
-      backdrop-filter:saturate(140%) blur(14px);
-      border-top:1px solid color-mix(in oklab, var(--text) 10%, transparent);
-      box-shadow:0 -5px 20px rgba(0,0,0,0.1);
+      background:linear-gradient(180deg, var(--card), var(--card-2));
+      backdrop-filter:saturate(180%) blur(20px);
+      border-radius:24px;
+      border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      box-shadow:0 8px 32px rgba(0, 0, 0, .3), 0 0 0 1px rgba(255, 255, 255, .08) inset;
       z-index:1000;
     }
     .nav-item{
@@ -755,15 +765,31 @@
       gap:4px;
       color:var(--muted);
       text-decoration:none;
-      font-size:12px;
-      font-weight:500;
-      transition:color .2s ease;
+      font-size:11px;
+      font-weight:600;
+      padding:8px 4px;
+      border-radius:16px;
+      transition:all .25s cubic-bezier(0.4, 0, 0.2, 1);
+      position:relative;
     }
-    .nav-item:hover{color:var(--text)}
-    .nav-item.active{color:var(--primary)}
-    .nav-item svg{width:24px; height:24px}
+    .nav-item:hover{
+      color:var(--text);
+      background:rgba(255, 255, 255, .06);
+    }
+    .nav-item.active{
+      color:var(--primary);
+      background:color-mix(in oklab, var(--primary) 12%, transparent);
+    }
+    .nav-item svg{
+      width:24px;
+      height:24px;
+      transition:transform .25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .nav-item:active svg{
+      transform:scale(0.85);
+    }
 
-    .spacer{height:calc(60px + env(safe-area-inset-bottom))}
+    .spacer{height:calc(68px + 32px + env(safe-area-inset-bottom))}
 
     @media (max-width:768px){
       .chat-messages-container{

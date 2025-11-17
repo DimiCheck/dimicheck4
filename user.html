@@ -171,14 +171,21 @@
       cursor:pointer; position:relative; padding:16px 16px 18px;
       border-radius:16px; border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
       background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
-      transition:transform .15s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
+      transition:all .25s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .status-card:hover{transform:translateY(-1px)}
+    .status-card:active{
+      transform:scale(0.97);
+      box-shadow:0 0 0 4px color-mix(in oklab, var(--primary) 15%, transparent);
+    }
     .status-card.selected{
       transform:translateY(-2px);
       box-shadow:var(--ring);
       border-color: color-mix(in oklab, var(--primary) 50%, transparent);
       background:linear-gradient(180deg, color-mix(in oklab, var(--primary) 10%, rgba(255,255,255,.1)), rgba(255,255,255,.05));
+    }
+    .status-card.selected:active{
+      box-shadow:0 0 0 10px color-mix(in oklab, var(--primary) 35%, transparent);
     }
     .status-card.selected.completed{
       box-shadow:0 0 0 8px color-mix(in oklab, #38d67a 28%, transparent);
@@ -212,17 +219,61 @@
       display:flex; align-items:center; justify-content:center; gap:10px;
       padding:12px 14px; border-radius:12px; font-weight:700;
       color:#0b0f14; background:#fff; box-shadow:0 2px 0 rgba(0,0,0,.05);
-      transition:transform .06s ease, box-shadow .2s ease;
+      transition:all .2s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .btn:active{transform:translateY(1px)}
+    .btn:active{
+      transform:scale(0.96);
+      box-shadow:0 0 0 4px color-mix(in oklab, var(--primary) 20%, transparent), 0 4px 12px rgba(0,0,0,.15);
+    }
     .btn.ghost{
       background:transparent; color:var(--text);
       border:1px solid color-mix(in oklab, var(--text) 12%, transparent); width:auto; padding:10px 12px;
+    }
+    .btn.ghost:active{
+      box-shadow:0 0 0 4px color-mix(in oklab, var(--text) 15%, transparent);
     }
     .btn.cta{
       background:linear-gradient(135deg, var(--primary), var(--primary-2));
       color:#fff;
     }
+    @keyframes btnGlow{
+      0%, 100%{box-shadow:0 0 0 4px color-mix(in oklab, var(--primary) 20%, transparent), 0 4px 12px rgba(208, 79, 255, .3);}
+      50%{box-shadow:0 0 0 6px color-mix(in oklab, var(--primary) 25%, transparent), 0 6px 16px rgba(208, 79, 255, .4);}
+    }
+
+    /* 완료 버튼 성공 애니메이션 */
+    .btn.cta.success-animation{
+      background:linear-gradient(135deg, #38d67a, #2eb869) !important;
+      animation:successGlow 0.6s ease-out;
+    }
+    @keyframes successGlow{
+      0%, 100%{box-shadow:0 0 0 4px color-mix(in oklab, #38d67a 25%, transparent), 0 4px 12px rgba(56, 214, 122, .3);}
+      50%{box-shadow:0 0 0 8px color-mix(in oklab, #38d67a 30%, transparent), 0 6px 16px rgba(56, 214, 122, .5);}
+    }
+
+    /* currentStatus 스크롤 애니메이션 */
+    @keyframes statusScrollOut{
+      0%{transform:translateY(0); filter:blur(0px); opacity:1;}
+      100%{transform:translateY(-20px); filter:blur(8px); opacity:0;}
+    }
+    @keyframes statusScrollIn{
+      0%{transform:translateY(20px); filter:blur(8px); opacity:0;}
+      100%{transform:translateY(0); filter:blur(0px); opacity:1;}
+    }
+    .status-scroll-out{animation:statusScrollOut 0.35s cubic-bezier(0.4, 0, 0.6, 1) forwards;}
+    .status-scroll-in{animation:statusScrollIn 0.35s cubic-bezier(0.4, 0, 0.6, 1) forwards;}
+
+    /* 저장 안됨 슬라이드 애니메이션 */
+    @keyframes slideInFromLeft{
+      0%{transform:translateX(-20px); opacity:0;}
+      100%{transform:translateX(0); opacity:1;}
+    }
+    @keyframes slideOutToLeft{
+      0%{transform:translateX(0); opacity:1;}
+      100%{transform:translateX(-20px); opacity:0;}
+    }
+    .unsaved-slide-in{animation:slideInFromLeft 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;}
+    .unsaved-slide-out{animation:slideOutToLeft 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;}
 
     .submit-wrap{ margin-top:4px }
     .thought-trigger{
@@ -560,19 +611,21 @@
       filter:drop-shadow(0 14px 30px rgba(0,0,0,.25)); pointer-events:none;
     }
 
-    /* Bottom Navigation */
+    /* Bottom Navigation - Floating Rounded Style */
     .bottom-nav {
       position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: calc(60px + env(safe-area-inset-bottom));
-      padding-bottom: env(safe-area-inset-bottom);
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(480px, calc(100% - 32px));
+      height: 68px;
+      padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
       display: flex;
-      background: var(--card);
-      backdrop-filter: saturate(140%) blur(14px);
-      border-top: 1px solid color-mix(in oklab, var(--text) 10%, transparent);
-      box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+      background: linear-gradient(180deg, var(--card), var(--card-2));
+      backdrop-filter: saturate(180%) blur(20px);
+      border-radius: 24px;
+      border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, .3), 0 0 0 1px rgba(255, 255, 255, .08) inset;
       z-index: 1000;
     }
     .nav-item {
@@ -584,23 +637,32 @@
       gap: 4px;
       color: var(--muted);
       text-decoration: none;
-      font-size: 12px;
-      font-weight: 500;
-      transition: color .2s ease;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 8px 4px;
+      border-radius: 16px;
+      transition: all .25s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
     }
     .nav-item:hover {
       color: var(--text);
+      background: rgba(255, 255, 255, .06);
     }
     .nav-item.active {
       color: var(--primary);
+      background: color-mix(in oklab, var(--primary) 12%, transparent);
     }
     .nav-item svg {
       width: 24px;
       height: 24px;
+      transition: transform .25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .nav-item:active svg {
+      transform: scale(0.85);
     }
 
     .spacer {
-      height: calc(60px + env(safe-area-inset-bottom));
+      height: calc(68px + 32px + env(safe-area-inset-bottom));
     }
 
     @media (max-width:1024px){
@@ -979,19 +1041,38 @@
         displayStatus = `기타 - ${etcItems[0]}`;
       }
 
-      currentStatusDisplay.textContent = displayStatus;
+      // 스크롤 애니메이션으로 텍스트 변경
+      currentStatusDisplay.classList.add('status-scroll-out');
+      setTimeout(() => {
+        currentStatusDisplay.textContent = displayStatus;
+        currentStatusDisplay.classList.remove('status-scroll-out');
+        currentStatusDisplay.classList.add('status-scroll-in');
+        setTimeout(() => {
+          currentStatusDisplay.classList.remove('status-scroll-in');
+        }, 350);
+      }, 350);
 
       // Determine if it's unsaved
       if (selectedStatus && displayStatus !== lastSavedStatus) {
         isUnsaved = true;
       }
+
+      // 저장 안됨 슬라이드 애니메이션
       if (unsavedIndicator) {
-        unsavedIndicator.style.display = isUnsaved ? 'inline' : 'none';
+        const wasVisible = unsavedIndicator.style.display !== 'none';
+        if (isUnsaved && !wasVisible) {
+          unsavedIndicator.style.display = 'inline';
+          unsavedIndicator.classList.remove('unsaved-slide-out');
+          unsavedIndicator.classList.add('unsaved-slide-in');
+        } else if (!isUnsaved && wasVisible) {
+          unsavedIndicator.classList.remove('unsaved-slide-in');
+          unsavedIndicator.classList.add('unsaved-slide-out');
+          setTimeout(() => {
+            unsavedIndicator.style.display = 'none';
+            unsavedIndicator.classList.remove('unsaved-slide-out');
+          }, 400);
+        }
       }
-      currentStatusDisplay.style.animation = 'none';
-      requestAnimationFrame(() => {
-        currentStatusDisplay.style.animation = 'rise .3s ease-out';
-      });
     }
 
     function setSelected(card) {
@@ -1277,7 +1358,23 @@
     document.getElementById('submitBtn').addEventListener('click', async () => {
       if (!selectedStatus) { alert("상태를 선택해주세요."); return; }
       const reason = (selectedStatus === "기타" && etcItems.length > 0) ? etcItems[0] : null;
+      const submitBtn = document.getElementById('submitBtn');
+
+      // 저장 시작
+      submitBtn.textContent = '저장 중...';
+      submitBtn.disabled = true;
+
       await saveMyState(selectedStatus, reason);
+
+      // 성공 애니메이션
+      submitBtn.classList.add('success-animation');
+      submitBtn.textContent = '완료됨';
+      setTimeout(() => {
+        submitBtn.textContent = '완료';
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('success-animation');
+      }, 2000);
+
       refreshCurrentStatus();
     });
 
