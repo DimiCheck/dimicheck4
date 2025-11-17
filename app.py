@@ -188,7 +188,7 @@ def index():  # type: ignore[override]
 @app.route("/reload-configs")
 def reload_configs():
     global CLASS_CONFIGS
-    CLASS_CONFIGS = load_class_config()
+    CLASS_CONFIGS = load_class_config(force_refresh=True)
     return jsonify({"status": "reloaded"})
 
 @app.route("/sitemap.xml")
