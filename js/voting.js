@@ -20,10 +20,10 @@ class VotingManager {
     this.resultSection = null;
     this.resultList = null;
     this.resultSummary = null;
-    this.messagesList = null;
     this.stateLabel = null;
     this.pendingSelection = new Set();
     this.currentVoteId = null;
+    this.lastResultCounts = null;
   }
 
   init(grade, section, myNumber) {
@@ -46,18 +46,6 @@ class VotingManager {
       this.resultList = document.getElementById('voteResultList');
       this.resultSummary = document.getElementById('voteResultSummary');
       this.stateLabel = document.getElementById('voteStateLabel');
-    }
-    const list = document.getElementById('chatMessagesList');
-    if (list) {
-      this.messagesList = list;
-    }
-  }
-
-  attachBubble(container) {
-    this.cacheElements();
-    if (!this.bubble || !container) return;
-    if (this.bubble.parentElement !== container) {
-      container.appendChild(this.bubble);
     }
   }
 
@@ -93,17 +81,68 @@ class VotingManager {
       if (!data.active) {
         this.activeVote = null;
         if (data.lastResult) {
-          this.showVoteResult(data.lastResult);
+          // 결과가 변경되었을 때만 렌더링
+          if (this.hasResultChanged(data.lastResult)) {
+            this.showVoteResult(data.lastResult);
+          }
         } else {
           this.hideVote();
         }
         return;
       }
 
-      this.activeVote = data;
-      this.showVote(data);
+      // 활성 투표가 변경되었을 때만 렌더링
+      if (this.hasVoteChanged(data)) {
+        this.activeVote = data;
+        this.showVote(data);
+      } else {
+        // 투표는 동일하지만 실시간 카운트만 업데이트
+        this.activeVote = data;
+        this.updateVoteCounts(data);
+      }
     } catch (err) {
       console.error('checkActiveVote error:', err);
+    }
+  }
+
+  hasVoteChanged(newVote) {
+    if (!this.activeVote) return true;
+
+    // 투표 ID가 다르면 새로운 투표
+    if (this.activeVote.voteId !== newVote.voteId) return true;
+
+    // 질문이 변경되었는지 확인
+    if (this.activeVote.question !== newVote.question) return true;
+
+    // 옵션이 변경되었는지 확인
+    if (JSON.stringify(this.activeVote.options) !== JSON.stringify(newVote.options)) return true;
+
+    // 내 투표가 변경되었는지 확인
+    if (JSON.stringify(this.activeVote.myVote) !== JSON.stringify(newVote.myVote)) return true;
+
+    return false;
+  }
+
+  hasResultChanged(newResult) {
+    if (!this.bubble || this.bubble.dataset.state !== 'result') return true;
+    if (this.currentVoteId !== newResult.voteId) return true;
+
+    // 카운트가 변경되었는지 확인
+    const oldCounts = this.lastResultCounts || {};
+    const newCounts = newResult.counts || {};
+
+    if (JSON.stringify(oldCounts) !== JSON.stringify(newCounts)) {
+      this.lastResultCounts = newCounts;
+      return true;
+    }
+
+    return false;
+  }
+
+  updateVoteCounts(voteData) {
+    // 투표 현황(counts)만 업데이트 - index.html 오버레이용
+    if (voteData.counts) {
+      this.showIndexVote(voteData);
     }
   }
 
@@ -117,9 +156,6 @@ class VotingManager {
     this.bubble.hidden = false;
     this.bubble.style.display = '';
     this.bubble.dataset.state = 'active';
-    if (this.messagesList) {
-      this.attachBubble(this.messagesList);
-    }
     if (this.formSection) this.formSection.hidden = false;
     if (this.resultSection) this.resultSection.hidden = true;
     if (this.stateLabel) this.stateLabel.textContent = '투표 진행 중';
@@ -188,6 +224,7 @@ class VotingManager {
     }
 
     this.showIndexVote(voteData);
+    this.notifyTimelineEvent(this.buildTimelineEventPayload('active', voteData));
   }
 
   showVoteResult(resultData) {
@@ -200,20 +237,69 @@ class VotingManager {
     this.bubble.hidden = false;
     this.bubble.style.display = '';
     this.bubble.dataset.state = 'result';
-    if (this.messagesList) {
-      this.attachBubble(this.messagesList);
-    }
     if (this.formSection) this.formSection.hidden = true;
-    if (this.resultSection) this.resultSection.hidden = false;
+    if (this.resultSection) {
+      this.resultSection.hidden = false;
+      // 기본으로 접혀있게 설정
+      if (!this.resultSection.dataset.initialized) {
+        this.resultSection.dataset.initialized = 'true';
+        this.resultSection.dataset.collapsed = 'true';
+        this.resultList.style.display = 'none';
+      }
+    }
     if (this.stateLabel) this.stateLabel.textContent = '투표 종료';
-    if (this.questionEl) this.questionEl.textContent = resultData.question;
-    if (this.countdownEl) this.countdownEl.textContent = '종료';
+    if (this.questionEl) {
+      this.questionEl.textContent = resultData.question;
+      // 클릭하면 접기/펼치기
+      this.questionEl.style.cursor = 'pointer';
+      this.questionEl.onclick = () => this.toggleResultCollapse();
+    }
+
+    // 종료 시간을 KST로 표시
+    if (this.countdownEl && resultData.expiresAt) {
+      const kstTime = this.formatKSTTime(resultData.expiresAt);
+      this.countdownEl.textContent = kstTime;
+    } else if (this.countdownEl) {
+      this.countdownEl.textContent = '종료';
+    }
+
     this.currentVoteId = resultData.voteId ?? null;
     this.renderResultList(resultData);
 
     const overlay = document.getElementById('indexVoteOverlay');
     if (overlay) {
       overlay.style.display = 'none';
+    }
+    this.notifyTimelineEvent(this.buildTimelineEventPayload('result', resultData));
+  }
+
+  toggleResultCollapse() {
+    if (!this.resultSection || !this.resultList) return;
+
+    const isCollapsed = this.resultSection.dataset.collapsed === 'true';
+    if (isCollapsed) {
+      this.resultSection.dataset.collapsed = 'false';
+      this.resultList.style.display = 'block';
+    } else {
+      this.resultSection.dataset.collapsed = 'true';
+      this.resultList.style.display = 'none';
+    }
+  }
+
+  formatKSTTime(isoString) {
+    try {
+      const date = new Date(isoString);
+      const kstOptions = { timeZone: 'Asia/Seoul', hour12: false };
+      const kstDateStr = date.toLocaleString('en-US', kstOptions);
+      const kstDate = new Date(kstDateStr);
+
+      const month = (kstDate.getMonth() + 1).toString().padStart(2, '0');
+      const day = kstDate.getDate().toString().padStart(2, '0');
+      const hours = kstDate.getHours().toString().padStart(2, '0');
+      const minutes = kstDate.getMinutes().toString().padStart(2, '0');
+      return `${month}/${day} ${hours}:${minutes} 종료`;
+    } catch {
+      return '종료';
     }
   }
 
@@ -304,6 +390,22 @@ class VotingManager {
     }
   }
 
+  buildTimelineEventPayload(state, data) {
+    if (!data) return null;
+    return {
+      state,
+      expiresAt: data.expiresAt,
+      timestamp: data.expiresAt || data.createdAt,
+      payload: data
+    };
+  }
+
+  notifyTimelineEvent(eventData) {
+    if (window.chatPage?.setVoteTimelineEvent) {
+      window.chatPage.setVoteTimelineEvent(eventData);
+    }
+  }
+
   hideVote() {
     this.cacheElements();
     if (this.bubble) {
@@ -318,6 +420,7 @@ class VotingManager {
     if (overlay) {
       overlay.style.display = 'none';
     }
+    this.notifyTimelineEvent(null);
   }
 
   startCountdown(expiresAt) {
@@ -367,6 +470,14 @@ class VotingManager {
       return { success: false, error: `최대 ${this.activeVote.maxChoices}개까지 선택 가능합니다.` };
     }
 
+    // 버튼 비활성화 및 로딩 상태 표시
+    const submitBtn = document.getElementById('voteSubmitBtn');
+    const originalText = submitBtn?.textContent || '투표하기';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = '투표 중...';
+    }
+
     try {
       const res = await fetch(`/api/classes/vote/respond?grade=${this.grade}&section=${this.section}`, {
         method: 'POST',
@@ -382,13 +493,56 @@ class VotingManager {
         throw new Error(errText || 'Failed to submit vote');
       }
 
+      // 성공 피드백 표시
+      if (submitBtn) {
+        submitBtn.textContent = '✓ 투표 완료!';
+        submitBtn.style.background = '#38d67a';
+      }
+      this.showToast('투표가 완료되었습니다!');
+
       // 즉시 투표 현황 새로고침
       await this.checkActiveVote();
       this.pendingSelection?.clear();
+
+      // 1초 후 버튼 원래대로 복구
+      setTimeout(() => {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+          submitBtn.style.background = '';
+        }
+      }, 1000);
+
       return { success: true };
     } catch (err) {
       console.error('submitVote error:', err);
+
+      // 에러 피드백 표시
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
+      this.showToast('투표를 제출하지 못했습니다.');
+
       return { success: false, error: '투표를 제출하지 못했어요.' };
+    }
+  }
+
+  showToast(message) {
+    // chat-page의 토스트 사용
+    if (window.chatPage?.showToast) {
+      window.chatPage.showToast(message);
+      return;
+    }
+
+    // 대체 토스트 표시
+    const toast = document.getElementById('chatToast');
+    if (toast) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
     }
   }
 
