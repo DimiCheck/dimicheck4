@@ -251,3 +251,38 @@ class VoteResponse(db.Model):
         db.UniqueConstraint("vote_id", "student_number", name="uq_vote_response"),
     )
 
+
+class MealVote(db.Model):
+    __tablename__ = "meal_votes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    grade = db.Column(db.Integer, nullable=False)
+    section = db.Column(db.Integer, nullable=False)
+    student_number = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.Date, nullable=False)  # 투표한 급식 날짜
+    is_positive = db.Column(db.Boolean, nullable=False)  # True = 👍, False = 👎
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("grade", "section", "student_number", "date", name="uq_meal_vote"),
+        db.Index("idx_meal_vote_date", "date"),
+    )
+
+
+class CalendarEvent(db.Model):
+    __tablename__ = "calendar_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    grade = db.Column(db.Integer, nullable=False)
+    section = db.Column(db.Integer, nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    event_date = db.Column(db.Date, nullable=False)
+    created_by = db.Column(db.Integer, nullable=False)  # student number who created
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index("idx_calendar_grade_section_date", "grade", "section", "event_date"),
+    )
+

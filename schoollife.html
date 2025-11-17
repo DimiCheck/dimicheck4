@@ -205,7 +205,7 @@
     @keyframes rise{to{opacity:1; transform:none}}
 
     .spacer {
-      height: calc(68px + 32px + env(safe-area-inset-bottom));
+      height: calc(68px + 80px + env(safe-area-inset-bottom));
     }
 
     /* Bottom Navigation - Floating Rounded Style */
@@ -328,6 +328,65 @@
       background: linear-gradient(145deg, #b6fbff, #83a4d4);
       color:#0b0f14;
     }
+
+    /* Vote buttons */
+    .vote-btn:hover {
+      transform: scale(1.05);
+      border-color: color-mix(in oklab, var(--primary) 50%, transparent);
+    }
+    .vote-btn:active {
+      transform: scale(0.95);
+    }
+    .vote-btn.selected {
+      background: color-mix(in oklab, var(--primary) 15%, transparent);
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 20%, transparent);
+    }
+
+    /* Calendar styles */
+    .calendar-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    }
+    .calendar-event {
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+      transition: all .2s ease;
+    }
+    .calendar-event:hover {
+      background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.08));
+      border-color: color-mix(in oklab, var(--primary) 30%, transparent);
+    }
+    .event-date {
+      font-size: 12px;
+      color: var(--primary);
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .event-title {
+      font-weight: 700;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+    .event-description {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .event-actions {
+      margin-top: 8px;
+      display: flex;
+      gap: 6px;
+    }
+    .event-btn {
+      font-size: 11px;
+      padding: 4px 10px;
+      height: auto;
+      border-radius: 8px;
+    }
   </style>
 </head>
 <body>
@@ -386,9 +445,33 @@
       <div class="meal-card"><h3>점심</h3><div class="empty">불러오는 중…</div></div>
       <div class="meal-card"><h3>저녁</h3><div class="empty">불러오는 중…</div></div>
     </div>
+
+    <!-- 급식 투표 -->
+    <div style="margin-top:16px; padding:14px; border-radius:14px; background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03)); border:1px solid color-mix(in oklab, var(--text) 10%, transparent);">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px;">
+        <div style="font-weight:600; font-size:14px;">오늘 급식 어때요?</div>
+        <div style="display:flex; gap:8px;">
+          <button id="mealThumbsUp" class="vote-btn" style="font-size:24px; background:transparent; border:1px solid color-mix(in oklab, var(--text) 15%, transparent); border-radius:10px; padding:8px 12px; cursor:pointer; transition:all .2s;">👍</button>
+          <button id="mealThumbsDown" class="vote-btn" style="font-size:24px; background:transparent; border:1px solid color-mix(in oklab, var(--text) 15%, transparent); border-radius:10px; padding:8px 12px; cursor:pointer; transition:all .2s;">👎</button>
+        </div>
+      </div>
+      <div id="mealVoteStats" style="font-size:13px; color:var(--muted); text-align:center;">투표 정보 불러오는 중...</div>
+    </div>
   </section>
-  <div class="spacer"></div>
+
+  <!-- 반별 공동 캘린더 -->
+  <section class="panel fade-up" style="grid-column:1/-1; --area:calendar" aria-labelledby="calendar-h">
+    <div class="head">
+      <h2 id="calendar-h">반 캘린더</h2>
+      <button id="addEventBtn" class="cta" style="height:36px; padding:0 16px; font-size:14px;" type="button">+ 일정 추가</button>
+    </div>
+    <div id="calendarView" style="margin-top:12px;">
+      <!-- Calendar will be rendered here -->
+    </div>
+  </section>
 </main>
+
+<div class="spacer"></div>
 
 <!-- 주간 시간표 모달 -->
 <div class="modal-overlay" id="weeklyOverlay" hidden>
@@ -430,7 +513,7 @@
   function onSelChange(){
     saveData('last_grade', gradeSel.value);
     saveData('last_class', classSel.value);
-    loadTodayAll();
+    loadAllSchoollifeData();
   }
 
   // -------- API helpers --------
@@ -739,10 +822,209 @@
     }
   }
 
-  document.getElementById('refreshBtn').addEventListener('click', loadTodayAll);
+  document.getElementById('refreshBtn').addEventListener('click', loadAllSchoollifeData);
+
+  // -------- Meal Vote --------
+  async function loadMealVoteStats(){
+    const g = gradeSel.value, c = classSel.value;
+    try {
+      const res = await fetchJson(`/api/classes/schoollife/meal/stats?grade=${g}&section=${c}`);
+      const statsEl = document.getElementById('mealVoteStats');
+      const thumbsUpBtn = document.getElementById('mealThumbsUp');
+      const thumbsDownBtn = document.getElementById('mealThumbsDown');
+
+      // Clear selection
+      thumbsUpBtn.classList.remove('selected');
+      thumbsDownBtn.classList.remove('selected');
+
+      // Show stats
+      if (res.totalCount === 0) {
+        statsEl.textContent = '아직 투표한 학생이 없습니다';
+      } else {
+        statsEl.textContent = `우리 학교 학생의 ${res.percentage}%가 맛있다고 표시했어요 (${res.positiveCount}/${res.totalCount}명)`;
+      }
+
+      // Highlight user's vote
+      if (res.myVote === true) {
+        thumbsUpBtn.classList.add('selected');
+      } else if (res.myVote === false) {
+        thumbsDownBtn.classList.add('selected');
+      }
+    } catch(e) {
+      console.error('Failed to load meal vote stats:', e);
+      document.getElementById('mealVoteStats').textContent = '투표 정보를 불러올 수 없습니다';
+    }
+  }
+
+  async function voteMeal(isPositive){
+    const g = gradeSel.value, c = classSel.value;
+    try {
+      await fetch(`/api/classes/schoollife/meal/vote?grade=${g}&section=${c}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({isPositive})
+      });
+      await loadMealVoteStats();
+    } catch(e) {
+      console.error('Failed to vote:', e);
+      alert('투표에 실패했습니다');
+    }
+  }
+
+  document.getElementById('mealThumbsUp').addEventListener('click', () => voteMeal(true));
+  document.getElementById('mealThumbsDown').addEventListener('click', () => voteMeal(false));
+
+  // -------- Calendar --------
+  let calendarEvents = [];
+
+  async function loadCalendarEvents(){
+    const g = gradeSel.value, c = classSel.value;
+    try {
+      const res = await fetchJson(`/api/classes/calendar/events?grade=${g}&section=${c}`);
+      calendarEvents = res.events || [];
+      renderCalendar();
+    } catch(e) {
+      console.error('Failed to load calendar events:', e);
+      document.getElementById('calendarView').innerHTML = '<div class="empty">캘린더를 불러올 수 없습니다</div>';
+    }
+  }
+
+  function renderCalendar(){
+    const container = document.getElementById('calendarView');
+    if (calendarEvents.length === 0) {
+      container.innerHTML = '<div class="empty">아직 등록된 일정이 없습니다</div>';
+      return;
+    }
+
+    // Group events by month
+    const grouped = {};
+    calendarEvents.forEach(event => {
+      const date = new Date(event.date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+      if (!grouped[monthKey]) grouped[monthKey] = [];
+      grouped[monthKey].push(event);
+    });
+
+    let html = '';
+    Object.keys(grouped).sort().reverse().forEach(monthKey => {
+      const [year, month] = monthKey.split('-');
+      html += `<div style="margin-bottom:20px;">`;
+      html += `<h3 style="font-size:16px; margin:0 0 10px; color:var(--primary);">${year}년 ${parseInt(month)}월</h3>`;
+      html += `<div class="calendar-grid">`;
+
+      grouped[monthKey].forEach(event => {
+        const date = new Date(event.date);
+        const dateStr = `${date.getMonth()+1}/${date.getDate()} (${['일','월','화','수','목','금','토'][date.getDay()]})`;
+
+        html += `<div class="calendar-event" data-event-id="${event.id}">`;
+        html += `<div class="event-date">${dateStr}</div>`;
+        html += `<div class="event-title">${escapeHtml(event.title)}</div>`;
+        if (event.description) {
+          html += `<div class="event-description">${escapeHtml(event.description)}</div>`;
+        }
+        html += `<div class="event-actions">`;
+        html += `<button class="event-btn ghost" onclick="editEvent(${event.id})">수정</button>`;
+        html += `<button class="event-btn ghost" onclick="deleteEvent(${event.id})">삭제</button>`;
+        html += `</div>`;
+        html += `</div>`;
+      });
+
+      html += `</div></div>`;
+    });
+
+    container.innerHTML = html;
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  window.editEvent = async function(eventId) {
+    const event = calendarEvents.find(e => e.id === eventId);
+    if (!event) return;
+
+    const title = prompt('일정 제목:', event.title);
+    if (title === null) return;
+    if (!title.trim()) {
+      alert('제목을 입력해주세요');
+      return;
+    }
+
+    const description = prompt('일정 설명 (선택):', event.description || '');
+    const dateStr = prompt('날짜 (YYYY-MM-DD):', event.date);
+    if (!dateStr) return;
+
+    try {
+      await fetch(`/api/classes/calendar/events/${eventId}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description ? description.trim() : '',
+          date: dateStr
+        })
+      });
+      await loadCalendarEvents();
+    } catch(e) {
+      console.error('Failed to update event:', e);
+      alert('일정 수정에 실패했습니다');
+    }
+  };
+
+  window.deleteEvent = async function(eventId) {
+    if (!confirm('이 일정을 삭제하시겠습니까?')) return;
+
+    try {
+      await fetch(`/api/classes/calendar/events/${eventId}`, {
+        method: 'DELETE'
+      });
+      await loadCalendarEvents();
+    } catch(e) {
+      console.error('Failed to delete event:', e);
+      alert('일정 삭제에 실패했습니다');
+    }
+  };
+
+  document.getElementById('addEventBtn').addEventListener('click', async () => {
+    const title = prompt('일정 제목:');
+    if (!title || !title.trim()) return;
+
+    const description = prompt('일정 설명 (선택):');
+    const dateStr = prompt('날짜 (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+    if (!dateStr) return;
+
+    const g = gradeSel.value, c = classSel.value;
+    try {
+      await fetch(`/api/classes/calendar/events?grade=${g}&section=${c}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description ? description.trim() : '',
+          date: dateStr
+        })
+      });
+      await loadCalendarEvents();
+    } catch(e) {
+      console.error('Failed to create event:', e);
+      alert('일정 추가에 실패했습니다');
+    }
+  });
+
+  // -------- Load all data --------
+  async function loadAllSchoollifeData() {
+    // Load all data in parallel for better performance
+    await Promise.all([
+      loadTodayAll(),
+      loadMealVoteStats(),
+      loadCalendarEvents()
+    ]);
+  }
 
   // initial kick
-  loadTodayAll();
+  loadAllSchoollifeData();
 </script>
 
 <nav class="bottom-nav" aria-label="하단 내비게이션">
