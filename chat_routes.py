@@ -695,10 +695,20 @@ def get_user_profile(student_number):
         ChatMessage.deleted_at == None
     ).order_by(ChatMessage.created_at.desc()).limit(20).all()
 
+    # 마지막 메시지 정보
+    last_message = None
+    last_message_at = None
+    if messages:
+        last_msg = messages[0]
+        last_message = last_msg.message
+        last_message_at = last_msg.created_at.isoformat()
+
     return jsonify({
         "studentNumber": student_number,
         "nickname": nickname_obj.nickname if nickname_obj else None,
         "avatar": avatar_data,
+        "lastMessage": last_message,
+        "lastMessageAt": last_message_at,
         "recentMessages": [
             {
                 "id": msg.id,
