@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from flask_smorest import Api
 from flask_socketio import SocketIO
 import requests
@@ -75,8 +75,10 @@ def handle_error(err):
     return send_from_directory(".", "404.html"), code
 
 @app.get("/healthz")
+@cross_origin(origins=["https://checstat.netlify.app"])
 def health() -> Any:
     return {"status": "ok"}
+
 
 @app.get("/me")
 def me() -> Any:

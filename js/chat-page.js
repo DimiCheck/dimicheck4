@@ -447,6 +447,7 @@ class ChatPageManager {
       const messageText = msg.message || (msg.imageUrl ? '이미지를 공유했습니다.' : '');
       // 마크다운 및 이펙트 처리
       text.innerHTML = this.parseMessageMarkdown(messageText);
+      this.attachMentionHandlers(text);
     }
 
     body.appendChild(text);
@@ -893,7 +894,58 @@ class ChatPageManager {
       return `<span class="effect-wave">${letters}</span>`;
     });
 
+    escaped = this.highlightMentions(escaped);
+
     return escaped;
+  }
+
+  highlightMentions(htmlText) {
+    if (!htmlText) return htmlText;
+    const mentionPattern = /(^|[\s.,!?()[\]{}"'])@([가-힣a-zA-Z0-9_]{1,20})/g;
+
+    return htmlText.replace(mentionPattern, (match, prefix, handle) => {
+      const type = /^\d+$/.test(handle) ? 'number' : 'text';
+      return `${prefix}<span class="message-mention" data-mention="${handle}" data-mention-type="${type}">@${handle}</span>`;
+    });
+  }
+
+  attachMentionHandlers(container) {
+    if (!container) return;
+    const mentions = container.querySelectorAll('.message-mention');
+    mentions.forEach((mentionEl) => {
+      mentionEl.addEventListener('click', () => {
+        const target = mentionEl.dataset.mention;
+        const type = mentionEl.dataset.mentionType || 'text';
+        this.handleMentionClick(target, type);
+      });
+    });
+  }
+
+  handleMentionClick(target, type) {
+    if (!target) return;
+
+    let studentNumber = null;
+    if (type === 'number') {
+      const num = Number(target);
+      if (!Number.isNaN(num)) {
+        studentNumber = num;
+      }
+    } else {
+      const normalizedTarget = target.toLowerCase();
+      const match = this.messages.find(
+        (msg) => msg.nickname && msg.nickname.toLowerCase() === normalizedTarget
+      );
+      if (match) {
+        studentNumber = match.studentNumber;
+      }
+    }
+
+    if (studentNumber && window.profileModalManager) {
+      window.profileModalManager.open(studentNumber);
+      return;
+    }
+
+    this.showToast('멘션 대상을 찾을 수 없어요');
   }
 }
 

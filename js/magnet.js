@@ -443,6 +443,17 @@ function ensureMagnetQuickMenuElements() {
   magnetMenuPanel.setAttribute('role', 'menu');
   magnetMenuOverlay.appendChild(magnetMenuPanel);
 
+  // 프로필 헤더 섹션 추가
+  const profileHeader = document.createElement('div');
+  profileHeader.className = 'magnet-menu-profile';
+  profileHeader.id = 'magnetMenuProfile';
+  magnetMenuPanel.appendChild(profileHeader);
+
+  // 구분선 추가
+  const separator = document.createElement('div');
+  separator.className = 'magnet-menu-separator';
+  magnetMenuPanel.appendChild(separator);
+
   MAGNET_MENU_OPTIONS.forEach(opt => {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -503,7 +514,106 @@ function positionMagnetQuickMenu(x, y) {
   magnetMenuPanel.style.top = `${top}px`;
 }
 
-function openMagnetQuickMenu(target, origin) {
+async function loadMagnetProfile(studentNumber, grade, section) {
+  try {
+    const res = await fetch(
+      `/api/classes/chat/profile/${studentNumber}?grade=${grade}&section=${section}`,
+      { credentials: 'include' }
+    );
+
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.error('Failed to load magnet profile:', err);
+    return null;
+  }
+}
+
+function formatTimeAgo(timestamp) {
+  if (!timestamp) return '';
+  const now = new Date();
+  const then = new Date(timestamp);
+  const diffMs = now - then;
+  const diffMins = Math.floor(diffMs / 60000);
+
+  if (diffMins < 1) return '방금';
+  if (diffMins < 60) return `${diffMins}분 전`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}시간 전`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}일 전`;
+}
+
+function renderMagnetMenuProfile(profile, studentNumber) {
+  const container = document.getElementById('magnetMenuProfile');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  // 아바타와 닉네임을 담을 컨테이너
+  const avatarContainer = document.createElement('div');
+  avatarContainer.style.display = 'flex';
+  avatarContainer.style.flexDirection = 'column';
+  avatarContainer.style.alignItems = 'center';
+  avatarContainer.style.gap = '8px';
+
+  // 아바타
+  const avatar = document.createElement('div');
+  avatar.className = 'magnet-menu-avatar';
+
+  if (profile && profile.avatar) {
+    if (profile.avatar.bgColor) {
+      avatar.style.background = `linear-gradient(135deg, ${profile.avatar.bgColor}, ${profile.avatar.bgColor}dd)`;
+    }
+    if (profile.avatar.emoji) {
+      const emoji = document.createElement('span');
+      emoji.className = 'avatar-emoji';
+      emoji.textContent = profile.avatar.emoji;
+      avatar.appendChild(emoji);
+    } else {
+      avatar.textContent = String(studentNumber).padStart(2, '0');
+    }
+  } else {
+    // 기본 아바타
+    avatar.textContent = String(studentNumber).padStart(2, '0');
+    avatar.classList.add(`avatar-color-${studentNumber % 10}`);
+  }
+
+  // 닉네임
+  const nickname = document.createElement('div');
+  nickname.className = 'magnet-menu-nickname';
+  nickname.textContent = (profile && profile.nickname) || `${studentNumber}번`;
+
+  avatarContainer.appendChild(avatar);
+  avatarContainer.appendChild(nickname);
+  container.appendChild(avatarContainer);
+
+  // 마지막 메시지 (있으면)
+  if (profile && profile.lastMessage) {
+    const lastMsgContainer = document.createElement('div');
+    lastMsgContainer.className = 'magnet-menu-last-message';
+
+    const msgText = document.createElement('div');
+    msgText.className = 'last-message-text';
+    msgText.textContent = profile.lastMessage;
+
+    const msgTime = document.createElement('div');
+    msgTime.className = 'last-message-time';
+    msgTime.textContent = formatTimeAgo(profile.lastMessageAt);
+
+    lastMsgContainer.appendChild(msgText);
+    lastMsgContainer.appendChild(msgTime);
+    container.appendChild(lastMsgContainer);
+  } else {
+    // 메시지 없음
+    const noMsg = document.createElement('div');
+    noMsg.className = 'magnet-menu-no-message';
+    noMsg.textContent = '메시지를 보낸 적이 없습니다';
+    container.appendChild(noMsg);
+  }
+}
+
+async function openMagnetQuickMenu(target, origin) {
   clearMagnetGroup({ restore: true });
   const overlay = ensureMagnetQuickMenuElements();
   magnetMenuCurrentTarget = target;
@@ -514,6 +624,13 @@ function openMagnetQuickMenu(target, origin) {
 
   const currentAction = resolveMagnetQuickMenuState(target);
   highlightMagnetQuickMenuSelection(currentAction);
+
+  // 프로필 로딩 및 렌더링
+  const studentNumber = parseInt(target.dataset.number, 10);
+  if (studentNumber && grade && section) {
+    const profile = await loadMagnetProfile(studentNumber, grade, section);
+    renderMagnetMenuProfile(profile, studentNumber);
+  }
 
   const firstButton = magnetMenuPanel.querySelector('button');
   if (firstButton) {
