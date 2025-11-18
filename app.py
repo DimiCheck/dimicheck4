@@ -5,6 +5,10 @@ from __future__ import annotations
 import json
 import secrets
 from typing import Any
+from dotenv import load_dotenv
+
+# .env 파일 로드 (환경 변수)
+load_dotenv()
 
 from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 from flask_cors import CORS
@@ -258,4 +262,9 @@ def robots():
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
+
+        # 스케줄러 시작 (2월 28일 데이터 초기화)
+        from scheduler import start_scheduler
+        start_scheduler()
+
     socketio.run(app, host="0.0.0.0", port=5000, allow_unsafe_werkzeug=True, debug=True)

@@ -286,3 +286,35 @@ class CalendarEvent(db.Model):
         db.Index("idx_calendar_grade_section_date", "grade", "section", "event_date"),
     )
 
+
+class ChatReaction(db.Model):
+    """채팅 메시지에 대한 반응 (이모지)"""
+    __tablename__ = "chat_reactions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    message_id = db.Column(db.Integer, db.ForeignKey("chat_messages.id"), nullable=False)
+    student_number = db.Column(db.Integer, nullable=False)
+    emoji = db.Column(db.String(10), nullable=False)  # 이모지 (👍, ❤️, 😂 등)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("message_id", "student_number", "emoji", name="uq_chat_reaction"),
+        db.Index("idx_chat_reaction_message", "message_id"),
+    )
+
+
+class UserAvatar(db.Model):
+    """사용자 아바타 커스터마이징 정보"""
+    __tablename__ = "user_avatars"
+
+    id = db.Column(db.Integer, primary_key=True)
+    grade = db.Column(db.Integer, nullable=False)
+    section = db.Column(db.Integer, nullable=False)
+    student_number = db.Column(db.Integer, nullable=False)
+    avatar_data = db.Column(db.Text, nullable=False)  # JSON: {"bgColor": "#667eea", "textColor": "#fff", "emoji": "😀"}
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("grade", "section", "student_number", name="uq_user_avatar"),
+    )
+

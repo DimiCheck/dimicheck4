@@ -31,6 +31,7 @@ class MyPageController {
     this.nicknameInput = document.getElementById('nicknameInput');
     this.nicknameSaveBtn = document.getElementById('nicknameSaveBtn');
     this.nicknameStatus = document.getElementById('nicknameStatus');
+    this.avatarBtn = document.getElementById('avatarBtn');
     this.chatToggle = document.getElementById('chatNotificationToggle');
     this.timetableToggle = document.getElementById('timetableNotificationToggle');
     this.browserToggle = document.getElementById('browserNotificationToggle');
@@ -50,6 +51,12 @@ class MyPageController {
     });
 
     this.nicknameSaveBtn?.addEventListener('click', () => this.saveNickname());
+
+    this.avatarBtn?.addEventListener('click', () => {
+      if (window.avatarModalManager) {
+        window.avatarModalManager.open();
+      }
+    });
 
     this.chatToggle?.addEventListener('change', (event) => {
       this.handleNotificationToggle('chatNotifications', event.target.checked);
@@ -156,22 +163,110 @@ class MyPageController {
       this.section = Math.floor((identifier % 1000) / 100);
       this.grade = Math.floor(identifier / 1000);
 
-      this.updateProfileCard();
+      await this.updateProfileCard();
       this.syncClassContext();
       await this.loadNickname();
+
+      // 아바타 매니저 초기화
+      if (window.avatarModalManager && this.grade && this.section && this.number) {
+        window.avatarModalManager.init(this.grade, this.section, this.number);
+        // 아바타 저장 시 프로필 카드 업데이트
+        window.avatarModalManager.onAvatarSaved = () => this.updateProfileCard();
+      }
     } catch (error) {
       console.error('[MyPage] Failed to load profile.', error);
       window.location.href = '/login.html';
     }
   }
 
-  updateProfileCard() {
+  async updateProfileCard() {
     if (!this.metaEl || !this.avatarEl) return;
     const gradeText = this.grade ? `${this.grade}학년` : '';
     const sectionText = this.section ? `${this.section}반` : '';
     const numberText = this.number ? `${this.number}번` : '';
     this.metaEl.textContent = [gradeText, sectionText, numberText].filter(Boolean).join(' ');
-    this.avatarEl.textContent = this.number?.toString().padStart(2, '0') || '--';
+
+    // 커스텀 아바타 가져오기
+    try {
+      const res = await fetch('/api/classes/chat/avatar', { credentials: 'include' });
+      console.log('[MyPage] Avatar API response status:', res.status);
+      if (res.ok) {
+        const data = await res.json();
+        console.log('[MyPage] Avatar data:', data);
+        if (data.avatar) {
+          // data.avatar는 이미 객체이므로 JSON.parse 불필요
+          console.log('[MyPage] Using avatar data:', data.avatar);
+          this.renderCustomAvatar(data.avatar);
+        } else {
+          console.log('[MyPage] No avatar data, using default');
+          this.avatarEl.textContent = this.number?.toString().padStart(2, '0') || '--';
+        }
+      } else {
+        console.warn('[MyPage] Avatar API failed:', res.status);
+        this.avatarEl.textContent = this.number?.toString().padStart(2, '0') || '--';
+      }
+    } catch (error) {
+      console.warn('[MyPage] Failed to load avatar.', error);
+      this.avatarEl.textContent = this.number?.toString().padStart(2, '0') || '--';
+    }
+  }
+
+  renderCustomAvatar(avatarData) {
+    console.log('[MyPage] renderCustomAvatar called with:', avatarData);
+    console.log('[MyPage] avatarEl:', this.avatarEl);
+
+    if (!this.avatarEl) {
+      console.error('[MyPage] avatarEl is null!');
+      return;
+    }
+
+    // 기본 스타일 리셋
+    this.avatarEl.style.background = '';
+    this.avatarEl.textContent = '';
+    this.avatarEl.innerHTML = '';
+    this.avatarEl.style.display = 'flex';
+    this.avatarEl.style.alignItems = 'center';
+    this.avatarEl.style.justifyContent = 'center';
+
+    // 배경 색상 적용
+    if (avatarData.bgColor) {
+      this.avatarEl.style.background = `linear-gradient(135deg, ${avatarData.bgColor}, ${avatarData.bgColor}dd)`;
+      console.log('[MyPage] Applied background color:', avatarData.bgColor);
+    }
+
+    // 이모지 표시
+    if (avatarData.emoji) {
+      console.log('[MyPage] Rendering emoji:', avatarData.emoji);
+      const emojiSpan = document.createElement('span');
+      emojiSpan.style.fontSize = '40px';
+      emojiSpan.style.lineHeight = '1';
+      emojiSpan.textContent = avatarData.emoji;
+      this.avatarEl.appendChild(emojiSpan);
+
+      // 학번 뱃지 추가
+      const numberBadge = document.createElement('span');
+      numberBadge.style.position = 'absolute';
+      numberBadge.style.bottom = '0px';
+      numberBadge.style.right = '0px';
+      numberBadge.style.background = 'var(--bg)';
+      numberBadge.style.border = '2px solid var(--card)';
+      numberBadge.style.borderRadius = '8px';
+      numberBadge.style.fontSize = '13px';
+      numberBadge.style.fontWeight = '700';
+      numberBadge.style.padding = '3px 7px';
+      numberBadge.style.lineHeight = '1';
+      numberBadge.textContent = this.number?.toString().padStart(2, '0') || '--';
+      this.avatarEl.appendChild(numberBadge);
+
+      // position relative 추가
+      this.avatarEl.style.position = 'relative';
+      console.log('[MyPage] Avatar rendered successfully');
+    } else {
+      console.log('[MyPage] No emoji, using default display');
+      this.avatarEl.style.display = 'grid';
+      this.avatarEl.style.placeItems = 'center';
+      this.avatarEl.textContent = this.number?.toString().padStart(2, '0') || '--';
+    }
   }
 
   async loadNickname() {
