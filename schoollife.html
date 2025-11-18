@@ -145,9 +145,9 @@
     main{
       width:min(1100px,92vw); margin:18px auto 28px; display:grid; gap:18px;
       grid-template-columns:1fr 1fr;
-      grid-template-areas:"left right";
+      grid-template-areas:"left right" "countdown countdown" "calendar calendar";
     }
-    @media (max-width: 980px){ main{grid-template-columns:1fr; grid-template-areas:"left" "right"} }
+    @media (max-width: 980px){ main{grid-template-columns:1fr; grid-template-areas:"left" "right" "countdown" "calendar"} }
 
     .panel{
       grid-area:var(--area);
@@ -387,6 +387,55 @@
       height: auto;
       border-radius: 8px;
     }
+
+    /* Countdown controls */
+    .countdown-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .countdown-controls input[type="date"],
+    .countdown-controls input[type="time"] {
+      height: 36px;
+      padding: 0 12px;
+      border-radius: 12px;
+      border: 1px solid color-mix(in oklab, var(--text) 15%, transparent);
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      color: var(--text);
+      font-weight: 600;
+      font-size: 14px;
+      flex: 1;
+      min-width: 120px;
+    }
+    .countdown-controls input[type="date"]::-webkit-calendar-picker-indicator,
+    .countdown-controls input[type="time"]::-webkit-calendar-picker-indicator {
+      filter: invert(1);
+      cursor: pointer;
+    }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) .countdown-controls input[type="date"]::-webkit-calendar-picker-indicator,
+      :root:not([data-theme="dark"]) .countdown-controls input[type="time"]::-webkit-calendar-picker-indicator {
+        filter: invert(0);
+      }
+    }
+    :root[data-theme="light"] .countdown-controls input[type="date"]::-webkit-calendar-picker-indicator,
+    :root[data-theme="light"] .countdown-controls input[type="time"]::-webkit-calendar-picker-indicator {
+      filter: invert(0);
+    }
+    @media (max-width: 600px) {
+      .countdown-controls {
+        width: 100%;
+      }
+      .countdown-controls input[type="date"],
+      .countdown-controls input[type="time"] {
+        flex: 1 1 calc(50% - 4px);
+        min-width: 0;
+      }
+      .countdown-controls button {
+        flex: 1 1 calc(50% - 4px);
+      }
+    }
   </style>
 </head>
 <body>
@@ -457,6 +506,23 @@
       </div>
       <div id="mealVoteStats" style="font-size:13px; color:var(--muted); text-align:center;">투표 정보 불러오는 중...</div>
     </div>
+  </section>
+
+  <!-- 귀가 카운트다운 -->
+  <section class="panel fade-up" style="grid-column:1/-1; --area:countdown" aria-labelledby="countdown-h">
+    <div class="head" style="flex-wrap:wrap;">
+      <h2 id="countdown-h">귀가까지</h2>
+      <div class="countdown-controls">
+        <input type="date" id="homeDateInput" placeholder="날짜">
+        <input type="time" id="homeTimeOnlyInput" placeholder="시간">
+        <button id="setHomeTimeBtn" class="cta" type="button">설정</button>
+        <button id="clearHomeTimeBtn" class="ghost" type="button" style="height:36px; padding:0 12px; font-size:13px;">초기화</button>
+      </div>
+    </div>
+    <div id="countdownDisplay" style="margin-top:16px; text-align:center; font-size:clamp(28px, 8vw, 48px); font-weight:800; color:var(--primary); min-height:60px; display:flex; align-items:center; justify-content:center;">
+      귀가 시간을 설정해주세요
+    </div>
+    <div id="countdownMessage" style="margin-top:12px; text-align:center; font-size:clamp(13px, 3.5vw, 16px); color:var(--muted);"></div>
   </section>
 
   <!-- 반별 공동 캘린더 -->
@@ -1013,6 +1079,121 @@
     }
   });
 
+  // -------- Countdown Timer --------
+  let countdownInterval = null;
+
+  function updateCountdown() {
+    const homeTime = loadData('homeTime');
+    if (!homeTime) {
+      document.getElementById('countdownDisplay').textContent = '귀가 시간을 설정해주세요';
+      document.getElementById('countdownMessage').textContent = '';
+      return;
+    }
+
+    const targetDate = new Date(homeTime);
+    const now = new Date();
+    const diff = targetDate - now;
+
+    if (diff <= 0) {
+      document.getElementById('countdownDisplay').textContent = '🎉 집에 가는 시간입니다!';
+      document.getElementById('countdownMessage').textContent = '안전하게 귀가하세요';
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
+      return;
+    }
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+    let displayText = '';
+    if (days > 0) {
+      displayText = `${days}일 ${hours}시간 ${minutes}분 ${seconds}초`;
+    } else if (hours > 0) {
+      displayText = `${hours}시간 ${minutes}분 ${seconds}초`;
+    } else if (minutes > 0) {
+      displayText = `${minutes}분 ${seconds}초`;
+    } else {
+      displayText = `${seconds}초`;
+    }
+
+    document.getElementById('countdownDisplay').textContent = displayText;
+
+    const dateStr = targetDate.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'short'
+    });
+    const timeStr = targetDate.toLocaleTimeString('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    document.getElementById('countdownMessage').textContent = `목표: ${dateStr} ${timeStr}`;
+  }
+
+  function startCountdown() {
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+    }
+    updateCountdown();
+    countdownInterval = setInterval(updateCountdown, 1000);
+  }
+
+  document.getElementById('setHomeTimeBtn').addEventListener('click', () => {
+    const dateInput = document.getElementById('homeDateInput');
+    const timeInput = document.getElementById('homeTimeOnlyInput');
+    const dateValue = dateInput.value;
+    const timeValue = timeInput.value;
+
+    if (!dateValue || !timeValue) {
+      alert('날짜와 시간을 모두 입력해주세요');
+      return;
+    }
+
+    const combinedValue = `${dateValue}T${timeValue}`;
+    const targetDate = new Date(combinedValue);
+    const now = new Date();
+
+    if (targetDate <= now) {
+      alert('미래의 날짜와 시간을 입력해주세요');
+      return;
+    }
+
+    saveData('homeTime', combinedValue);
+    startCountdown();
+  });
+
+  document.getElementById('clearHomeTimeBtn').addEventListener('click', () => {
+    if (confirm('귀가 시간 설정을 초기화하시겠습니까?')) {
+      saveData('homeTime', null);
+      document.getElementById('homeDateInput').value = '';
+      document.getElementById('homeTimeOnlyInput').value = '';
+      document.getElementById('countdownDisplay').textContent = '귀가 시간을 설정해주세요';
+      document.getElementById('countdownMessage').textContent = '';
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
+    }
+  });
+
+  // Load saved countdown time on page load
+  function initCountdown() {
+    const savedTime = loadData('homeTime');
+    if (savedTime) {
+      const date = new Date(savedTime);
+      const dateStr = date.toISOString().split('T')[0];
+      const timeStr = date.toTimeString().substring(0, 5);
+      document.getElementById('homeDateInput').value = dateStr;
+      document.getElementById('homeTimeOnlyInput').value = timeStr;
+      startCountdown();
+    }
+  }
+
   // -------- Load all data --------
   async function loadAllSchoollifeData() {
     // Load all data in parallel for better performance
@@ -1025,6 +1206,7 @@
 
   // initial kick
   loadAllSchoollifeData();
+  initCountdown();
 </script>
 
 <nav class="bottom-nav" aria-label="하단 내비게이션">
