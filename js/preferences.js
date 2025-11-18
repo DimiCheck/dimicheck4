@@ -73,7 +73,8 @@
     persist();
   }
 
-  applyThemePreference();
+  // 초기 테마는 이미 HTML의 inline script에서 적용되었으므로 여기서는 적용하지 않음
+  // applyThemePreference(); // 제거: 이중 렌더링 방지
   notify();
 
   window.preferences = {

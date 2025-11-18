@@ -27,12 +27,22 @@ class ChatPageManager {
     // Image URL state
     this.pendingImageUrl = null;
 
+    // Avatar customization state
+    this.currentAvatar = {
+      emoji: '😀',
+      bgColor: '#667eea'
+    };
+
+    // Message reaction state
+    this.pendingReactionMessageId = null;
+
     // DOM elements
     this.messagesList = null;
     this.messagesContainer = null;
     this.chatInput = null;
     this.sendBtn = null;
     this.imageUrlBtn = null;
+    this.gifBtn = null;
     this.voteBubble = null;
 
     // Modals
@@ -72,6 +82,7 @@ class ChatPageManager {
     this.chatInput = document.getElementById('chatInput');
     this.sendBtn = document.getElementById('sendBtn');
     this.imageUrlBtn = document.getElementById('imageUrlBtn');
+    this.gifBtn = document.getElementById('gifBtn');
     this.voteBubble = document.getElementById('voteBubble');
 
     // Modals
@@ -105,6 +116,13 @@ class ChatPageManager {
 
     // Image URL button
     this.imageUrlBtn?.addEventListener('click', () => this.openImageUrlModal());
+
+    // GIF button
+    this.gifBtn?.addEventListener('click', () => {
+      if (window.gifPickerManager) {
+        window.gifPickerManager.open();
+      }
+    });
 
     // Image URL modal
     this.imageUrlInput?.addEventListener('input', () => this.handleImageUrlInput());
@@ -145,11 +163,31 @@ class ChatPageManager {
       if (window.reactionsManager && this.grade && this.section) {
         window.reactionsManager.init(this.grade, this.section, this.studentNumber);
       }
+      // 추가 기능 매니저 초기화
+      if (window.avatarModalManager && this.grade && this.section && this.studentNumber) {
+        window.avatarModalManager.init(this.grade, this.section, this.studentNumber);
+      }
+      if (window.messageReactionManager && this.grade && this.section && this.studentNumber) {
+        window.messageReactionManager.init(this.grade, this.section, this.studentNumber);
+      }
+      if (window.profileModalManager && this.grade && this.section) {
+        window.profileModalManager.init(this.grade, this.section);
+      }
+      if (window.gifPickerManager && this.grade && this.section && this.studentNumber) {
+        await window.gifPickerManager.init(this.grade, this.section, this.studentNumber);
+      }
       this.loadMessages();
     } catch (err) {
       console.error('Failed to load auth status:', err);
       this.showToast('로그인 정보를 불러오지 못했습니다');
     }
+  }
+
+  createDefaultAvatar(studentNumber) {
+    const avatar = document.createElement('div');
+    avatar.className = `message-avatar avatar-color-${studentNumber % 10}`;
+    avatar.textContent = String(studentNumber).padStart(2, '0');
+    return avatar;
   }
 
   resolveClassContext(data) {
@@ -321,10 +359,17 @@ class ChatPageManager {
       msgEl.classList.add('own');
     }
 
-    // Avatar
-    const avatar = document.createElement('div');
-    avatar.className = `message-avatar avatar-color-${msg.studentNumber % 10}`;
-    avatar.textContent = String(msg.studentNumber).padStart(2, '0');
+    // Avatar (커스터마이징 지원)
+    const avatar = window.renderAvatar
+      ? window.renderAvatar(msg.studentNumber, msg.avatar)
+      : this.createDefaultAvatar(msg.studentNumber);
+
+    // 아바타 클릭 시 프로필 표시
+    avatar.addEventListener('click', () => {
+      if (window.profileModalManager) {
+        window.profileModalManager.open(msg.studentNumber);
+      }
+    });
 
     // Content container
     const content = document.createElement('div');
@@ -400,6 +445,23 @@ class ChatPageManager {
     content.appendChild(header);
     content.appendChild(body);
 
+    // Reactions (메시지 반응 표시)
+    if (!msg.deletedAt && window.renderMessageReactions) {
+      const reactionsEl = window.renderMessageReactions(msg, this.studentNumber, (messageId, emoji, isOwn) => {
+        if (isOwn && window.messageReactionManager) {
+          // 이미 반응한 경우 제거
+          window.messageReactionManager.removeReaction(messageId, emoji);
+        } else if (window.messageReactionManager) {
+          // 반응 추가 (같은 이모지 클릭 시)
+          window.messageReactionManager.addReaction(messageId, emoji);
+        }
+      });
+
+      if (reactionsEl) {
+        content.appendChild(reactionsEl);
+      }
+    }
+
     // Actions (delete button for own messages)
     if (msg.studentNumber === this.studentNumber && !msg.deletedAt) {
       const actions = document.createElement('div');
@@ -410,12 +472,22 @@ class ChatPageManager {
       replyBtn.textContent = '답장';
       replyBtn.addEventListener('click', () => this.setReplyTo(msg));
 
+      const addReactionBtn = document.createElement('button');
+      addReactionBtn.className = 'btn-message-action btn-add-reaction';
+      addReactionBtn.textContent = '👍+';
+      addReactionBtn.addEventListener('click', () => {
+        if (window.messageReactionManager) {
+          window.messageReactionManager.open(msg.id);
+        }
+      });
+
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'btn-message-action btn-delete';
       deleteBtn.textContent = '삭제';
       deleteBtn.addEventListener('click', () => this.deleteMessage(msg.id));
 
       actions.appendChild(replyBtn);
+      actions.appendChild(addReactionBtn);
       actions.appendChild(deleteBtn);
       content.appendChild(actions);
     } else if (!msg.deletedAt) {
@@ -428,7 +500,17 @@ class ChatPageManager {
       replyBtn.textContent = '답장';
       replyBtn.addEventListener('click', () => this.setReplyTo(msg));
 
+      const addReactionBtn = document.createElement('button');
+      addReactionBtn.className = 'btn-message-action btn-add-reaction';
+      addReactionBtn.textContent = '👍+';
+      addReactionBtn.addEventListener('click', () => {
+        if (window.messageReactionManager) {
+          window.messageReactionManager.open(msg.id);
+        }
+      });
+
       actions.appendChild(replyBtn);
+      actions.appendChild(addReactionBtn);
       content.appendChild(actions);
     }
 
@@ -744,6 +826,10 @@ class ChatPageManager {
     // Escape HTML first
     let escaped = this.escapeHtml(text);
 
+    // 링크 자동 인식 (URL을 클릭 가능한 링크로 변환)
+    const urlPattern = /(https?:\/\/[^\s]+)/g;
+    escaped = escaped.replace(urlPattern, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+
     // 마크다운 문법 처리
     // **굵게** -> <strong>굵게</strong>
     escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
@@ -881,6 +967,16 @@ document.addEventListener('DOMContentLoaded', () => {
     reactionCloseBtn.addEventListener('click', () => {
       if (window.reactionsManager) {
         window.reactionsManager.closePicker();
+      }
+    });
+  }
+
+  // Avatar customization event listener
+  const avatarBtn = document.getElementById('avatarBtn');
+  if (avatarBtn) {
+    avatarBtn.addEventListener('click', () => {
+      if (window.avatarModalManager) {
+        window.avatarModalManager.open();
       }
     });
   }

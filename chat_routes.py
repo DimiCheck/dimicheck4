@@ -6,7 +6,7 @@ import json
 from flask import Blueprint, jsonify, request, session
 
 from extensions import db
-from models import ChatMessage, UserNickname, ClassState
+from models import ChatMessage, UserNickname, ClassState, ChatReaction, UserAvatar
 from utils import is_board_session_active, is_teacher_session_active
 import re
 
@@ -222,6 +222,36 @@ def get_today_messages():
         ChatMessage.deleted_at == None  # Filter out deleted messages
     ).order_by(ChatMessage.created_at.asc()).all()
 
+    # 메시지 ID 목록
+    message_ids = [msg.id for msg in messages]
+
+    # 모든 메시지의 반응 가져오기
+    reactions = ChatReaction.query.filter(ChatReaction.message_id.in_(message_ids)).all() if message_ids else []
+
+    # 메시지 ID별로 반응 그룹화
+    reactions_by_message = {}
+    for r in reactions:
+        if r.message_id not in reactions_by_message:
+            reactions_by_message[r.message_id] = {}
+        if r.emoji not in reactions_by_message[r.message_id]:
+            reactions_by_message[r.message_id][r.emoji] = []
+        reactions_by_message[r.message_id][r.emoji].append(r.student_number)
+
+    # 모든 학생의 아바타 정보 가져오기
+    student_numbers = list(set(msg.student_number for msg in messages))
+    avatars = UserAvatar.query.filter(
+        UserAvatar.grade == grade,
+        UserAvatar.section == section,
+        UserAvatar.student_number.in_(student_numbers)
+    ).all() if student_numbers else []
+
+    avatars_by_student = {}
+    for av in avatars:
+        try:
+            avatars_by_student[av.student_number] = json.loads(av.avatar_data)
+        except (TypeError, json.JSONDecodeError):
+            pass
+
     return jsonify({
         "messages": [
             {
@@ -231,7 +261,16 @@ def get_today_messages():
                 "timestamp": msg.created_at.isoformat(),
                 "imageUrl": msg.image_url,
                 "replyToId": msg.reply_to_id,
-                "nickname": msg.nickname
+                "nickname": msg.nickname,
+                "avatar": avatars_by_student.get(msg.student_number),
+                "reactions": [
+                    {
+                        "emoji": emoji,
+                        "count": len(students),
+                        "students": students
+                    }
+                    for emoji, students in reactions_by_message.get(msg.id, {}).items()
+                ]
             }
             for msg in messages
         ]
@@ -433,4 +472,250 @@ def set_nickname():
     return jsonify({
         "ok": True,
         "nickname": nickname_obj.nickname
+    })
+
+
+@blueprint.post("/reactions/<int:message_id>")
+def add_reaction(message_id):
+    """메시지에 반응(이모지) 추가"""
+    session_grade, session_section, session_number = _get_student_session_info()
+
+    if session_number is None:
+        return jsonify({"error": "unauthorized"}), 401
+
+    payload = request.get_json() or {}
+    emoji = (payload.get("emoji") or "").strip()
+
+    if not emoji:
+        return jsonify({"error": "emoji is required"}), 400
+
+    # 이모지 길이 검증 (최대 10자)
+    if len(emoji) > 10:
+        return jsonify({"error": "emoji too long"}), 400
+
+    # 메시지 존재 여부 확인
+    msg = ChatMessage.query.get(message_id)
+    if not msg or msg.deleted_at is not None:
+        return jsonify({"error": "message not found"}), 404
+
+    # 같은 반 학생만 반응 가능
+    if msg.grade != session_grade or msg.section != session_section:
+        return jsonify({"error": "forbidden"}), 403
+
+    # 이미 같은 반응이 있는지 확인
+    existing = ChatReaction.query.filter_by(
+        message_id=message_id,
+        student_number=session_number,
+        emoji=emoji
+    ).first()
+
+    if existing:
+        return jsonify({"error": "already reacted"}), 400
+
+    # 반응 추가
+    reaction = ChatReaction(
+        message_id=message_id,
+        student_number=session_number,
+        emoji=emoji
+    )
+    db.session.add(reaction)
+    db.session.commit()
+
+    return jsonify({"ok": True})
+
+
+@blueprint.delete("/reactions/<int:message_id>")
+def remove_reaction(message_id):
+    """메시지에서 반응 제거"""
+    session_grade, session_section, session_number = _get_student_session_info()
+
+    if session_number is None:
+        return jsonify({"error": "unauthorized"}), 401
+
+    payload = request.get_json() or {}
+    emoji = (payload.get("emoji") or "").strip()
+
+    if not emoji:
+        return jsonify({"error": "emoji is required"}), 400
+
+    # 반응 찾기
+    reaction = ChatReaction.query.filter_by(
+        message_id=message_id,
+        student_number=session_number,
+        emoji=emoji
+    ).first()
+
+    if not reaction:
+        return jsonify({"error": "reaction not found"}), 404
+
+    db.session.delete(reaction)
+    db.session.commit()
+
+    return jsonify({"ok": True})
+
+
+@blueprint.get("/reactions/<int:message_id>")
+def get_reactions(message_id):
+    """메시지의 모든 반응 가져오기"""
+    msg = ChatMessage.query.get(message_id)
+    if not msg:
+        return jsonify({"error": "message not found"}), 404
+
+    reactions = ChatReaction.query.filter_by(message_id=message_id).all()
+
+    # 이모지별로 그룹화
+    reaction_counts = {}
+    for r in reactions:
+        if r.emoji not in reaction_counts:
+            reaction_counts[r.emoji] = []
+        reaction_counts[r.emoji].append(r.student_number)
+
+    return jsonify({
+        "reactions": [
+            {
+                "emoji": emoji,
+                "count": len(students),
+                "students": students
+            }
+            for emoji, students in reaction_counts.items()
+        ]
+    })
+
+
+@blueprint.get("/avatar")
+def get_avatar():
+    """현재 사용자의 아바타 정보 가져오기"""
+    session_grade, session_section, session_number = _get_student_session_info()
+
+    if session_number is None:
+        return jsonify({"error": "unauthorized"}), 401
+
+    avatar = UserAvatar.query.filter_by(
+        grade=session_grade,
+        section=session_section,
+        student_number=session_number
+    ).first()
+
+    if not avatar:
+        return jsonify({"avatar": None})
+
+    try:
+        avatar_data = json.loads(avatar.avatar_data)
+    except (TypeError, json.JSONDecodeError):
+        avatar_data = None
+
+    return jsonify({"avatar": avatar_data})
+
+
+@blueprint.post("/avatar")
+def set_avatar():
+    """아바타 커스터마이징 설정"""
+    session_grade, session_section, session_number = _get_student_session_info()
+
+    if session_number is None:
+        return jsonify({"error": "unauthorized"}), 401
+
+    payload = request.get_json() or {}
+    avatar_data = payload.get("avatar")
+
+    if not avatar_data or not isinstance(avatar_data, dict):
+        return jsonify({"error": "invalid avatar data"}), 400
+
+    # 아바타 데이터 검증
+    allowed_keys = {"bgColor", "textColor", "emoji", "borderColor", "style"}
+    if not all(key in allowed_keys for key in avatar_data.keys()):
+        return jsonify({"error": "invalid avatar keys"}), 400
+
+    # 업데이트 또는 생성
+    avatar = UserAvatar.query.filter_by(
+        grade=session_grade,
+        section=session_section,
+        student_number=session_number
+    ).first()
+
+    avatar_json = json.dumps(avatar_data, ensure_ascii=False)
+
+    if avatar:
+        avatar.avatar_data = avatar_json
+        avatar.updated_at = datetime.utcnow()
+    else:
+        avatar = UserAvatar(
+            grade=session_grade,
+            section=session_section,
+            student_number=session_number,
+            avatar_data=avatar_json
+        )
+        db.session.add(avatar)
+
+    db.session.commit()
+
+    return jsonify({"ok": True, "avatar": avatar_data})
+
+
+@blueprint.get("/profile/<int:student_number>")
+def get_user_profile(student_number):
+    """사용자 프로필 및 메시지 이력 가져오기"""
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+
+    if grade is None or section is None:
+        return jsonify({"error": "missing grade or section"}), 400
+
+    if not _is_authorized(grade, section):
+        return jsonify({"error": "forbidden"}), 403
+
+    # 닉네임 가져오기
+    nickname_obj = UserNickname.query.filter_by(
+        grade=grade,
+        section=section,
+        student_number=student_number
+    ).first()
+
+    # 아바타 가져오기
+    avatar_obj = UserAvatar.query.filter_by(
+        grade=grade,
+        section=section,
+        student_number=student_number
+    ).first()
+
+    avatar_data = None
+    if avatar_obj:
+        try:
+            avatar_data = json.loads(avatar_obj.avatar_data)
+        except (TypeError, json.JSONDecodeError):
+            pass
+
+    # 최근 메시지 가져오기 (최대 20개)
+    today_start_utc = _academic_year_start_utc()
+    messages = ChatMessage.query.filter(
+        ChatMessage.grade == grade,
+        ChatMessage.section == section,
+        ChatMessage.student_number == student_number,
+        ChatMessage.created_at >= today_start_utc,
+        ChatMessage.deleted_at == None
+    ).order_by(ChatMessage.created_at.desc()).limit(20).all()
+
+    return jsonify({
+        "studentNumber": student_number,
+        "nickname": nickname_obj.nickname if nickname_obj else None,
+        "avatar": avatar_data,
+        "recentMessages": [
+            {
+                "id": msg.id,
+                "message": msg.message,
+                "timestamp": msg.created_at.isoformat(),
+                "imageUrl": msg.image_url
+            }
+            for msg in messages
+        ]
+    })
+
+
+@blueprint.route("/config", methods=["GET"])
+def get_chat_config():
+    """채팅 설정 (API 키 등) 조회"""
+    from config import config
+
+    return jsonify({
+        "klipyApiKey": config.KLIPY_API_KEY
     })
