@@ -191,22 +191,42 @@ class ChatPageManager {
   }
 
   resolveClassContext(data) {
-    // Parse grade, section, studentNumber from auth data
-    if (data.grade) this.grade = data.grade;
-    if (data.section || data.class || data.class_no) {
-      this.section = data.section || data.class || data.class_no;
-    }
-    if (data.number) {
-      this.studentNumber = data.number;
-    } else if (data.student_number) {
-      const num = Number(data.student_number);
-      if (num >= 1000) {
-        this.grade = Math.floor(num / 1000);
-        this.section = Math.floor((num % 1000) / 100);
-        this.studentNumber = num % 100;
-      } else {
-        this.studentNumber = num;
+    const parseIdentifier = (raw) => {
+      if (raw == null) return {};
+      const digits = String(raw).replace(/[^\d]/g, '');
+      if (!digits) return {};
+      if (digits.length >= 3) {
+        const grade = Number(digits[0]);
+        const sectionDigits = digits.slice(1, -2);
+        const section = sectionDigits ? Number(sectionDigits) : undefined;
+        const number = Number(digits.slice(-2));
+        return {
+          grade: Number.isNaN(grade) ? undefined : grade,
+          section: Number.isNaN(section) ? undefined : section,
+          number: Number.isNaN(number) ? undefined : number
+        };
       }
+      const number = Number(digits);
+      return { number: Number.isNaN(number) ? undefined : number };
+    };
+
+    const explicitGrade = data.grade;
+    const explicitSection = data.section || data.class || data.class_no;
+    const numberInfo = parseIdentifier(data.number);
+    const studentNumberInfo = parseIdentifier(data.student_number);
+
+    if (explicitGrade) this.grade = explicitGrade;
+    if (!this.grade && numberInfo.grade !== undefined) this.grade = numberInfo.grade;
+    if (!this.grade && studentNumberInfo.grade !== undefined) this.grade = studentNumberInfo.grade;
+
+    if (explicitSection) this.section = explicitSection;
+    if (!this.section && numberInfo.section !== undefined) this.section = numberInfo.section;
+    if (!this.section && studentNumberInfo.section !== undefined) this.section = studentNumberInfo.section;
+
+    if (numberInfo.number !== undefined) {
+      this.studentNumber = numberInfo.number;
+    } else if (studentNumberInfo.number !== undefined) {
+      this.studentNumber = studentNumberInfo.number;
     }
   }
 
