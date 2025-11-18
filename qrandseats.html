@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>양자 랜덤 자리 바꾸기</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --bg: #d2cbb8;
+      --panel: #f7f2df;
+      --ink: #1e1e1e;
+      --muted: #4f5051;
+      --accent: #c2410c;
+      --accent-dark: #7c2d0c;
+      --grid-line: #a49a88;
+      --seat-bg: #fffdf5;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: "IBM Plex Mono", "Courier New", monospace;
+      background: var(--bg);
+      background-image: repeating-linear-gradient(0deg, rgba(0,0,0,0.08), rgba(0,0,0,0.08) 1px, transparent 1px, transparent 10px);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 18px;
+    }
+    .hidden {
+      display: none !important;
+    }
+    .intro-overlay {
+      position: fixed;
+      inset: 0;
+      background: #111;
+      color: #f5eed1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+      z-index: 50;
+    }
+    .intro-panel {
+      width: 100%;
+      max-width: 780px;
+      border: 3px solid #f5eed1;
+      background: #0d0d0d;
+      padding: 22px 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 16px 16px 0 #443b2e;
+    }
+    .intro-banner {
+      font-size: 18px;
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      border-bottom: 2px solid #f5eed1;
+      padding-bottom: 8px;
+    }
+    .intro-panel img {
+      width: 100%;
+      height: 220px;
+      object-fit: cover;
+      border: 2px solid #f5eed1;
+    }
+    .intro-copy {
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .intro-section {
+      border: 2px solid #f5eed1;
+      background: #060606;
+      padding: 12px 16px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .intro-section h3 {
+      margin-bottom: 8px;
+      letter-spacing: 0.3em;
+      font-size: 12px;
+    }
+    .intro-section ol {
+      padding-left: 18px;
+    }
+    .intro-panel button {
+      border: 2px solid #f5eed1;
+      background: transparent;
+      color: #f5eed1;
+      padding: 10px;
+      letter-spacing: 0.4em;
+      font-size: 12px;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .intro-panel button:hover {
+      background: #f5eed1;
+      color: #111;
+    }
+    .app {
+      width: 100%;
+      max-width: 960px;
+      background: var(--panel);
+      border: 3px solid #111;
+      padding: 24px 26px 32px;
+      box-shadow: inset 0 0 0 4px #e3dcc7, 18px 18px 0 #9f9277;
+      position: relative;
+    }
+    .app-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+      gap: 12px;
+      border-bottom: 2px solid #111;
+      padding-bottom: 8px;
+    }
+    .app-title {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 250px;
+    }
+    .app-title span.sub {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .status-area {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      color: var(--muted);
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      text-transform: uppercase;
+    }
+    .chip {
+      padding: 4px 10px;
+      border: 2px solid #111;
+      background: #e6dfc4;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+    }
+    .chip-dot {
+      width: 9px;
+      height: 9px;
+      border: 1px solid #111;
+      background: #1ca746;
+    }
+    .chip-dot.offline {
+      background: #8f8f8f;
+    }
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 10px;
+    }
+    .toggle-switch {
+      width: 40px;
+      height: 18px;
+      border: 2px solid #111;
+      background: #c9c1ac;
+      position: relative;
+    }
+    .toggle-knob {
+      width: 18px;
+      height: 14px;
+      border: 2px solid #111;
+      background: #fbf7e6;
+      position: absolute;
+      top: -1px;
+      left: -1px;
+      transition: transform 0.2s ease;
+    }
+    .toggle.on .toggle-knob {
+      transform: translateX(20px);
+    }
+    .toggle-label {
+      letter-spacing: 0.3em;
+    }
+
+    .seat-layout-wrapper {
+      margin-top: 12px;
+      border: 2px solid #111;
+      background: #f2edd5;
+      padding: 14px 16px;
+    }
+    .layout-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      gap: 8px;
+      flex-wrap: wrap;
+      border-bottom: 2px solid #111;
+      padding-bottom: 6px;
+    }
+    .layout-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.28em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .layout-title span.badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border: 1px solid #111;
+      background: #fff;
+      color: #111;
+    }
+    .layout-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    button {
+      border: 2px solid #111;
+      padding: 6px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #fff;
+      color: #111;
+      letter-spacing: 0.2em;
+    }
+    button.primary {
+      background: var(--accent);
+      color: #fff7dc;
+    }
+    button:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    .seat-stage {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: stretch;
+      margin-top: 4px;
+      border: 1px dashed #111;
+      padding: 6px;
+      background: #fffef5;
+    }
+    .stage-label {
+      text-align: center;
+      font-size: 10px;
+      letter-spacing: 0.4em;
+      color: #555;
+    }
+    .seat-layout {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 0;
+      min-height: 110px;
+    }
+    .seat-row {
+      display: flex;
+      gap: 18px;
+      justify-content: center;
+      width: 100%;
+    }
+    .seat-block {
+      display: flex;
+      gap: 6px;
+      padding: 4px;
+      border: 1px solid #111;
+      background: #d9cfb6;
+    }
+    .seat {
+      width: 36px;
+      height: 36px;
+      border: 1px solid #111;
+      background: var(--seat-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .seat.empty {
+      background: repeating-linear-gradient(45deg, #f5f0d1, #f5f0d1 4px, #fff 4px, #fff 8px);
+      color: transparent;
+    }
+
+    .log-panel {
+      margin-top: 14px;
+      border: 2px solid #111;
+      background: #f9f5df;
+      padding: 10px;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+    }
+    .log-title {
+      font-weight: 700;
+      border-bottom: 1px solid #111;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+    }
+    .log-stream {
+      font-family: "IBM Plex Mono", monospace;
+      max-height: 140px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .log-line {
+      background: #1b1b1b;
+      color: #f5eed1;
+      padding: 4px 6px;
+    }
+
+    .footer-panel {
+      margin-top: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      font-size: 10px;
+      color: var(--muted);
+      border-top: 2px solid #111;
+      padding-top: 10px;
+    }
+    .footer-panel .label {
+      font-weight: 700;
+      color: #111;
+      letter-spacing: 0.25em;
+    }
+    .selection-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .selection-line {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .selection-line span.value {
+      font-weight: 600;
+      color: #111;
+    }
+    .history {
+      font-size: 10px;
+      color: #555;
+      max-width: 100%;
+      word-break: break-all;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,15,15,0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 40;
+    }
+    .modal {
+      width: 100%;
+      max-width: 420px;
+      background: #f3edd3;
+      border: 3px solid #111;
+      padding: 16px;
+      box-shadow: 14px 14px 0 #8e826a;
+      font-size: 11px;
+    }
+    .modal-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.25em;
+      margin-bottom: 4px;
+    }
+    .modal-desc {
+      font-size: 11px;
+      color: #2c2c2c;
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .form-row-full {
+      grid-column: 1 / -1;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .field label {
+      color: #1f1f1f;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+    }
+    .field input,
+    .field textarea {
+      border: 2px solid #111;
+      padding: 6px 8px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      background: #fff;
+      outline: none;
+    }
+    .field textarea {
+      min-height: 60px;
+    }
+    .inline-note {
+      font-size: 10px;
+      color: #4a4a4a;
+    }
+    .epoch-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .checkbox-inline {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+    }
+    .checkbox-inline input {
+      width: 12px;
+      height: 12px;
+    }
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .busy-indicator {
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      padding: 6px 10px;
+      border: 2px solid #111;
+      background: #111;
+      color: #f6f0d4;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+    }
+    .spinner {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: #fff;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 26px;
+      transform: translateX(-50%);
+      background: #111;
+      color: #f5eed1;
+      padding: 8px 14px;
+      border: 2px solid #f5eed1;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      z-index: 60;
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 20px 10px;
+      }
+      .app {
+        padding: 16px;
+        box-shadow: inset 0 0 0 3px #e3dcc7, 10px 10px 0 #9f9277;
+      }
+      .seat-row {
+        gap: 8px;
+      }
+      .seat {
+        width: 30px;
+        height: 30px;
+        font-size: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="intro-overlay" id="introOverlay">
+  <div class="intro-panel">
+    <div class="intro-banner">Quantum Chairing Initiative Manual</div>
+    <img src="qcim.jpg" alt="Quantum Chairing Initiative" />
+    <div class="intro-copy">
+      세계 최초의 양자 난수 기반 자리 배치 시스템(QCIM-01)에 접속했습니다. 이 프로그램은 호주 국립대(ANU)의 양자 난수원과
+      자체 검증 알고리즘을 통해 가공되지 않은 좌석 순열을 제공합니다. 자리 배치는 여러 에포크(epoch)를 거쳐 생성되며, 각 에포크는 독립적인 난수 시드를 사용합니다.
+    </div>
+    <div class="intro-section">
+      <h3>TECHNICAL BRIEF</h3>
+      <ol>
+        <li>ANU Quantum Random Number Generator → /api/qrng 경유 수신.</li>
+        <li>양자 바이어스를 줄이기 위해 8비트 샘플을 합성, 페어링 후 피셔-예이츠 셔플 반복.</li>
+        <li>에포크 변조(1~N)로 동일 시드 재현 확률 최소화.</li>
+      </ol>
+    </div>
+    <div class="intro-section">
+      <h3>주의</h3>
+      <p>이 소프트웨어는 무료 소프트웨어입니다. 교탁 방향은 화면 상단 기준입니다. </p>
+    </div>
+    <button id="btnIntroConfirm">I UNDERSTAND</button>
+  </div>
+</div>
+<div class="app hidden" id="appShell">
+  <div class="app-header">
+    <div class="app-title">
+      양자 랜덤 자리 바꾸기
+      <span class="sub">ANU Quantum RNG 기반</span>
+    </div>
+    <div class="status-area">
+      <div class="chip" id="qrngStatus">
+        <span class="chip-dot" id="qrngDot"></span>
+        <span id="qrngText">양자 난수 준비 중...</span>
+      </div>
+      <label class="toggle on" id="toggleQuantum">
+        <div class="toggle-switch">
+          <div class="toggle-knob"></div>
+        </div>
+        <span class="toggle-label">양자 난수 사용</span>
+      </label>
+    </div>
+
+    <div class="log-panel">
+      <div class="log-title">QUANTUM LINK LOG</div>
+      <div class="log-stream" id="logStream">
+        <div class="log-line">[INIT] Awaiting operator confirmation…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="seat-layout-wrapper">
+    <div class="layout-header">
+      <div class="layout-title">
+        현재 자리 배치
+        <span class="badge" id="summaryBadge">아직 설정되지 않음</span>
+      </div>
+      <div class="layout-actions">
+        <button id="btnConfig">자리 설정 변경</button>
+        <button class="primary" id="btnShuffle" disabled>랜덤 자리 재배치</button>
+      </div>
+    </div>
+
+    <div class="seat-stage">
+      <div class="stage-label front">앞 (교탁)</div>
+      <div class="seat-layout" id="seatLayout">
+        <span style="font-size: 12px; color: #9ca3af;">상단의 버튼으로 자리 설정을 먼저 해주세요.</span>
+      </div>
+      <div class="stage-label back">뒤</div>
+    </div>
+  </div>
+
+  <div class="footer-panel">
+    <div class="selection-info">
+      <div class="selection-line">
+        <span class="label">마지막 에포크</span>
+        <span class="value" id="lastEpoch">-</span>
+        <span class="label">총 자리 재배치</span>
+        <span class="value" id="shuffleCount">0회</span>
+      </div>
+      <div class="history" id="history"></div>
+    </div>
+    <div>
+      <span class="label">총 인원</span>
+      <span id="totalStudents">0명</span>
+    </div>
+  </div>
+
+  <div class="busy-indicator hidden" id="busyIndicator">
+    <div class="spinner"></div>
+    <span id="busyMessage">랜덤 생성 중...</span>
+  </div>
+</div>
+
+<!-- 설정 모달 (처음부터 띄움) -->
+<div class="modal-backdrop" id="configModal">
+  <div class="modal">
+    <div class="modal-title">자리 배치 설정</div>
+    <div class="modal-desc">
+      시작 / 끝 번호, 제외할 번호, 분단 수, 에포크를 설정하면 자동으로 자리 배치를 만들어줍니다.
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label for="startNumber">시작 번호</label>
+        <input id="startNumber" type="number" inputmode="numeric" value="1" />
+      </div>
+      <div class="field">
+        <label for="endNumber">끝 번호</label>
+        <input id="endNumber" type="number" inputmode="numeric" value="30" />
+      </div>
+
+      <div class="field form-row-full">
+        <label for="missingNumbers">없는 번호 <span class="sub">(쉼표로 구분)</span></label>
+        <textarea id="missingNumbers" placeholder="예: 3, 7, 15"></textarea>
+        <div class="inline-note">실제 반에 없는 번호(전학, 결석 등)를 적으면 됩니다.</div>
+      </div>
+
+      <div class="field">
+        <label for="blocks">분단 수</label>
+        <input id="blocks" type="number" inputmode="numeric" value="3" />
+        <div class="inline-note">한 분단당 2자리(짝)로 배치됩니다.</div>
+      </div>
+
+      <div class="field form-row-full">
+        <label for="epochCount">에포크 수</label>
+        <div class="epoch-row">
+          <input id="epochCount" type="number" inputmode="numeric" value="50" min="1" />
+          <label class="checkbox-inline">
+            <input type="checkbox" id="epochRandom" />
+            에포크 수 랜덤 (1 ~ 입력값 사이)
+          </label>
+        </div>
+        <div class="inline-note">
+          자리 바꾸기 버튼을 누를 때, 에포크 수만큼 여러 번 섞은 뒤 마지막 결과로 자리 배치를 확정합니다.
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button id="btnCancelConfig">닫기</button>
+      <button class="primary" id="btnApplyConfig">자리 배치 시작</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script>
+  // ---- 상태 변수 ----
+  let useQuantum = true;
+  let qrngBuffer = [];
+  let qrngReady = false;
+
+  let config = {
+    start: 1,
+    end: 30,
+    missing: new Set(),
+    blocks: 3,
+    epochCount: 50,
+    epochRandom: false
+  };
+
+  let baseStudents = [];   // 실제 존재하는 번호 리스트(정렬)
+  let students = [];       // 현재 자리 배치(셔플된 결과)
+  let shuffleCount = 0;
+
+  const qrngStatus = document.getElementById("qrngStatus");
+  const qrngDot = document.getElementById("qrngDot");
+  const qrngText = document.getElementById("qrngText");
+  const toggleQuantum = document.getElementById("toggleQuantum");
+
+  const configModal = document.getElementById("configModal");
+  const startNumberInput = document.getElementById("startNumber");
+  const endNumberInput = document.getElementById("endNumber");
+  const missingNumbersInput = document.getElementById("missingNumbers");
+  const blocksInput = document.getElementById("blocks");
+  const epochCountInput = document.getElementById("epochCount");
+  const epochRandomInput = document.getElementById("epochRandom");
+
+  const seatLayoutEl = document.getElementById("seatLayout");
+  const summaryBadge = document.getElementById("summaryBadge");
+  const totalStudentsEl = document.getElementById("totalStudents");
+  const btnConfig = document.getElementById("btnConfig");
+  const btnShuffle = document.getElementById("btnShuffle");
+
+  const busyIndicator = document.getElementById("busyIndicator");
+  const busyMessage = document.getElementById("busyMessage");
+  const lastEpochEl = document.getElementById("lastEpoch");
+  const shuffleCountEl = document.getElementById("shuffleCount");
+  const historyEl = document.getElementById("history");
+  const toastEl = document.getElementById("toast");
+  const logStream = document.getElementById("logStream");
+  const introOverlay = document.getElementById("introOverlay");
+  const btnIntroConfirm = document.getElementById("btnIntroConfirm");
+  const appShell = document.getElementById("appShell");
+
+  // ---- 유틸 ----
+  function appendLog(message) {
+    if (!logStream) return;
+    const ts = new Date().toLocaleTimeString("ko-KR", { hour12: false });
+    const line = document.createElement("div");
+    line.className = "log-line";
+    line.textContent = `[${ts}] ${message}`;
+    logStream.prepend(line);
+    while (logStream.children.length > 20) {
+      logStream.removeChild(logStream.lastChild);
+    }
+  }
+
+  function showToast(msg, ms = 2200) {
+    toastEl.textContent = msg;
+    toastEl.classList.remove("hidden");
+    setTimeout(() => {
+      toastEl.classList.add("hidden");
+    }, ms);
+  }
+
+  function setBusy(isBusy, message) {
+    if (isBusy) {
+      busyMessage.textContent = message || "랜덤 생성 중...";
+      busyIndicator.classList.remove("hidden");
+    } else {
+      busyIndicator.classList.add("hidden");
+    }
+  }
+
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function updateQrngStatus() {
+    if (!useQuantum) {
+      qrngDot.classList.add("offline");
+      qrngText.textContent = "양자 난수 비활성화됨";
+      historyEl.textContent = "현재: 브라우저 암호학 난수 모드";
+    } else if (qrngReady) {
+      qrngDot.classList.remove("offline");
+      qrngText.textContent = "양자 난수 사용 중";
+      historyEl.textContent = "현재: ANU Quantum RNG 사용 중";
+    } else {
+      qrngDot.classList.remove("offline");
+      qrngText.textContent = "양자 난수 준비 중...";
+      historyEl.textContent = "";
+    }
+  }
+
+  // ---- QRNG / 난수 ----
+  async function fetchQrngBytes(count) {
+    const params = new URLSearchParams({ length: String(count), type: "uint8" });
+    const endpoints = [
+      { url: `/api/qrng?${params.toString()}`, options: { credentials: "include" } },
+      { url: `https://qrng.anu.edu.au/API/jsonI.php?${params.toString()}`, options: {} }
+    ];
+
+    for (const endpoint of endpoints) {
+      try {
+        appendLog(`Dialing ${endpoint.url}`);
+        const res = await fetch(endpoint.url, endpoint.options);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!data.success) throw new Error("QRNG 실패");
+        appendLog(`OK ${endpoint.url}`);
+        return data.data;
+      } catch (err) {
+        console.warn("QRNG endpoint failed", endpoint.url, err);
+        appendLog(`FAIL ${endpoint.url} :: ${err}`);
+      }
+    }
+
+    throw new Error("QRNG fetch 실패");
+  }
+
+  async function ensureQrngBuffer(minCount) {
+    if (!useQuantum) return;
+    if (qrngBuffer.length >= minCount) return;
+    setBusy(true, "양자 난수 가져오는 중...");
+    try {
+      const chunk = await fetchQrngBytes(Math.max(minCount, 128));
+      qrngBuffer.push(...chunk);
+      qrngReady = true;
+    } catch (e) {
+      console.error(e);
+      useQuantum = false;
+      showToast("QRNG 오류. 브라우저 난수로 대체합니다.");
+      appendLog("QRNG upstream unavailable. Switching to crypto RNG.");
+    } finally {
+      setBusy(false);
+      updateQrngStatus();
+    }
+  }
+
+  function cryptoRandomInt(max) {
+    if (max <= 1) return 0;
+    const array = new Uint32Array(1);
+    const limit = Math.floor(0xffffffff / max) * max;
+    let x;
+    do {
+      crypto.getRandomValues(array);
+      x = array[0];
+    } while (x >= limit);
+    return x % max;
+  }
+
+  async function quantumRandomInt(max) {
+    if (max <= 1) return 0;
+    if (!useQuantum) return cryptoRandomInt(max);
+
+    const range = 256;
+    const limit = range - (range % max);
+    let x;
+    for (let tries = 0; tries < 10; tries++) {
+      await ensureQrngBuffer(1);
+      if (!useQuantum) return cryptoRandomInt(max);
+      x = qrngBuffer.pop();
+      if (x < limit) return x % max;
+    }
+    useQuantum = false;
+    updateQrngStatus();
+    appendLog("Entropy exhausted. Crypto RNG engaged.");
+    return cryptoRandomInt(max);
+  }
+
+  async function quantumShuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = await quantumRandomInt(i + 1);
+      const tmp = a[i];
+      a[i] = a[j];
+      a[j] = tmp;
+    }
+    return a;
+  }
+
+  // ---- 자리 배치 ----
+  function parseMissingSet(text) {
+    const set = new Set();
+    if (!text) return set;
+    const parts = text.split(/[, \n\t]+/);
+    for (const p of parts) {
+      const v = p.trim();
+      if (!v) continue;
+      const n = Number(v);
+      if (!isNaN(n)) set.add(n);
+    }
+    return set;
+  }
+
+  function openConfigModal() {
+    configModal.classList.remove("hidden");
+    startNumberInput.value = config.start;
+    endNumberInput.value = config.end;
+    blocksInput.value = config.blocks;
+    epochCountInput.value = config.epochCount;
+    epochRandomInput.checked = config.epochRandom;
+    missingNumbersInput.value = [...config.missing].join(", ");
+  }
+
+  function closeConfigModal() {
+    configModal.classList.add("hidden");
+  }
+
+  async function applyConfig() {
+    const start = Number(startNumberInput.value);
+    const end = Number(endNumberInput.value);
+    const blocks = Number(blocksInput.value);
+    let epochCount = Number(epochCountInput.value);
+
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start <= 0 || end <= 0 || end < start) {
+      showToast("시작/끝 번호를 다시 확인해주세요.");
+      return;
+    }
+    if (!Number.isInteger(blocks) || blocks <= 0) {
+      showToast("분단 수를 올바르게 입력해주세요.");
+      return;
+    }
+    if (!Number.isInteger(epochCount) || epochCount <= 0) {
+      epochCount = 50;
+      epochCountInput.value = "50";
+    }
+
+    const missingSet = parseMissingSet(missingNumbersInput.value);
+    const list = [];
+    for (let i = start; i <= end; i++) {
+      if (!missingSet.has(i)) list.push(i);
+    }
+    if (list.length === 0) {
+      showToast("실제 인원이 0명입니다. 제외 번호를 줄여주세요.");
+      return;
+    }
+
+    config.start = start;
+    config.end = end;
+    config.blocks = blocks;
+    config.epochCount = epochCount;
+    config.epochRandom = epochRandomInput.checked;
+    config.missing = missingSet;
+
+    baseStudents = list.slice();
+    shuffleCount = 0;
+    shuffleCountEl.textContent = "0회";
+    lastEpochEl.textContent = "-";
+
+    setBusy(true, "자리 배치 중...");
+    btnShuffle.disabled = true;
+
+    // 초기 배치는 에포크 없이 한 번만 섞는다
+    students = await quantumShuffle(baseStudents);
+    renderLayout();
+    updateSummary();
+
+    setBusy(false);
+    btnShuffle.disabled = false;
+    closeConfigModal();
+    showToast("자리 배치 완료!");
+  }
+
+  function renderLayout() {
+    seatLayoutEl.innerHTML = "";
+
+    const total = students.length;
+    const blocks = config.blocks;
+    const perRow = blocks * 2;
+    const rows = Math.ceil(total / perRow);
+    let index = 0;
+
+    for (let r = 0; r < rows; r++) {
+      const rowEl = document.createElement("div");
+      rowEl.className = "seat-row";
+
+      for (let b = 0; b < blocks; b++) {
+        const blockEl = document.createElement("div");
+        blockEl.className = "seat-block";
+
+        for (let side = 0; side < 2; side++) {
+          const seatEl = document.createElement("div");
+          seatEl.className = "seat";
+          if (index < total) {
+            const num = students[index];
+            seatEl.textContent = num;
+            index++;
+          } else {
+            seatEl.classList.add("empty");
+          }
+          blockEl.appendChild(seatEl);
+        }
+
+        rowEl.appendChild(blockEl);
+      }
+
+      seatLayoutEl.appendChild(rowEl);
+    }
+  }
+
+  function updateSummary() {
+    const total = students.length;
+    totalStudentsEl.textContent = total + "명";
+    summaryBadge.textContent =
+      `${config.start}~${config.end}번, 제외 ${config.missing.size}명 / 분단 ${config.blocks}개, 실제 ${total}명`;
+  }
+
+  async function shuffleSeating() {
+    if (!baseStudents.length) {
+      showToast("먼저 자리 배치를 설정해주세요.");
+      return;
+    }
+
+    btnShuffle.disabled = true;
+
+    let baseEpoch = config.epochCount || 50;
+    if (baseEpoch < 1) baseEpoch = 1;
+
+    let effectiveEpoch = baseEpoch;
+    if (config.epochRandom) {
+      const r = await quantumRandomInt(baseEpoch);
+      effectiveEpoch = r + 1; // 1 ~ baseEpoch
+    }
+    lastEpochEl.textContent = effectiveEpoch;
+
+    setBusy(true, "자리 다시 섞는 중...");
+
+    let current = students.slice();
+    // 에포크 수만큼 여러 번 셔플
+    for (let i = 0; i < effectiveEpoch; i++) {
+      current = await quantumShuffle(current);
+      // 몇 번에 한 번씩만 가볍게 재렌더해서 "돌아가는 느낌"만 줌
+      const step = Math.max(1, Math.floor(effectiveEpoch / 5));
+      if (i === effectiveEpoch - 1 || i % step === 0) {
+        students = current.slice();
+        renderLayout();
+        await sleep(Math.min(40 + i * 2, 120));
+      }
+    }
+
+    students = current.slice();
+    shuffleCount++;
+    shuffleCountEl.textContent = shuffleCount + "회";
+
+    setBusy(false);
+    btnShuffle.disabled = false;
+    showToast("자리 재배치 완료!");
+  }
+
+  // ---- 이벤트 바인딩 ----
+  btnConfig.addEventListener("click", openConfigModal);
+  document.getElementById("btnCancelConfig").addEventListener("click", closeConfigModal);
+  document.getElementById("btnApplyConfig").addEventListener("click", () => {
+    applyConfig().catch(err => {
+      console.error(err);
+      setBusy(false);
+      showToast("자리 배치 중 오류가 발생했습니다.");
+    });
+  });
+
+  btnShuffle.addEventListener("click", () => {
+    shuffleSeating().catch(err => {
+      console.error(err);
+      setBusy(false);
+      btnShuffle.disabled = false;
+      showToast("자리 재배치 중 오류가 발생했습니다.");
+    });
+  });
+
+  toggleQuantum.addEventListener("click", () => {
+    useQuantum = !useQuantum;
+    if (useQuantum) {
+      toggleQuantum.classList.add("on");
+      qrngReady = false;
+      qrngBuffer = [];
+      ensureQrngBuffer(32).catch(() => {});
+      appendLog("Quantum mode enabled. Requesting fresh entropy.");
+    } else {
+      toggleQuantum.classList.remove("on");
+      appendLog("Quantum mode disabled, reverting to crypto RNG");
+    }
+    updateQrngStatus();
+  });
+
+  btnIntroConfirm.addEventListener("click", () => {
+    introOverlay.classList.add("hidden");
+    appShell.classList.remove("hidden");
+    appendLog("Operator acknowledged protocol. System unlocked.");
+  });
+
+  // 초기 QRNG 워밍업
+  (async () => {
+    try {
+      await ensureQrngBuffer(32);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      updateQrngStatus();
+    }
+  })();
+</script>
+</body>
+</html>

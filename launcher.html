@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Launcher</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Samsung One', sans-serif;
+          background: url('launchbg.png') center/cover no-repeat fixed;
+          min-height: 100vh;
+          padding: 40px 60px;
+          overflow-x: hidden;
+          touch-action: pan-y;
+        }
+
+        /* 위젯 컨테이너 */
+        .widget-container {
+            position: relative;
+            width: 100%;
+            height: 280px;
+            margin-bottom: 30px;
+            overflow: hidden;
+            border-radius: 32px;
+        }
+
+        .widget-wrapper {
+            display: flex;
+            height: 100%;
+            transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            touch-action: pan-x;
+        }
+
+        .widget {
+            min-width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border-radius: 32px;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 디지털 시계 */
+        .digital-clock {
+            font-size: 72px;
+            font-weight: 200;
+            color: white;
+            letter-spacing: 2px;
+        }
+
+        .digital-date {
+            font-size: 24px;
+            color: rgba(255, 255, 255, 0.8);
+            margin-top: 10px;
+        }
+
+        /* 아날로그 시계 */
+        .analog-clock {
+            width: 200px;
+            height: 200px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            position: relative;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .clock-center {
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+
+        .hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: bottom center;
+            background: white;
+            border-radius: 10px;
+        }
+
+        .hour-hand {
+            width: 6px;
+            height: 60px;
+            margin-left: -3px;
+        }
+
+        .minute-hand {
+            width: 4px;
+            height: 80px;
+            margin-left: -2px;
+        }
+
+        .second-hand {
+            width: 2px;
+            height: 90px;
+            margin-left: -1px;
+            background: #ff6b6b;
+        }
+
+        /* 위젯 인디케이터 */
+        .widget-indicators {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.4);
+            transition: all 0.3s;
+        }
+
+        .indicator.active {
+            background: white;
+            width: 24px;
+            border-radius: 4px;
+        }
+
+        /* 검색창 */
+        .search-container {
+            margin-bottom: 30px;
+            margin-top: 30px;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 20px 30px;
+            font-size: 20px;
+            border: none;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            color: white;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            outline: none;
+        }
+
+        .search-box::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        /* 앱 그리드 */
+        .apps-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .app-icon {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            position: relative;
+        }
+
+        .app-icon:active {
+            transform: scale(0.9);
+        }
+
+        .app-icon-img {
+            width: 100px;
+            height: 100px;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .app-icon-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .app-icon-img.add {
+            font-size: 48px;
+            color: #667eea;
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        .app-label {
+            font-size: 16px;
+            color: white;
+            text-align: center;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .settings-btn {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.95);
+            color: #667eea;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .app-icon:hover .settings-btn {
+            display: flex;
+        }
+
+        /* 모달 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 32px;
+            padding: 40px;
+            min-width: 400px;
+            max-width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: modalSlideUp 0.3s ease;
+        }
+
+        @keyframes modalSlideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-title {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 25px;
+            color: #333;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 16px;
+            font-size: 18px;
+            border: 2px solid #e0e0e0;
+            border-radius: 16px;
+            margin-bottom: 15px;
+            outline: none;
+            transition: border 0.3s;
+        }
+
+        .modal-input:focus {
+            border-color: #667eea;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 25px;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 16px;
+            font-size: 18px;
+            border: none;
+            border-radius: 16px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .modal-btn.primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .modal-btn.primary:active {
+            background: #5568d3;
+            transform: scale(0.98);
+        }
+
+        .modal-btn.secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .modal-btn.secondary:active {
+            background: #e0e0e0;
+            transform: scale(0.98);
+        }
+
+        /* QR 이미지 표시 */
+        .qr-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+
+        .qr-overlay.active {
+            display: flex;
+        }
+
+        .qr-overlay img {
+            max-width: 80%;
+            max-height: 80%;
+            border-radius: 24px;
+        }
+
+        .qr-close {
+            margin-top: 30px;
+            padding: 16px 40px;
+            font-size: 20px;
+            background: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .remove-btn {
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #ff4444;
+            color: white;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .app-icon.custom:hover .remove-btn {
+            display: flex;
+        }
+    </style>
+</head>
+<body>
+    <!-- 위젯 영역 -->
+    <div class="widget-container" id="widgetContainer">
+        <div class="widget-wrapper" id="widgetWrapper">
+            <!-- 디지털 시계 -->
+            <div class="widget">
+                <div class="digital-clock" id="digitalClock">00:00:00</div>
+                <div class="digital-date" id="digitalDate"></div>
+            </div>
+            
+            <!-- 아날로그 시계 -->
+            <div class="widget">
+                <div class="analog-clock">
+                    <div class="hand hour-hand" id="hourHand"></div>
+                    <div class="hand minute-hand" id="minuteHand"></div>
+                    <div class="hand second-hand" id="secondHand"></div>
+                    <div class="clock-center"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="widget-indicators">
+        <div class="indicator active"></div>
+        <div class="indicator"></div>
+    </div>
+
+    <!-- 검색창 -->
+    <div class="search-container">
+        <input type="text" class="search-box" id="searchBox" placeholder="YouTube 검색">
+    </div>
+
+    <!-- 앱 아이콘들 -->
+    <div class="apps-container" id="appsContainer">
+        <!-- YouTube -->
+        <div class="app-icon" onclick="openApp('https://www.youtube.com')">
+            <div class="app-icon-img">
+                <img src="ytlogo.png" alt="YouTube" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E▶%3C/text%3E%3C/svg%3E'">
+            </div>
+            <div class="app-label">YouTube</div>
+        </div>
+
+        <!-- DimiCheck -->
+        <div class="app-icon" onclick="openDimiCheck()">
+            <div class="app-icon-img">
+                <img src="logo.png" alt="DimiCheck" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E✓%3C/text%3E%3C/svg%3E'">
+            </div>
+            <div class="app-label">DimiCheck</div>
+            <button class="settings-btn" onclick="event.stopPropagation(); openSettings()">⚙</button>
+        </div>
+
+        <!-- DimiCheck 학생 -->
+        <div class="app-icon" onclick="showQR('sqr.png')">
+            <div class="app-icon-img">
+                <img src="logo_student.png" alt="DimiCheck 학생" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🎓%3C/text%3E%3C/svg%3E'">
+            </div>
+            <div class="app-label">DimiCheck 학생</div>
+        </div>
+
+        <!-- DimiCheck 교사 -->
+        <div class="app-icon" onclick="showQR('tqr.png')">
+            <div class="app-icon-img">
+                <img src="logo_teacher.png" alt="DimiCheck 교사" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E👨‍🏫%3C/text%3E%3C/svg%3E'">
+            </div>
+            <div class="app-label">DimiCheck 교사</div>
+        </div>
+
+        <!-- Quantum Seats -->
+        <div class="app-icon" onclick="openApp('qrandseats.html')">
+            <div class="app-icon-img">
+                <img src="qrandicon.png" alt="Quantum Seats" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3EQ%3C/text%3E%3C/svg%3E'">
+            </div>
+            <div class="app-label">양자 난수 자리 배치</div>
+        </div>
+
+        <!-- Game Center -->
+        <div class="app-icon" onclick="openApp('https://chec.kro.kr/games.html')">
+            <div class="app-icon-img">
+                <img src="gamelogo.png" alt="Game Center" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🎮%3C/text%3E%3C/svg%3E'">
+            </div>
+            <div class="app-label">Game Center</div>
+        </div>
+
+        <!-- 추가 버튼 -->
+        <div class="app-icon" onclick="openAddSite()">
+            <div class="app-icon-img add">+</div>
+            <div class="app-label">추가</div>
+        </div>
+    </div>
+
+    <!-- DimiCheck 설정 모달 -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-title">DimiCheck 설정</div>
+            <select class="modal-input" id="gradeSelect">
+                <option value="1">1학년</option>
+                <option value="2">2학년</option>
+                <option value="3">3학년</option>
+            </select>
+            <select class="modal-input" id="sectionSelect">
+                <option value="1">1반</option>
+                <option value="2">2반</option>
+                <option value="3">3반</option>
+                <option value="4">4반</option>
+                <option value="5">5반</option>
+                <option value="6">6반</option>
+            </select>
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeModal('settingsModal')">취소</button>
+                <button class="modal-btn primary" onclick="saveSettings()">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 사이트 추가 모달 -->
+    <div class="modal" id="addSiteModal">
+        <div class="modal-content">
+            <div class="modal-title">사이트 추가</div>
+            <input type="text" class="modal-input" id="siteNameInput" placeholder="사이트 이름">
+            <input type="text" class="modal-input" id="siteUrlInput" placeholder="URL (https://...)">
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeModal('addSiteModal')">취소</button>
+                <button class="modal-btn primary" onclick="addCustomSite()">추가</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR 오버레이 -->
+    <div class="qr-overlay" id="qrOverlay">
+        <img id="qrImage" src="" alt="QR Code">
+        <button class="qr-close" onclick="closeQR()">닫기</button>
+    </div>
+
+    <script>
+        // 로컬스토리지에서 설정 불러오기
+        let grade = localStorage.getItem('dimicheck_grade') || '1';
+        let section = localStorage.getItem('dimicheck_section') || '3';
+        let customSites = JSON.parse(localStorage.getItem('custom_sites') || '[]');
+
+        // 위젯 스와이프
+        let currentWidget = 0;
+        let startX = 0;
+        let currentX = 0;
+        let isDragging = false;
+
+        const widgetContainer = document.getElementById('widgetContainer');
+        const widgetWrapper = document.getElementById('widgetWrapper');
+        const indicators = document.querySelectorAll('.indicator');
+
+        widgetContainer.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            isDragging = true;
+        });
+
+        widgetContainer.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            currentX = e.touches[0].clientX;
+            const diff = currentX - startX;
+            const offset = -currentWidget * 100 + (diff / widgetContainer.offsetWidth * 100);
+            widgetWrapper.style.transform = `translateX(${offset}%)`;
+        });
+
+        widgetContainer.addEventListener('touchend', (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            const diff = currentX - startX;
+            
+            if (Math.abs(diff) > 50) {
+                if (diff > 0 && currentWidget > 0) {
+                    currentWidget--;
+                } else if (diff < 0 && currentWidget < 1) {
+                    currentWidget++;
+                }
+            }
+            
+            updateWidget();
+        });
+
+        function updateWidget() {
+            widgetWrapper.style.transform = `translateX(-${currentWidget * 100}%)`;
+            indicators.forEach((ind, idx) => {
+                ind.classList.toggle('active', idx === currentWidget);
+            });
+        }
+
+        // 디지털 시계
+        function updateDigitalClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('digitalClock').textContent = `${hours}:${minutes}:${seconds}`;
+            
+            const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1;
+            const date = now.getDate();
+            const day = days[now.getDay()];
+            document.getElementById('digitalDate').textContent = `${year}년 ${month}월 ${date}일 ${day}`;
+        }
+
+        // 아날로그 시계
+        function updateAnalogClock() {
+            const now = new Date();
+            const hours = now.getHours() % 12;
+            const minutes = now.getMinutes();
+            const seconds = now.getSeconds();
+            
+            const hourDeg = (hours * 30) + (minutes * 0.5);
+            const minuteDeg = minutes * 6;
+            const secondDeg = seconds * 6;
+            
+            document.getElementById('hourHand').style.transform = `rotate(${hourDeg}deg)`;
+            document.getElementById('minuteHand').style.transform = `rotate(${minuteDeg}deg)`;
+            document.getElementById('secondHand').style.transform = `rotate(${secondDeg}deg)`;
+        }
+
+        // 캘린더
+        function updateCalendar() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const today = now.getDate();
+            
+            document.getElementById('calendarHeader').textContent = `${year}년 ${month + 1}월`;
+            
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            
+            const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+            dayNames.forEach(name => {
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'calendar-day header';
+                dayHeader.textContent = name;
+                grid.appendChild(dayHeader);
+            });
+            
+            for (let i = 0; i < firstDay; i++) {
+                grid.appendChild(document.createElement('div'));
+            }
+            
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayCell = document.createElement('div');
+                dayCell.className = 'calendar-day';
+                if (day === today) dayCell.classList.add('today');
+                dayCell.textContent = day;
+                grid.appendChild(dayCell);
+            }
+        }
+
+        // 시계 업데이트
+        setInterval(() => {
+            updateDigitalClock();
+            updateAnalogClock();
+        }, 1000);
+        
+        updateDigitalClock();
+        updateAnalogClock();
+        updateCalendar();
+
+        // YouTube 검색
+        document.getElementById('searchBox').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const query = e.target.value;
+                if (query) {
+                    window.location.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+                }
+            }
+        });
+
+        // 앱 열기
+        function openApp(url) {
+            window.location.href = url;
+        }
+
+        function openDimiCheck() {
+            window.location.href = `https://chec.kro.kr/board?grade=${grade}&section=${section}`;
+        }
+
+        // DimiCheck 설정
+        function openSettings() {
+            document.getElementById('gradeSelect').value = grade;
+            document.getElementById('sectionSelect').value = section;
+            document.getElementById('settingsModal').classList.add('active');
+        }
+
+        function saveSettings() {
+            grade = document.getElementById('gradeSelect').value;
+            section = document.getElementById('sectionSelect').value;
+            localStorage.setItem('dimicheck_grade', grade);
+            localStorage.setItem('dimicheck_section', section);
+            closeModal('settingsModal');
+        }
+
+        // QR 표시
+        function showQR(imagePath) {
+            document.getElementById('qrImage').src = imagePath;
+            document.getElementById('qrOverlay').classList.add('active');
+        }
+
+        function closeQR() {
+            document.getElementById('qrOverlay').classList.remove('active');
+        }
+
+        // 사이트 추가
+        function openAddSite() {
+            document.getElementById('siteNameInput').value = '';
+            document.getElementById('siteUrlInput').value = '';
+            document.getElementById('addSiteModal').classList.add('active');
+        }
+
+        function addCustomSite() {
+            const name = document.getElementById('siteNameInput').value.trim();
+            const url = document.getElementById('siteUrlInput').value.trim();
+            
+            if (!name || !url) {
+                alert('사이트 이름과 URL을 모두 입력해주세요.');
+                return;
+            }
+            
+            const site = { name, url, id: Date.now() };
+            customSites.push(site);
+            localStorage.setItem('custom_sites', JSON.stringify(customSites));
+            renderCustomSites();
+            closeModal('addSiteModal');
+        }
+
+        function removeCustomSite(id) {
+            customSites = customSites.filter(site => site.id !== id);
+            localStorage.setItem('custom_sites', JSON.stringify(customSites));
+            renderCustomSites();
+        }
+
+        function renderCustomSites() {
+            const container = document.getElementById('appsContainer');
+            
+            // 기존 커스텀 사이트 제거
+            document.querySelectorAll('.app-icon.custom').forEach(el => el.remove());
+            
+            // 새로 추가
+            const addButton = container.lastElementChild;
+            
+            customSites.forEach(site => {
+                const appIcon = document.createElement('div');
+                appIcon.className = 'app-icon custom';
+                appIcon.innerHTML = `
+                    <div class="app-icon-img">
+                        <div style="font-size: 48px;">🌐</div>
+                    </div>
+                    <div class="app-label">${site.name}</div>
+                    <button class="remove-btn" onclick="event.stopPropagation(); removeCustomSite(${site.id})">×</button>
+                `;
+                appIcon.onclick = () => openApp(site.url.startsWith('http') ? site.url : 'https://' + site.url);
+                container.insertBefore(appIcon, addButton);
+            });
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // 모달 배경 클릭시 닫기
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+
+        // QR 오버레이 배경 클릭시 닫기
+        document.getElementById('qrOverlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                closeQR();
+            }
+        });
+
+        // 초기 커스텀 사이트 렌더링
+        renderCustomSites();
+    </script>
+</body>
+</html>

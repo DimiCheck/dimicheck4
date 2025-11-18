@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import secrets
 from typing import Any
 
 from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 from flask_cors import CORS
 from flask_smorest import Api
 from flask_socketio import SocketIO
+import requests
 
 from auth import blueprint as auth_bp
 from class_routes import blueprint as class_bp
@@ -98,6 +100,60 @@ api_spec = {
 api = Api(app, spec_kwargs=api_spec)
 
 CLASS_CONFIGS = load_class_config()
+QRNG_ENDPOINT = "https://qrng.anu.edu.au/API/jsonI.php"
+QRNG_ALLOWED_TYPES = {"uint8", "uint16", "hex16"}
+QRNG_MAX_LENGTH = 1024
+
+
+def _fallback_qrng(length: int, qtype: str) -> dict[str, Any]:
+    if qtype == "uint16":
+        data = [secrets.randbits(16) for _ in range(length)]
+    elif qtype == "hex16":
+        data = [f"{secrets.randbits(16):04x}" for _ in range(length)]
+    else:  # default uint8
+        data = list(secrets.token_bytes(length))
+
+    return {"success": True, "data": data, "source": "fallback"}
+
+
+@app.get("/api/qrng")
+def qrng_proxy():
+    length = request.args.get("length", default=128, type=int)
+    qtype = request.args.get("type", default="uint8")
+
+    if not length or length < 1 or length > QRNG_MAX_LENGTH:
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": "invalid_length",
+                    "message": f"length must be between 1 and {QRNG_MAX_LENGTH}",
+                }
+            ),
+            400,
+        )
+
+    if qtype not in QRNG_ALLOWED_TYPES:
+        qtype = "uint8"
+
+    try:
+        upstream = requests.get(
+            QRNG_ENDPOINT,
+            params={"length": length, "type": qtype},
+            timeout=5,
+        )
+        upstream.raise_for_status()
+        data = upstream.json()
+        if data.get("success"):
+            return jsonify(data)
+        app.logger.warning("QRNG upstream responded without success flag: %s", data)
+    except requests.RequestException as exc:
+        app.logger.warning("QRNG upstream error: %s", exc)
+    except ValueError:
+        app.logger.warning("QRNG upstream returned invalid JSON")
+
+    fallback = _fallback_qrng(length, qtype)
+    return jsonify(fallback), 200
 
 @app.route("/board", methods=["GET", "POST"])
 def board():
