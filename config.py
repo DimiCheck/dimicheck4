@@ -1,11 +1,20 @@
 import os
 from datetime import timedelta
 
+
+def _env_bool(key: str, default: bool) -> bool:
+    value = os.getenv(key)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "t", "yes", "y", "on"}
+
 class Config:
     SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-secret")
     SESSION_COOKIE_HTTPONLY: bool = True
-    SESSION_COOKIE_SAMESITE: str = "Lax"
-    PERMANENT_SESSION_LIFETIME: timedelta = timedelta(days=7)
+    SESSION_COOKIE_SECURE: bool = _env_bool("SESSION_COOKIE_SECURE", True)
+    SESSION_COOKIE_SAMESITE: str = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
+    PERMANENT_SESSION_LIFETIME: timedelta = timedelta(days=30)
+    SESSION_REFRESH_EACH_REQUEST: bool = True
 
     # DB
     SQLALCHEMY_DATABASE_URI: str = os.getenv("DATABASE_URL", "sqlite:///app.db")

@@ -113,7 +113,9 @@ def get_public_key() -> str:
 
 
 def issue_session(payload: Dict[str, Any]) -> None:
+    session.permanent = True
     session["user"] = payload
+    session.modified = True
 
 
 def ensure_user(data: Dict[str, Any]) -> User:
@@ -153,7 +155,7 @@ def callback() -> Any:
 
     # 세션 저장 및 유저 등록
     _normalize_student_payload(user_data)
-    session["user"] = user_data
+    issue_session(user_data)
     ensure_user(user_data)
 
     # 역할에 따라 리디렉션
