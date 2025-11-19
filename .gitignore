@@ -10,7 +10,7 @@ __pycache__/
 .venv/
 venv/
 ENV/
-env/
+env
 pyvenv.cfg
 
 # 패키징/빌드 산출물

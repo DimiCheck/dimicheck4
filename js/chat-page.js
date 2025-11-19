@@ -544,7 +544,13 @@ class ChatPageManager {
   async handleSendMessage() {
     const text = this.chatInput?.value?.trim();
 
-    if (!text && !this.pendingImageUrl) {
+    // Check for pending image from mediaManager as well
+    let imageUrl = this.pendingImageUrl;
+    if (!imageUrl && window.mediaManager?.hasPendingImage()) {
+      imageUrl = window.mediaManager.getPendingImageUrl();
+    }
+
+    if (!text && !imageUrl) {
       this.showToast('메시지를 입력해주세요');
       return;
     }
@@ -556,7 +562,7 @@ class ChatPageManager {
 
     const payload = {
       message: text || '',
-      imageUrl: this.pendingImageUrl || undefined,
+      imageUrl: imageUrl || undefined,
       replyToId: this.replyToMessage?.id || undefined
     };
 
@@ -726,7 +732,16 @@ class ChatPageManager {
 
   scrollToBottom() {
     if (this.messagesContainer) {
-      this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+      // Double RAF to ensure images and all content are loaded
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+          // Extra safety: scroll again after a short delay to catch late-loading images
+          setTimeout(() => {
+            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+          }, 100);
+        });
+      });
     }
   }
 

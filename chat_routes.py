@@ -6,7 +6,7 @@ import json
 from flask import Blueprint, jsonify, request, session
 
 from extensions import db
-from models import ChatMessage, UserNickname, ClassState, ChatReaction, UserAvatar
+from models import ChatMessage, UserNickname, ClassState, ChatReaction, UserAvatar, ClassEmoji
 from utils import is_board_session_active, is_teacher_session_active
 import re
 
@@ -727,5 +727,142 @@ def get_chat_config():
     from config import config
 
     return jsonify({
-        "klipyApiKey": config.KLIPY_API_KEY
+        "klipyApiKey": config.KLIPY_API_KEY,
+        "imageUploadUrl": config.IMAGE_UPLOAD_URL
     })
+
+
+# ============================================================================
+# Class Emoji Endpoints
+# ============================================================================
+
+@blueprint.route("/emojis", methods=["GET"])
+def get_class_emojis():
+    """
+    현재 반의 커스텀 이모티콘 목록 조회
+
+    Response:
+        - emojis: 이모티콘 배열
+            - id, name, imageUrl, uploadedBy, createdAt
+    """
+    # 학생 세션 확인
+    grade, section, student_number = _get_student_session_info()
+    if grade is None or section is None or student_number is None:
+        return jsonify({"error": "학생 로그인이 필요합니다"}), 401
+
+    # 반 이모티콘 조회
+    emojis = ClassEmoji.query.filter_by(
+        grade=grade,
+        section=section
+    ).order_by(ClassEmoji.created_at.desc()).all()
+
+    return jsonify({
+        "emojis": [
+            {
+                "id": emoji.id,
+                "name": emoji.name,
+                "imageUrl": emoji.image_url,
+                "uploadedBy": emoji.uploaded_by,
+                "createdAt": emoji.created_at.isoformat()
+            }
+            for emoji in emojis
+        ]
+    })
+
+
+@blueprint.route("/emojis", methods=["POST"])
+def upload_class_emoji():
+    """
+    반 커스텀 이모티콘 등록 (클라이언트에서 이미 업로드된 이미지 URL 전달)
+
+    Request (JSON):
+        - name: 이모티콘 이름
+        - imageUrl: 업로드된 이미지 URL
+
+    Response:
+        - emoji: 생성된 이모티콘 정보
+    """
+    # 학생 세션 확인
+    grade, section, student_number = _get_student_session_info()
+    if grade is None or section is None or student_number is None:
+        return jsonify({"error": "학생 로그인이 필요합니다"}), 401
+
+    # JSON 데이터 파싱
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON 데이터가 필요합니다"}), 400
+
+    # 이모티콘 이름
+    emoji_name = data.get('name', '').strip()
+    if not emoji_name:
+        return jsonify({"error": "이모티콘 이름을 입력해주세요"}), 400
+
+    # 이름 길이 검증
+    if len(emoji_name) > 50:
+        return jsonify({"error": "이모티콘 이름은 50자를 초과할 수 없습니다"}), 400
+
+    # 이미지 URL
+    image_url = data.get('imageUrl', '').strip()
+    if not image_url:
+        return jsonify({"error": "이미지 URL이 필요합니다"}), 400
+
+    # URL 길이 검증
+    if len(image_url) > 500:
+        return jsonify({"error": "이미지 URL이 너무 깁니다"}), 400
+
+    # DB에 저장
+    emoji = ClassEmoji(
+        grade=grade,
+        section=section,
+        name=emoji_name,
+        image_url=image_url,
+        uploaded_by=student_number
+    )
+    db.session.add(emoji)
+    db.session.commit()
+
+    return jsonify({
+        "emoji": {
+            "id": emoji.id,
+            "name": emoji.name,
+            "imageUrl": emoji.image_url,
+            "uploadedBy": emoji.uploaded_by,
+            "createdAt": emoji.created_at.isoformat()
+        }
+    }), 201
+
+
+@blueprint.route("/emojis/<int:emoji_id>", methods=["DELETE"])
+def delete_class_emoji(emoji_id: int):
+    """
+    반 커스텀 이모티콘 삭제
+
+    권한: 업로더 본인 또는 관리자(선생님)
+
+    Response:
+        - success: True
+    """
+    # 학생 세션 확인
+    grade, section, student_number = _get_student_session_info()
+    is_teacher = is_teacher_session_active()
+
+    if grade is None or section is None or (student_number is None and not is_teacher):
+        return jsonify({"error": "로그인이 필요합니다"}), 401
+
+    # 이모티콘 조회
+    emoji = ClassEmoji.query.get(emoji_id)
+    if not emoji:
+        return jsonify({"error": "이모티콘을 찾을 수 없습니다"}), 404
+
+    # 권한 확인: 같은 반이면서 (업로더 본인이거나 선생님)
+    if not (emoji.grade == grade and emoji.section == section):
+        return jsonify({"error": "접근 권한이 없습니다"}), 403
+
+    if not (is_teacher or emoji.uploaded_by == student_number):
+        return jsonify({"error": "이모티콘을 삭제할 권한이 없습니다 (업로더 또는 관리자만 가능)"}), 403
+
+    # 삭제
+    db.session.delete(emoji)
+    db.session.commit()
+
+    return jsonify({"success": True})

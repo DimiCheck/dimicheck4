@@ -318,3 +318,21 @@ class UserAvatar(db.Model):
         db.UniqueConstraint("grade", "section", "student_number", name="uq_user_avatar"),
     )
 
+
+class ClassEmoji(db.Model):
+    """반 공용 커스텀 이모티콘"""
+    __tablename__ = "class_emojis"
+
+    id = db.Column(db.Integer, primary_key=True)
+    grade = db.Column(db.Integer, nullable=False)
+    section = db.Column(db.Integer, nullable=False)
+    name = db.Column(db.String(50), nullable=False)  # 이모티콘 이름
+    image_url = db.Column(db.String(500), nullable=False)  # Imgur에 업로드된 PNG URL
+    uploaded_by = db.Column(db.Integer, nullable=False)  # 업로드한 학생 번호
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index("idx_class_emoji_grade_section", "grade", "section"),
+        db.Index("idx_class_emoji_uploader", "uploaded_by"),
+    )
+
