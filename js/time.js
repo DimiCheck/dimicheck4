@@ -23,6 +23,14 @@ const AUTO_RETURN_SCHEDULES = [
 ];
 const autoReturnState = Object.create(null);
 
+function canSyncWithBackend() {
+  const monitor = window.connectionMonitor;
+  if (!monitor || typeof monitor.isOffline !== 'function') {
+    return true;
+  }
+  return !monitor.isOffline();
+}
+
 const ROUTINE_ALLOWED_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 let routineData = { afterschool: {}, club: {} };
 let routineLoaded = false;
@@ -253,6 +261,10 @@ function normalizeRoutineData(value) {
 async function loadRoutineData(force = false) {
   if (routineLoading) return;
   if (!force && routineLoaded) return;
+  const monitor = window.connectionMonitor;
+  if (monitor && typeof monitor.isOffline === 'function' && monitor.isOffline()) {
+    return;
+  }
   routineLoading = true;
   try {
     const res = await fetch(`/api/classes/routine?grade=${grade}&section=${section}`, {
@@ -817,16 +829,39 @@ async function initBoard() {
   setInterval(updateClock, 1000);
 }
 
+window.forceResyncState = async function forceResyncState() {
+  if (grade == null || section == null) {
+    return;
+  }
+  try {
+    await saveState(grade, section);
+    await loadState(grade, section, { ignoreOffline: true });
+    await loadRoutineData(true);
+  } catch (err) {
+    console.warn('forceResyncState failed:', err);
+  }
+};
+
 initBoard();
 
 setInterval(() => {
-  if (!window.isMagnetDragging && !window.isAutoReturning && !window.isRoutineApplying) {
+  if (
+    canSyncWithBackend() &&
+    !window.isMagnetDragging &&
+    !window.isAutoReturning &&
+    !window.isRoutineApplying
+  ) {
     loadState(grade, section);
   }
 }, 1000);
 
 setInterval(() => {
-  if (!window.isMagnetDragging && !window.isAutoReturning && !window.isRoutineApplying) {
+  if (
+    canSyncWithBackend() &&
+    !window.isMagnetDragging &&
+    !window.isAutoReturning &&
+    !window.isRoutineApplying
+  ) {
     loadRoutineData(true);
   }
 }, 5 * 60 * 1000);
