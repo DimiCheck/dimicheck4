@@ -561,8 +561,33 @@
   // updateClock(); setInterval(updateClock, 1000);
 
   // -------- storage helpers (compat with etc.js keys) --------
-  function saveData(k,v){ try{localStorage.setItem(k, JSON.stringify(v))}catch(_){}}
-  function loadData(k){ try{const v=localStorage.getItem(k); return v?JSON.parse(v):null }catch(_){ return null } }
+  function saveData(key, value){
+    try{
+      if (value === undefined || value === null){
+        localStorage.removeItem(key);
+        return;
+      }
+      localStorage.setItem(key, JSON.stringify(value));
+    }catch(err){
+      console.warn('[storage] save failed', err);
+    }
+  }
+  function loadData(key){
+    try{
+      const raw = localStorage.getItem(key);
+      if (raw === null || raw === 'undefined'){
+        return null;
+      }
+      try{
+        return JSON.parse(raw);
+      }catch(parseErr){
+        return raw;
+      }
+    }catch(err){
+      console.warn('[storage] load failed', err);
+      return null;
+    }
+  }
 
   // -------- select init --------
   const gradeSel = document.getElementById('gradeSel');
@@ -1082,15 +1107,39 @@
   // -------- Countdown Timer --------
   let countdownInterval = null;
 
+  function parseSavedHomeTime(raw){
+    if (!raw && raw !== 0){
+      return null;
+    }
+    if (typeof raw === 'number'){
+      const byNumber = new Date(raw);
+      return Number.isNaN(byNumber.getTime()) ? null : byNumber;
+    }
+    const parsed = new Date(String(raw));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function formatDateInputValue(date){
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function formatTimeInputValue(date){
+    const h = String(date.getHours()).padStart(2, '0');
+    const m = String(date.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
+  }
+
   function updateCountdown() {
-    const homeTime = loadData('homeTime');
-    if (!homeTime) {
+    const targetDate = parseSavedHomeTime(loadData('homeTime'));
+    if (!targetDate) {
       document.getElementById('countdownDisplay').textContent = '귀가 시간을 설정해주세요';
       document.getElementById('countdownMessage').textContent = '';
       return;
     }
 
-    const targetDate = new Date(homeTime);
     const now = new Date();
     const diff = targetDate - now;
 
@@ -1154,8 +1203,7 @@
       return;
     }
 
-    const combinedValue = `${dateValue}T${timeValue}`;
-    const targetDate = new Date(combinedValue);
+    const targetDate = new Date(`${dateValue}T${timeValue}:00`);
     const now = new Date();
 
     if (targetDate <= now) {
@@ -1163,7 +1211,7 @@
       return;
     }
 
-    saveData('homeTime', combinedValue);
+    saveData('homeTime', targetDate.toISOString());
     startCountdown();
   });
 
@@ -1183,13 +1231,10 @@
 
   // Load saved countdown time on page load
   function initCountdown() {
-    const savedTime = loadData('homeTime');
+    const savedTime = parseSavedHomeTime(loadData('homeTime'));
     if (savedTime) {
-      const date = new Date(savedTime);
-      const dateStr = date.toISOString().split('T')[0];
-      const timeStr = date.toTimeString().substring(0, 5);
-      document.getElementById('homeDateInput').value = dateStr;
-      document.getElementById('homeTimeOnlyInput').value = timeStr;
+      document.getElementById('homeDateInput').value = formatDateInputValue(savedTime);
+      document.getElementById('homeTimeOnlyInput').value = formatTimeInputValue(savedTime);
       startCountdown();
     }
   }

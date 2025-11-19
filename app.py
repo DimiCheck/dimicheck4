@@ -58,6 +58,12 @@ for ns in namespaces:
 app.before_request(before_request)
 app.after_request(after_request)
 
+
+@app.before_request
+def _refresh_user_session() -> None:
+    if session.get("user"):
+        session.permanent = True
+
 @app.errorhandler(400)
 @app.errorhandler(401)
 @app.errorhandler(403)
