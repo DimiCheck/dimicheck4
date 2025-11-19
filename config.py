@@ -55,6 +55,9 @@ class Config:
     NEIS_API_KEY: str | None = os.getenv("NEIS_API_KEY", "da82433f0f3a4351bda4ca9a0f11fc7d")
     KLIPY_API_KEY: str | None = os.getenv("KLIPY_API_KEY")
 
+    # Image Upload Server
+    IMAGE_UPLOAD_URL: str = os.getenv("IMAGE_UPLOAD_URL", "https://img.codz.me/upload")
+
     # Weather
 
 config = Config()
