@@ -1,4 +1,117 @@
+const connectionMonitor = (() => {
+  const banner = document.getElementById('connectionStatusBanner');
+  const OFFLINE_HTML = '현재 디미체크가 정상적으로 작동하지 않아 오프라인 모드로 전환합니다. 디미체크 상태는 <a href="https://checstat.netlify.app" target="_blank" rel="noopener noreferrer">checstat.netlify.app</a>에서 확인하실 수 있습니다. 상태를 계속 확인하는 중...';
+  const ONLINE_HTML = '디미체크에 다시 연결되었습니다. 최신 상태를 동기화했습니다.';
+  let state = 'online';
+  let healthTimer = null;
+  let hideTimer = null;
+  let resyncInFlight = false;
+
+  function showBanner(variant, html, autoHideMs) {
+    if (!banner) return;
+    banner.innerHTML = html;
+    banner.classList.remove('offline', 'online', 'visible');
+    banner.classList.add(variant);
+    banner.hidden = false;
+    requestAnimationFrame(() => banner.classList.add('visible'));
+    if (hideTimer) {
+      clearTimeout(hideTimer);
+      hideTimer = null;
+    }
+    if (autoHideMs) {
+      hideTimer = window.setTimeout(() => {
+        hideBanner();
+      }, autoHideMs);
+    }
+  }
+
+  function hideBanner() {
+    if (!banner) return;
+    banner.classList.remove('visible');
+    if (hideTimer) {
+      clearTimeout(hideTimer);
+      hideTimer = null;
+    }
+    setTimeout(() => {
+      if (!banner.classList.contains('visible')) {
+        banner.hidden = true;
+      }
+    }, 250);
+  }
+
+  async function runHealthCheck() {
+    try {
+      const res = await fetch(`/healthz?ts=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`health ${res.status}`);
+      handleRecovery();
+    } catch {
+      // keep waiting
+    }
+  }
+
+  function startHealthMonitoring() {
+    if (healthTimer) return;
+    runHealthCheck();
+    healthTimer = window.setInterval(runHealthCheck, 5000);
+  }
+
+  function stopHealthMonitoring() {
+    if (!healthTimer) return;
+    clearInterval(healthTimer);
+    healthTimer = null;
+  }
+
+  function triggerResync() {
+    if (resyncInFlight) return;
+    const fn = window.forceResyncState;
+    if (typeof fn !== 'function') {
+      return;
+    }
+    resyncInFlight = true;
+    Promise.resolve()
+      .then(() => fn())
+      .catch(err => console.warn('[connection] resync failed', err))
+      .finally(() => {
+        resyncInFlight = false;
+      });
+  }
+
+  function handleRecovery() {
+    if (state !== 'offline') return;
+    state = 'online';
+    showBanner('online', ONLINE_HTML, 4000);
+    stopHealthMonitoring();
+    triggerResync();
+  }
+
+  function markFailure() {
+    if (state === 'offline') return;
+    state = 'offline';
+    showBanner('offline', OFFLINE_HTML);
+    startHealthMonitoring();
+  }
+
+  function markSuccess() {
+    if (state === 'offline') {
+      handleRecovery();
+    }
+  }
+
+  function isOffline() {
+    return state === 'offline';
+  }
+
+  return {
+    markFailure,
+    markSuccess,
+    isOffline,
+  };
+})();
+
+window.connectionMonitor = connectionMonitor;
+
 async function saveState(grade, section) {
+  const monitor = window.connectionMonitor;
   const magnets = {};
   document.querySelectorAll('.magnet:not(.placeholder)').forEach(m => {
     const num = m.dataset.number;
@@ -16,13 +129,24 @@ async function saveState(grade, section) {
   });
 
   try {
-    await fetch(`/api/classes/state/save?grade=${grade}&section=${section}`, {
+    const res = await fetch(`/api/classes/state/save?grade=${grade}&section=${section}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ magnets })
     });
+    if (!res.ok) {
+      throw new Error(`save failed: ${res.status}`);
+    }
+    if (monitor && typeof monitor.markSuccess === 'function') {
+      monitor.markSuccess();
+    }
+    return true;
   } catch (e) {
     console.warn("saveState failed:", e);
+    if (monitor && typeof monitor.markFailure === 'function') {
+      monitor.markFailure();
+    }
+    return false;
   }
 }
 
@@ -64,9 +188,15 @@ function restoreToFreePosition(el, data) {
   }
 }
 
-async function loadState(grade, section) {
+async function loadState(grade, section, options = {}) {
+  const monitor = window.connectionMonitor;
+  const ignoreOffline = Boolean(options && options.ignoreOffline);
+  if (!ignoreOffline && monitor && typeof monitor.isOffline === 'function' && monitor.isOffline()) {
+    return;
+  }
+
   try {
-    const res = await fetch(`/api/classes/state/load?grade=${grade}&section=${section}`);
+    const res = await fetch(`/api/classes/state/load?grade=${grade}&section=${section}`, { cache: 'no-store' });
     if (!res.ok) throw new Error("로드 실패");
     const parsed = await res.json();
     const magnets = parsed.magnets || {};
@@ -148,11 +278,17 @@ async function loadState(grade, section) {
       window.repositionThoughtBubbles();
     }
 
-    if (didNormalizeSection){
+    if (didNormalizeSection) {
       await saveState(grade, section);
     }
 
+    if (monitor && typeof monitor.markSuccess === 'function') {
+      monitor.markSuccess();
+    }
   } catch (e) {
     console.error("loadState error:", e);
+    if (monitor && typeof monitor.markFailure === 'function') {
+      monitor.markFailure();
+    }
   }
 }

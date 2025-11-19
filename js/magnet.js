@@ -778,6 +778,8 @@ function getQueryParam(name) {
 
 const grade = getQueryParam("grade");
 const section = getQueryParam("section");
+window.boardGrade = grade;
+window.boardSection = section;
 
 function createPlaceholder(num) {
   if (placeholders.has(num)) return;

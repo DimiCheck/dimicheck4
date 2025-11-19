@@ -1587,3 +1587,48 @@ body.fullscreen .fullscreen-btn {
   opacity: 0.7;
   line-height: 1.4;
 }
+
+.connection-banner {
+  position: fixed;
+  top: 24px;
+  left: 40px;
+  right: 40px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: -0.01em;
+  z-index: 2000;
+  transform: translateY(calc(-100% - 12px));
+  transition: transform 0.25s ease;
+  border-radius: 999px;
+}
+
+.connection-banner a {
+  color: inherit;
+  text-decoration: underline;
+  font-weight: 700;
+}
+
+.connection-banner.visible {
+  transform: translateY(0);
+}
+
+.connection-banner.offline {
+  background: #facc15;
+  color: #1f2937;
+}
+
+.connection-banner.online {
+  background: #16a34a;
+  color: #fff;
+}
+
+@media (max-width: 900px) {
+  .connection-banner {
+    left: 20px;
+    right: 20px;
+    top: 16px;
+    font-size: 13px;
+  }
+}
