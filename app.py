@@ -59,6 +59,12 @@ app.before_request(before_request)
 app.after_request(after_request)
 
 
+@app.context_processor
+def inject_asset_version():
+    """Inject asset version for cache busting"""
+    return {'asset_version': config.ASSET_VERSION}
+
+
 @app.before_request
 def _refresh_user_session() -> None:
     if session.get("user"):
@@ -182,11 +188,11 @@ def board():
         pin = request.form.get("pin")
         if str(config["pin"]) == pin:
             session[f"board_verified_{grade}_{section}"] = True
-            return send_from_directory(".", "index.html")
+            return render_template("index.html")
         return send_from_directory(".", "enter_pin.html")
 
     if session.get(f"board_verified_{grade}_{section}"):
-        return send_from_directory(".", "index.html")
+        return render_template("index.html")
 
     return send_from_directory(".", "enter_pin.html")
 
@@ -258,6 +264,12 @@ def reload_configs():
     global CLASS_CONFIGS
     CLASS_CONFIGS = load_class_config(force_refresh=True)
     return jsonify({"status": "reloaded"})
+
+
+@app.route("/api/version")
+def get_version():
+    """Get current asset version for cache busting"""
+    return jsonify({"version": config.ASSET_VERSION})
 
 @app.route("/sitemap.xml")
 def sitemap():

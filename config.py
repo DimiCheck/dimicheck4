@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import timedelta
 
 
@@ -57,6 +58,9 @@ class Config:
 
     # Image Upload Server
     IMAGE_UPLOAD_URL: str = os.getenv("IMAGE_UPLOAD_URL", "https://img.codz.me/upload")
+
+    # Cache busting - use timestamp or version from env
+    ASSET_VERSION: str = os.getenv("ASSET_VERSION", str(int(time.time())))
 
     # Weather
 

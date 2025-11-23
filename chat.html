@@ -27,6 +27,36 @@
       }
     })();
   </script>
+  <script>
+    // Cache busting: Check version and reload if outdated
+    (function() {
+      const CURRENT_VERSION = localStorage.getItem('app_version');
+      const CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes
+
+      async function checkVersion() {
+        try {
+          const res = await fetch('/api/version');
+          const data = await res.json();
+          const newVersion = data.version;
+
+          if (CURRENT_VERSION && CURRENT_VERSION !== newVersion) {
+            console.log('New version detected, reloading...');
+            localStorage.setItem('app_version', newVersion);
+            location.reload(true);
+          } else if (!CURRENT_VERSION) {
+            localStorage.setItem('app_version', newVersion);
+          }
+        } catch (err) {
+          console.error('Version check failed:', err);
+        }
+      }
+
+      // Check on load
+      checkVersion();
+      // Check periodically
+      setInterval(checkVersion, CHECK_INTERVAL);
+    })();
+  </script>
   <script defer src="/js/pwa.js"></script>
   <script defer src="/js/preferences.js"></script>
   <script defer src="/js/auth-guard.js"></script>
