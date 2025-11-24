@@ -10,6 +10,7 @@ from config import config
 from models import ClassState, ClassRoutine, ChatMessage, MealVote, CalendarEvent
 from config_loader import load_class_config
 from utils import is_board_session_active, is_teacher_session_active
+from public_api import broadcast_public_status_update
 
 # Import socketio for broadcasting
 try:
@@ -196,6 +197,11 @@ def save_state():
             }, namespace=f'/ws/classes/{grade}/{section}')
         except Exception as e:
             print(f"[WebSocket] Failed to broadcast state update: {e}")
+
+    try:
+        broadcast_public_status_update(grade, section)
+    except Exception as exc:
+        print(f"[PublicAPI] Failed to broadcast status: {exc}")
 
     return jsonify({"ok": True, "magnets": magnets})
 

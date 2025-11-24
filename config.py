@@ -64,4 +64,8 @@ class Config:
 
     # Weather
 
+    # Public API limits
+    PUBLIC_API_MINUTE_LIMIT: int = int(os.getenv("PUBLIC_API_MINUTE_LIMIT", "2"))
+    PUBLIC_API_DAILY_LIMIT: int = int(os.getenv("PUBLIC_API_DAILY_LIMIT", "30"))
+
 config = Config()

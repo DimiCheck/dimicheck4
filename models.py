@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, date
 from enum import Enum
 import json
 
@@ -201,9 +201,42 @@ class ChatMessage(db.Model):
 
     __table_args__ = (
         db.Index("idx_chat_grade_section_created", "grade", "section", "created_at"),
-        db.Index("idx_chat_reply", "reply_to_id"),  # Index for reply queries
+        db.Index("idx_chat_reply", "reply_to_id"),
     )
 
+
+class APIKey(db.Model):
+    __tablename__ = "api_keys"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    label = db.Column(db.String(100), nullable=True)
+    key = db.Column(db.String(128), unique=True, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    last_used_at = db.Column(db.DateTime, nullable=True)
+    tier = db.Column(db.String(20), default="tier1", nullable=False)
+    tier_requested_at = db.Column(db.DateTime, nullable=True)
+    tier_upgraded_at = db.Column(db.DateTime, nullable=True)
+    streak_days = db.Column(db.Integer, default=0, nullable=False)
+    streak_last_date = db.Column(db.Date, nullable=True)
+
+
+class APIRateLimit(db.Model):
+    __tablename__ = "api_rate_limits"
+
+    id = db.Column(db.Integer, primary_key=True)
+    api_key_id = db.Column(db.Integer, db.ForeignKey("api_keys.id"), nullable=False, unique=True)
+    minute_window_start = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    minute_count = db.Column(db.Integer, default=0, nullable=False)
+    day = db.Column(db.Date, default=date.today, nullable=False)
+    day_count = db.Column(db.Integer, default=0, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    api_key = db.relationship(
+        "APIKey",
+        backref=db.backref("rate_limit", uselist=False, cascade="all, delete-orphan"),
+    )
 
 class UserNickname(db.Model):
     __tablename__ = "user_nicknames"
@@ -335,4 +368,3 @@ class ClassEmoji(db.Model):
         db.Index("idx_class_emoji_grade_section", "grade", "section"),
         db.Index("idx_class_emoji_uploader", "uploaded_by"),
     )
-
