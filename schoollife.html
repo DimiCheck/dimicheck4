@@ -360,11 +360,25 @@
       background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.08));
       border-color: color-mix(in oklab, var(--primary) 30%, transparent);
     }
+    .calendar-event.past {
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border-color: color-mix(in oklab, var(--text) 8%, transparent);
+      color: var(--muted);
+      opacity: .75;
+    }
     .event-date {
       font-size: 12px;
       color: var(--primary);
       font-weight: 700;
       margin-bottom: 4px;
+    }
+    .calendar-event.past .event-date,
+    .calendar-event.past .event-title,
+    .calendar-event.past .event-description {
+      color: var(--muted);
+      text-decoration: line-through;
+      text-decoration-thickness: 1px;
+      text-decoration-color: color-mix(in oklab, var(--muted) 90%, transparent);
     }
     .event-title {
       font-weight: 700;
@@ -987,38 +1001,54 @@
       return;
     }
 
-    // Group events by month
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    // Group upcoming events by month (exclude past months)
     const grouped = {};
     calendarEvents.forEach(event => {
-      const date = new Date(event.date);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+      const dateObj = new Date(event.date);
+      if (Number.isNaN(dateObj.getTime()) || dateObj < currentMonthStart) {
+        return;
+      }
+      const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}`;
       if (!grouped[monthKey]) grouped[monthKey] = [];
-      grouped[monthKey].push(event);
+      grouped[monthKey].push({...event, dateObj});
     });
 
+    const monthKeys = Object.keys(grouped).sort();
+    if (monthKeys.length === 0) {
+      container.innerHTML = '<div class="empty">다가오는 일정이 없습니다</div>';
+      return;
+    }
+
+    const dayNames = ['일','월','화','수','목','금','토'];
     let html = '';
-    Object.keys(grouped).sort().reverse().forEach(monthKey => {
+    monthKeys.forEach(monthKey => {
       const [year, month] = monthKey.split('-');
       html += `<div style="margin-bottom:20px;">`;
-      html += `<h3 style="font-size:16px; margin:0 0 10px; color:var(--primary);">${year}년 ${parseInt(month)}월</h3>`;
+      html += `<h3 style="font-size:16px; margin:0 0 10px; color:var(--primary);">${year}년 ${parseInt(month, 10)}월</h3>`;
       html += `<div class="calendar-grid">`;
 
-      grouped[monthKey].forEach(event => {
-        const date = new Date(event.date);
-        const dateStr = `${date.getMonth()+1}/${date.getDate()} (${['일','월','화','수','목','금','토'][date.getDay()]})`;
+      grouped[monthKey]
+        .sort((a, b) => a.dateObj - b.dateObj)
+        .forEach(event => {
+          const dateStr = `${event.dateObj.getMonth()+1}/${event.dateObj.getDate()} (${dayNames[event.dateObj.getDay()]})`;
+          const isPast = event.dateObj < today;
 
-        html += `<div class="calendar-event" data-event-id="${event.id}">`;
-        html += `<div class="event-date">${dateStr}</div>`;
-        html += `<div class="event-title">${escapeHtml(event.title)}</div>`;
-        if (event.description) {
-          html += `<div class="event-description">${escapeHtml(event.description)}</div>`;
-        }
-        html += `<div class="event-actions">`;
-        html += `<button class="event-btn ghost" onclick="editEvent(${event.id})">수정</button>`;
-        html += `<button class="event-btn ghost" onclick="deleteEvent(${event.id})">삭제</button>`;
-        html += `</div>`;
-        html += `</div>`;
-      });
+          html += `<div class="calendar-event${isPast ? ' past' : ''}" data-event-id="${event.id}">`;
+          html += `<div class="event-date">${dateStr}</div>`;
+          html += `<div class="event-title">${escapeHtml(event.title)}</div>`;
+          if (event.description) {
+            html += `<div class="event-description">${escapeHtml(event.description)}</div>`;
+          }
+          html += `<div class="event-actions">`;
+          html += `<button class="event-btn ghost" onclick="editEvent(${event.id})">수정</button>`;
+          html += `<button class="event-btn ghost" onclick="deleteEvent(${event.id})">삭제</button>`;
+          html += `</div>`;
+          html += `</div>`;
+        });
 
       html += `</div></div>`;
     });

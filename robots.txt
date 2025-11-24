@@ -2,9 +2,10 @@ User-agent: *
 Allow: /
 Allow: /board
 Allow: /teacher
+
+# Block sensitive or noisy endpoints from being crawled.
 Disallow: /api/
-Disallow: /auth/callback
-Disallow: /auth/logout
+Disallow: /auth/
 Disallow: /metrics
 Disallow: /reload-configs
 
