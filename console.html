@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DIMI Check 개발자 콘솔</title>
+  <title>DimiCheck 개발자 콘솔</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -248,7 +248,7 @@
   <div class="console-shell">
     <aside class="sidebar">
       <div class="brand">
-        <h1>DIMI Check</h1>
+        <h1>DimiCheck</h1>
         <span>Public API Console</span>
       </div>
       <nav class="nav" aria-label="섹션 이동">
@@ -280,8 +280,9 @@
 
       <section id="section-usage" class="panel" aria-live="polite">
         <h2>사용량 모니터링</h2>
-        <p class="lead">현재 분당·일일 제한 상태를 확인하세요. 분당 카운트는 최신 호출이 있었던 분에만 표시됩니다.</p>
+        <p class="lead">현재 분당·일일 제한 상태를 확인하세요. 모든 API 키를 합산한 계정 전체 한도가 적용됩니다.</p>
         <div id="usageSummary" class="usage-grid"></div>
+        <div id="usageNote" style="color:var(--muted);font-size:12px">모든 키 사용량이 계정 전체로 합산되어 제한이 적용됩니다.</div>
         <div style="overflow-x:auto">
           <table id="usageTable" aria-label="API 키 사용량">
             <thead>
@@ -301,7 +302,7 @@
 
       <section id="section-docs" class="panel">
         <h2>Public API 문서</h2>
-        <p class="lead">DIMI Check Public API는 읽기 전용이며 Raspberry Pi 5 환경에서 동작합니다.</p>
+        <p class="lead">DimiCheck Public API는 읽기 전용이며 서버는 Raspberry Pi 4b 환경에서 동작합니다. 간혹 API 제공이 원활하지 않을 수 있습니다.</p>
         <div class="doc-grid">
           <article class="doc-card">
             <h3>1. 인증</h3>
@@ -330,8 +331,9 @@
           <article class="doc-card">
             <h3>3. 레이트 리밋</h3>
             <ul>
-              <li>Tier 1: 분당 10회 / 일일 50회 (기본)</li>
-              <li>Tier 2: 분당 15회 / 일일 100회 (업그레이드)</li>
+              <li>Tier 1: 분당 10회 / 일일 50회 (계정 전체, 기본)</li>
+              <li>Tier 2: 분당 15회 / 일일 100회 (계정 전체, 업그레이드)</li>
+              <li>모든 API 키 호출이 계정 단위로 합산되어 제한이 적용됩니다.</li>
               <li>한도 초과 시 HTTP 429 + JSON 에러</li>
             </ul>
             <pre><code>{
@@ -555,10 +557,19 @@ socket.on('status_update', (payload) => {
       const tableBody = document.querySelector('#usageTable tbody');
       if (!summaryEl || !tableBody || !state.usage) return;
 
+      const summary = state.usage.summary || {};
+      const dailyCount = summary.requests_today ?? 0;
+      const accountMinuteCount = summary.account_minute_count ?? 0;
+      const accountDailyLimit = summary.per_account_daily_limit ?? "-";
+      const accountMinuteLimit = summary.per_account_minute_limit ?? "-";
+      const minuteWindowLabel = summary.account_minute_window_start
+        ? new Date(summary.account_minute_window_start).toLocaleTimeString()
+        : "-";
+
       summaryEl.innerHTML = `
-        <div class="usage-card"><small>발급된 키</small><strong style="font-size:22px">${state.usage.summary.total_keys}</strong></div>
-        <div class="usage-card"><small>오늘 호출</small><strong style="font-size:22px">${state.usage.summary.requests_today}</strong><div style="color:var(--muted);font-size:12px">일일 제한 ${state.usage.summary.per_key_daily_limit}</div></div>
-        <div class="usage-card"><small>분당 제한</small><strong style="font-size:22px">${state.usage.summary.per_key_minute_limit}</strong><div style="color:var(--muted);font-size:12px">키 당 분당 호출</div></div>`;
+        <div class="usage-card"><small>발급된 키</small><strong style="font-size:22px">${summary.total_keys ?? 0}</strong></div>
+        <div class="usage-card"><small>계정 일일 사용</small><strong style="font-size:22px">${dailyCount}</strong><div style="color:var(--muted);font-size:12px">일일 제한 ${accountDailyLimit}</div></div>
+        <div class="usage-card"><small>계정 분당 사용</small><strong style="font-size:22px">${accountMinuteCount}</strong><div style="color:var(--muted);font-size:12px">분당 제한 ${accountMinuteLimit} · window ${minuteWindowLabel}</div></div>`;
 
       tableBody.innerHTML = state.usage.keys.map((item) => {
         const minuteInfo = item.minute_window_start ? `${item.minute_count}/${item.minute_limit} (window ${new Date(item.minute_window_start).toLocaleTimeString()})` : `${item.minute_count}/${item.minute_limit}`;

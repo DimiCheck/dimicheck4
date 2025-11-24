@@ -13,6 +13,7 @@ from public_api_tiers import (
     GOOGLE_FORM_URL,
     TIER2_STREAK_DAYS,
     TIER_LIMITS,
+    determine_highest_tier,
     get_limits_for_tier,
 )
 
@@ -41,6 +42,13 @@ def _calculate_minute_snapshot(limits) -> tuple[int, str | None]:
     if minute_window_start == now_window:
         return (limits.minute_count or 0), limits.minute_window_start.isoformat()
     return 0, limits.minute_window_start.isoformat()
+
+
+def _resolve_account_tier(keys: list[APIKey]) -> str:
+    if not keys:
+        return DEFAULT_TIER
+    tier_candidates = [key.tier or DEFAULT_TIER for key in keys]
+    return determine_highest_tier(tier_candidates)
 
 
 def _serialize_key(api_key: APIKey) -> dict:
@@ -80,6 +88,50 @@ def _serialize_key(api_key: APIKey) -> dict:
             "can_request": eligible_for_upgrade,
             "form_url": GOOGLE_FORM_URL,
         },
+    }
+
+
+def _aggregate_account_usage(keys: list[APIKey]) -> dict:
+    now_window = datetime.utcnow().replace(second=0, microsecond=0)
+    today = date.today()
+    minute_count = 0
+    day_count = 0
+    for key in keys:
+        limits = key.rate_limit
+        if not limits:
+            continue
+        if limits.minute_window_start:
+            window = limits.minute_window_start.replace(second=0, microsecond=0)
+            if window == now_window:
+                minute_count += limits.minute_count or 0
+        if limits.day == today:
+            day_count += limits.day_count or 0
+
+    tier = _resolve_account_tier(keys)
+    minute_limit, daily_limit = get_limits_for_tier(tier)
+    tier_label = TIER_LIMITS.get(tier, {}).get("label", tier)
+    streak_days = 0
+    latest_last_date = None
+    for key in keys:
+        sd = key.streak_days or 0
+        if sd > streak_days:
+            streak_days = sd
+        if key.streak_last_date:
+            if not latest_last_date or key.streak_last_date > latest_last_date:
+                latest_last_date = key.streak_last_date
+
+    eligible_for_upgrade = tier == DEFAULT_TIER and streak_days >= TIER2_STREAK_DAYS
+    return {
+        "tier": tier,
+        "tier_label": tier_label,
+        "minute_limit": minute_limit,
+        "daily_limit": daily_limit,
+        "minute_count": minute_count,
+        "day_count": day_count,
+        "minute_window_start": now_window.isoformat(),
+        "streak_days": streak_days,
+        "streak_last_date": latest_last_date.isoformat() if latest_last_date else None,
+        "eligible_for_upgrade": eligible_for_upgrade,
     }
 
 
@@ -161,9 +213,10 @@ def upgrade_api_key_tier(key_id: int):
         _json_abort(400, "usage streak requirement not met")
 
     now = datetime.utcnow()
-    api_key.tier = "tier2"
-    api_key.tier_requested_at = now
-    api_key.tier_upgraded_at = now
+    for key in APIKey.query.filter_by(user_id=user["id"]).all():
+        key.tier = "tier2"
+        key.tier_requested_at = now
+        key.tier_upgraded_at = now
     db.session.commit()
     return jsonify({"key": _serialize_key(api_key)})
 
@@ -173,16 +226,12 @@ def usage_summary():
     user = _require_user()
     keys = APIKey.query.filter_by(user_id=user["id"]).all()
     summary = []
-    total_requests_today = 0
-
     today = date.today()
-    tier_minute_limit, tier_daily_limit = get_limits_for_tier(DEFAULT_TIER)
     for key in keys:
         limits = key.rate_limit
         minute_count, minute_window = _calculate_minute_snapshot(limits)
         minute_limit, daily_limit = get_limits_for_tier(key.tier)
         day_count = limits.day_count if limits and limits.day == today else 0
-        total_requests_today += day_count
         tier_label = TIER_LIMITS.get(key.tier or DEFAULT_TIER, {}).get("label", key.tier)
         summary.append(
             {
@@ -203,17 +252,26 @@ def usage_summary():
             }
         )
 
+    account_usage = _aggregate_account_usage(keys)
     return jsonify(
         {
             "summary": {
                 "total_keys": len(keys),
-                "requests_today": total_requests_today,
-                "per_key_daily_limit": tier_daily_limit,
-                "per_key_minute_limit": tier_minute_limit,
+                "requests_today": account_usage["day_count"],
+                "per_account_daily_limit": account_usage["daily_limit"],
+                "per_account_minute_limit": account_usage["minute_limit"],
+                "account_minute_count": account_usage["minute_count"],
+                "account_minute_window_start": account_usage["minute_window_start"],
                 "tiers": TIER_LIMITS,
                 "upgrade_goal_days": TIER2_STREAK_DAYS,
                 "upgrade_form_url": GOOGLE_FORM_URL,
+                "account_tier": account_usage["tier"],
+                "account_tier_label": account_usage["tier_label"],
+                "account_eligible_for_upgrade": account_usage["eligible_for_upgrade"],
+                "account_streak_days": account_usage["streak_days"],
+                "account_streak_last_date": account_usage["streak_last_date"],
             },
+            "account": account_usage,
             "keys": summary,
         }
     )

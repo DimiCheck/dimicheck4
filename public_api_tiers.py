@@ -22,3 +22,16 @@ def get_limits_for_tier(tier: str | None) -> Tuple[int, int]:
 def get_tier_label(tier: str | None) -> str:
     spec = TIER_LIMITS.get(tier or DEFAULT_TIER, TIER_LIMITS[DEFAULT_TIER])
     return str(spec.get("label", tier or DEFAULT_TIER)).title()
+
+
+def determine_highest_tier(tiers: list[str | None]) -> str:
+    best_tier = DEFAULT_TIER
+    _, best_daily = get_limits_for_tier(best_tier)
+    for tier in tiers:
+        if not tier:
+            continue
+        _, daily = get_limits_for_tier(tier)
+        if daily > best_daily:
+            best_daily = daily
+            best_tier = tier
+    return best_tier
