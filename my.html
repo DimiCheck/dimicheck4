@@ -186,6 +186,80 @@
       backdrop-filter: saturate(140%) blur(14px);
     }
 
+    .developer-card {
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .dev-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 24px;
+    }
+
+    .dev-card-title {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .dev-card-title h3 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    .dev-card-title small {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .dev-card-toggle {
+      border: none;
+      background: color-mix(in oklab, var(--primary) 10%, transparent);
+      color: inherit;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.25s ease;
+    }
+
+    .dev-card-toggle:focus-visible {
+      outline: 2px solid color-mix(in oklab, var(--primary) 60%, transparent);
+      outline-offset: 4px;
+    }
+
+    .developer-card[data-open="true"] .dev-card-toggle {
+      transform: rotate(90deg);
+    }
+
+    .dev-card-content {
+      border-top: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      padding: 20px 24px 0;
+      display: grid;
+      gap: 16px;
+      background: color-mix(in oklab, var(--card) 70%, transparent);
+    }
+
+    .developer-card[data-open="false"] .dev-card-content {
+      display: none;
+    }
+
+    .developer-card[data-open="true"] .dev-card-content {
+      padding-bottom: 24px;
+    }
+
+    .dev-card-content p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
     .profile-card {
       display: flex;
       align-items: center;
@@ -737,6 +811,24 @@
       <p class="notification-note">PC 환경에서만 사용 가능합니다.</p>
     </section>
 
+    <section class="card developer-card fade-up" id="developerCard" data-open="false">
+      <div class="dev-card-header">
+        <div class="dev-card-title">
+          <h3>개발자 기능</h3>
+          <small>Public API, WebSocket 상태, 사용량 확인</small>
+        </div>
+        <button type="button" class="dev-card-toggle" aria-expanded="false" aria-controls="developerCardContent">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
+      <div class="dev-card-content" id="developerCardContent">
+        <p>DIMI Check Public API를 위한 키 발급과 사용량 모니터링, 문서 확인이 가능한 개발자 콘솔로 이동합니다.</p>
+        <button type="button" id="openConsoleBtn" class="btn-primary">개발자 콘솔 열기</button>
+      </div>
+    </section>
+
     <section class="card logout-card fade-up">
       <div>
         <h3 style="margin:0 0 6px">로그아웃</h3>
@@ -819,5 +911,40 @@
       </div>
     </div>
   </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const devCard = document.getElementById('developerCard');
+      if (!devCard) return;
+      const toggle = devCard.querySelector('.dev-card-toggle');
+      const header = devCard.querySelector('.dev-card-header');
+      const content = document.getElementById('developerCardContent');
+      const consoleBtn = document.getElementById('openConsoleBtn');
+
+      const setState = (open) => {
+        toggle?.setAttribute('aria-expanded', open.toString());
+        devCard.dataset.open = open.toString();
+      };
+
+      const handleToggle = () => {
+        if (!toggle) return;
+        const next = toggle.getAttribute('aria-expanded') !== 'true';
+        setState(next);
+      };
+
+      toggle?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        handleToggle();
+      });
+
+      header?.addEventListener('click', () => {
+        handleToggle();
+      });
+
+      consoleBtn?.addEventListener('click', () => {
+        window.location.href = '/console.html';
+      });
+    });
+  </script>
 </body>
 </html>

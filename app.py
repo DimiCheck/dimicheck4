@@ -21,6 +21,8 @@ from class_routes import blueprint as class_bp
 from exports_routes import blueprint as export_bp
 from chat_routes import blueprint as chat_bp
 from vote_routes import blueprint as vote_bp
+from public_api import public_api_bp
+from developer_routes import blueprint as developer_bp
 from config import config
 from extensions import db
 from models import ClassConfig, ClassPin
@@ -47,6 +49,8 @@ app.register_blueprint(class_bp)
 app.register_blueprint(export_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(vote_bp)
+app.register_blueprint(public_api_bp)
+app.register_blueprint(developer_bp)
 app.add_url_rule("/metrics", "metrics", metrics)
 
 db.init_app(app)
