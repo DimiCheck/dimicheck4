@@ -135,6 +135,7 @@ def _fallback_qrng(length: int, qtype: str) -> dict[str, Any]:
 
 
 @app.get("/api/qrng")
+@cross_origin(origins=[config.FRONTEND_ORIGIN, "https://churchofquantum.netlify.app"])
 def qrng_proxy():
     length = request.args.get("length", default=128, type=int)
     qtype = request.args.get("type", default="uint8")
