@@ -11,7 +11,9 @@ from config import config
 from extensions import db
 from models import APIKey, APIRateLimit, CalendarEvent, ClassConfig, ClassState
 from public_api_tiers import (
+    DEFAULT_TIER,
     TIER2_MIN_DAILY_REQUESTS,
+    determine_highest_tier,
     get_limits_for_tier,
 )
 
@@ -35,21 +37,49 @@ def _resolve_api_key(header_value: str | None) -> APIKey | None:
     return APIKey.query.filter_by(key=header_value).first()
 
 
-def _update_streak(api_key: APIKey, evaluated_day: date | None, daily_count: int) -> None:
-    if not evaluated_day:
+def _update_user_streak(keys: list[APIKey], evaluated_day: date | None, daily_count: int) -> None:
+    if not evaluated_day or not keys:
         return
+
+    reference = max(
+        keys,
+        key=lambda key: (
+            key.streak_last_date or date.min,
+            key.streak_days or 0,
+        ),
+    )
+    current_last_date = reference.streak_last_date
+    current_streak_days = reference.streak_days or 0
+    target_last_date = current_last_date
+    target_streak_days = current_streak_days
+
     if daily_count >= TIER2_MIN_DAILY_REQUESTS:
-        if api_key.streak_last_date == evaluated_day:
+        if current_last_date == evaluated_day:
             return
-        if api_key.streak_last_date == evaluated_day - timedelta(days=1):
-            api_key.streak_days = (api_key.streak_days or 0) + 1
+        if current_last_date == evaluated_day - timedelta(days=1):
+            target_streak_days = current_streak_days + 1
         else:
-            api_key.streak_days = 1
-        api_key.streak_last_date = evaluated_day
+            target_streak_days = 1
+        target_last_date = evaluated_day
     else:
-        if api_key.streak_last_date != evaluated_day:
-            api_key.streak_days = 0
-            api_key.streak_last_date = evaluated_day
+        if current_last_date == evaluated_day:
+            return
+        target_streak_days = 0
+        target_last_date = evaluated_day
+
+    if target_last_date == current_last_date and target_streak_days == current_streak_days:
+        return
+
+    for key in keys:
+        key.streak_days = target_streak_days
+        key.streak_last_date = target_last_date
+
+
+def _determine_account_tier(keys: list[APIKey]) -> str:
+    if not keys:
+        return DEFAULT_TIER
+    tier_candidates = [key.tier or DEFAULT_TIER for key in keys]
+    return determine_highest_tier(tier_candidates)
 
 
 def require_api_key(func):
@@ -80,7 +110,11 @@ def enforce_rate_limit(func):
         now = datetime.utcnow()
         minute_window = now.replace(second=0, microsecond=0)
         today = now.date()
-        minute_cap, daily_cap = get_limits_for_tier(api_key.tier)
+        yesterday = today - timedelta(days=1)
+
+        user_keys = APIKey.query.filter_by(user_id=api_key.user_id).all()
+        account_tier = _determine_account_tier(user_keys)
+        minute_cap, daily_cap = get_limits_for_tier(account_tier)
 
         limits = APIRateLimit.query.filter_by(api_key_id=api_key.id).first()
         if not limits:
@@ -91,6 +125,15 @@ def enforce_rate_limit(func):
             )
             db.session.add(limits)
 
+        user_limits = (
+            APIRateLimit.query.join(APIKey)
+            .filter(APIKey.user_id == api_key.user_id)
+            .all()
+        )
+        aggregated_yesterday = sum(
+            (limit.day_count or 0) for limit in user_limits if limit.day == yesterday
+        )
+
         if limits.minute_window_start != minute_window:
             limits.minute_window_start = minute_window
             limits.minute_count = 0
@@ -99,24 +142,31 @@ def enforce_rate_limit(func):
             limits.minute_count = 0
 
         if limits.day != today:
-            previous_day = limits.day
-            previous_day_count = limits.day_count or 0
-            _update_streak(api_key, previous_day, previous_day_count)
+            _update_user_streak(user_keys, yesterday, aggregated_yesterday)
             limits.day = today
             limits.day_count = 0
 
         if limits.day_count is None:
             limits.day_count = 0
 
-        minute_projection = (limits.minute_count or 0) + 1
-        daily_projection = (limits.day_count or 0) + 1
+        aggregated_minute = sum(
+            (limit.minute_count or 0)
+            for limit in user_limits
+            if limit.minute_window_start == minute_window
+        )
+        aggregated_day = sum(
+            (limit.day_count or 0) for limit in user_limits if limit.day == today
+        )
+
+        minute_projection = aggregated_minute + 1
+        daily_projection = aggregated_day + 1
 
         if minute_projection > minute_cap or daily_projection > daily_cap:
             db.session.rollback()
             return _json_error(429, "rate limit exceeded")
 
-        limits.minute_count = minute_projection
-        limits.day_count = daily_projection
+        limits.minute_count += 1
+        limits.day_count += 1
         limits.updated_at = now
         api_key.last_used_at = now
         db.session.commit()
