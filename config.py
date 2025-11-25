@@ -71,6 +71,13 @@ class Config:
     # Cache busting - use timestamp or version from env
     ASSET_VERSION: str = os.getenv("ASSET_VERSION", str(int(time.time())))
 
+    # Google Analytics (Measurement Protocol)
+    GA4_MEASUREMENT_ID: str | None = os.getenv("GA4_MEASUREMENT_ID")
+    GA4_API_SECRET: str | None = os.getenv("GA4_API_SECRET")
+    GA4_MEASUREMENT_ENDPOINT: str = os.getenv(
+        "GA4_MEASUREMENT_ENDPOINT", "https://www.google-analytics.com/mp/collect"
+    )
+
     # Weather
 
     # Public API limits
