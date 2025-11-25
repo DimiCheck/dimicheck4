@@ -17,12 +17,15 @@ from flask_socketio import SocketIO
 import requests
 
 from auth import blueprint as auth_bp
+from auth.sessions import load_remembered_user
 from class_routes import blueprint as class_bp
 from exports_routes import blueprint as export_bp
 from chat_routes import blueprint as chat_bp
 from vote_routes import blueprint as vote_bp
 from public_api import public_api_bp
 from developer_routes import blueprint as developer_bp
+from oauth import blueprint as oauth_bp
+from account import blueprint as account_bp
 from config import config
 from extensions import db
 from models import ClassConfig, ClassPin
@@ -51,6 +54,8 @@ app.register_blueprint(chat_bp)
 app.register_blueprint(vote_bp)
 app.register_blueprint(public_api_bp)
 app.register_blueprint(developer_bp)
+app.register_blueprint(oauth_bp)
+app.register_blueprint(account_bp)
 app.add_url_rule("/metrics", "metrics", metrics)
 
 db.init_app(app)
@@ -67,6 +72,11 @@ app.after_request(after_request)
 def inject_asset_version():
     """Inject asset version for cache busting"""
     return {'asset_version': config.ASSET_VERSION}
+
+
+@app.before_request
+def _inject_remembered_session():
+    load_remembered_user()
 
 
 @app.before_request
@@ -262,6 +272,10 @@ def index():  # type: ignore[override]
             return redirect("/user.html")
 
     return send_from_directory(".", "login.html") 
+
+@app.get("/privacy")
+def privacy():
+    return send_from_directory(".", "privacy.html")
 
 
 @app.route("/reload-configs")

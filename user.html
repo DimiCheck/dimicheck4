@@ -1,6 +1,16 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-NX4P51JHZD"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-NX4P51JHZD');
+  </script>
+
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   
@@ -34,7 +44,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <script defer data-domain="chec.kro.kr" src="https://plausible.io/js/script.js"></script>
   <link rel="apple-touch-icon" sizes="180x180" href="src/favicon/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="src/favicon/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="src/favicon/favicon-16x16.png">
@@ -1054,9 +1063,16 @@
 
         if (!data.logged_in) { location.href = "/auth/login"; return; }
 
-        myGrade   = Math.floor(data.number/1000);
-        mySection = Math.floor((data.number%1000)/100);
-        myNumber  = Math.floor(data.number%100);
+        if (Number.isFinite(data.grade) && Number.isFinite(data.section) && Number.isFinite(data.number)) {
+          myGrade = data.grade;
+          mySection = data.section;
+          myNumber = data.number;
+        } else {
+          const composite = Number.isFinite(data.number) ? data.number : 0;
+          myGrade   = Math.floor(composite/1000);
+          mySection = Math.floor((composite%1000)/100);
+          myNumber  = Math.floor(composite%100);
+        }
 
         document.getElementById("userMeta").textContent =
           `${myGrade}학년 ${mySection}반 ${myNumber}번`;
