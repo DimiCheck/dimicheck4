@@ -2,6 +2,16 @@
 <html lang="ko">
 <!-- 로그인 버튼 연동은 맨 밑에 있어요 -->
 <head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-NX4P51JHZD"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-NX4P51JHZD');
+  </script>
+
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   
@@ -21,7 +31,6 @@
   <link rel="apple-touch-icon" sizes="180x180" href="src/favicon/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="src/favicon/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="src/favicon/favicon-16x16.png">
-  <script defer data-domain="chec.kro.kr" src="https://plausible.io/js/script.js"></script>
   <style>
     :root {
       --bg: #0b0f14;
@@ -438,6 +447,18 @@
         transform: none;
       }
     }
+
+    .legal-links {
+      margin-top: 18px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .legal-links a {
+      color: inherit;
+      text-decoration: underline;
+    }
   </style>
 </head>
 
@@ -455,10 +476,18 @@
         <h2 id="login-title">시작하기</h2>
         <p>DimiCheck 오신 걸 환영합니다.</p>
         <div class="submit" style="display:grid; gap:10px; margin-top:14px">
-          <button class="btn cta" type="button" aria-label="로그인"><img src="src/dipulllogo.svg" width=20px height=20px>디풀로 로그인</button>
-          <div class="footer" style="margin:0">아직 디풀 계정이 없나요? 
+          <label style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px">
+            <input type="checkbox" id="rememberMe" checked style="accent-color:#d04fff" />
+            로그인 유지
+          </label>
+          <button id="loginButton" class="btn cta" type="button" aria-label="로그인">
+            <span id="loginButtonText">로그인</span>
+          </button>
+          <div class="footer" style="margin:0" id="legacySignup">
+            아직 디풀 계정이 없나요?
             <button class="btn ghost" type="button" aria-label="디풀에서 계정 만들기"
-              style="width:auto; padding:8px 12px">디풀에서 계정 만들기</button></div>
+              style="width:auto; padding:8px 12px">디풀에서 계정 만들기</button>
+          </div>
         </div>
       </div>
     </section>
@@ -495,14 +524,31 @@
     </section>
   </main>
 
+  <p class="legal-links">
+    <a href="/privacy.html">개인정보 처리방침</a>
+  </p>
+
   <script>
-    //여기다가 연동하면 됨요
-    document.querySelector('[aria-label="로그인"]').addEventListener('click', () => {
-       location.href = '/auth/login';
+    const loginBtn = document.getElementById('loginButton');
+    const loginText = document.getElementById('loginButtonText');
+    const rememberInput = document.getElementById('rememberMe');
+    const legacySignup = document.getElementById('legacySignup');
+    loginBtn?.addEventListener('click', () => {
+      const remember = rememberInput?.checked ? 1 : 0;
+      location.href = `/auth/login?remember=${remember}`;
     });
-    document.querySelector('[aria-label="디풀에서 계정 만들기"]').addEventListener('click', () => {
+    legacySignup?.querySelector('button')?.addEventListener('click', () => {
       location.href = 'https://auth.dimigo.net/oauth?client=66207bf5d851264633e0e0a8&redirect=https://dimigo.net/auth?redirect=url';
     });
+    fetch('/auth/mode')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.use_dimicheck_oauth) {
+          loginText.textContent = 'Google로 로그인';
+          legacySignup.style.display = 'none';
+        }
+      })
+      .catch(() => {});
   </script>
 </body>
 

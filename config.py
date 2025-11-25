@@ -21,10 +21,19 @@ class Config:
     SQLALCHEMY_DATABASE_URI: str = os.getenv("DATABASE_URL", "sqlite:///app.db")
     SQLALCHEMY_TRACK_MODIFICATIONS: bool = False
 
-    # OAuth (디풀 SSO)
+    # OAuth (디풀 SSO or DIMICheck OAuth feature flag)
     OAUTH_CLIENT: str = os.getenv("OAUTH_CLIENT", "68a508a281af8e9319919275")
     OAUTH_REDIRECT_URI: str = os.getenv("OAUTH_REDIRECT_URI", "https://chec.kro.kr/auth/callback")
     OAUTH_PUBLIC_KEY_URL: str | None = os.getenv("OAUTH_PUBLIC_KEY_URL")
+    USE_DIMICHECK_OAUTH: bool = _env_bool("USE_DIMICHECK_OAUTH", False)
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    GOOGLE_REDIRECT_URI: str = os.getenv("GOOGLE_REDIRECT_URI", OAUTH_REDIRECT_URI)
+    OAUTH_ISSUER: str = os.getenv("OAUTH_ISSUER", "https://chec.kro.kr")
+    REMEMBER_ME_COOKIE_NAME: str = os.getenv("REMEMBER_ME_COOKIE_NAME", "dimicheck_remember")
+    REMEMBER_ME_DURATION_DAYS: int = int(os.getenv("REMEMBER_ME_DURATION_DAYS", "30"))
+    OAUTH_AUTH_CODE_LIFETIME_SECONDS: int = int(os.getenv("OAUTH_AUTH_CODE_LIFETIME_SECONDS", "300"))
+    OAUTH_REFRESH_TOKEN_DURATION_DAYS: int = int(os.getenv("OAUTH_REFRESH_TOKEN_DURATION_DAYS", "90"))
 
     # 프론트엔드 도메인 (CORS)
     FRONTEND_ORIGIN: str = os.getenv("FRONTEND_ORIGIN", "https://chec.kro.kr")

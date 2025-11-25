@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-NX4P51JHZD"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-NX4P51JHZD');
+  </script>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DIMI Check - 계정 관리</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Pretendard', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0b0f14;
+      color: #f4f6ff;
+      min-height: 100vh;
+      padding: 32px 16px 80px;
+    }
+    main {
+      width: min(780px, 100%);
+      margin: 0 auto;
+      display: grid;
+      gap: 20px;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 18px;
+      padding: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    }
+    h1 {
+      margin-bottom: 8px;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(0, 0, 0, 0.25);
+      color: inherit;
+      font-size: 15px;
+    }
+    .grid {
+      display: flex;
+      gap: 12px;
+    }
+    .grid .field {
+      flex: 1;
+    }
+    button {
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(135deg, #d04fff, #ff6ad0);
+      color: #0b0f14;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+    }
+    .muted {
+      color: #aab4d4;
+      font-size: 14px;
+    }
+    .status {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .status span {
+      font-weight: 600;
+    }
+    a {
+      color: #9dd8ff;
+    }
+    .notice {
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(255, 214, 120, 0.12);
+      color: #ffddb0;
+      font-size: 14px;
+      margin-bottom: 16px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>계정 관리</h1>
+      <p class="muted">DIMI Check OAuth 및 학번 정보를 관리하세요.</p>
+    </header>
+
+    {% if not user %}
+      <section class="card">
+        <p>{{ error or '로그인이 필요합니다. ' }}<a href="/login.html">로그인 페이지</a>로 이동하세요.</p>
+      </section>
+    {% else %}
+      <section class="card">
+        <h2>기본 정보</h2>
+        <p class="muted">이메일: {{ user.email }}</p>
+        <div class="status">
+          <div>마지막 수정: <span>{{ (last_update.strftime('%Y-%m-%d %H:%M') if last_update else '없음') }}</span></div>
+          <div>다음 변경 가능일: <span>{{ next_change.strftime('%Y-%m-%d') }}</span></div>
+          <div>로그인 유지: <span>{{ '사용 중' if remember_enabled else '사용 안 함' }}</span></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>학번 정보</h2>
+        <div class="notice">
+          학번 정보는 매년 2월 20일~다음 해 2월 19일 사이에 한 번만 수정할 수 있습니다. 변경 가능 기간을 확인한 뒤 제출하세요.
+        </div>
+        {% if not can_edit %}
+          <p class="muted">현재는 수정할 수 없습니다. 다음 변경 가능일 이후에 다시 시도하세요.</p>
+        {% endif %}
+        <form id="accountForm">
+          <div class="field">
+            <label for="name">이름</label>
+            <input id="name" name="name" type="text" value="{{ user.name or '' }}" />
+          </div>
+          <div class="grid">
+            <div class="field">
+              <label for="grade">학년</label>
+              <input id="grade" name="grade" type="number" min="1" max="3" value="{{ user.grade or '' }}" {% if not can_edit %}disabled{% endif %} required />
+            </div>
+            <div class="field">
+              <label for="class">반</label>
+              <input id="class" name="class" type="number" min="1" max="10" value="{{ user.class_no or '' }}" {% if not can_edit %}disabled{% endif %} required />
+            </div>
+            <div class="field">
+              <label for="number">번호</label>
+              <input id="number" name="number" type="number" min="1" max="40" value="{{ user.number or '' }}" {% if not can_edit %}disabled{% endif %} required />
+            </div>
+          </div>
+          <button type="submit" {% if not can_edit %}disabled{% endif %}>정보 업데이트</button>
+        </form>
+        <p id="accountStatus" class="muted" style="margin-top:12px"></p>
+      </section>
+
+      <section class="card">
+        <h2>빠른 작업</h2>
+        <ul>
+          <li><a href="/console.html">Public API 콘솔</a></li>
+          <li><a href="/auth/logout">로그아웃</a></li>
+        </ul>
+      </section>
+    {% endif %}
+  </main>
+
+  {% if user %}
+  <script>
+    const form = document.getElementById('accountForm');
+    const statusEl = document.getElementById('accountStatus');
+    if (form) {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const payload = new FormData(form);
+        try {
+          const res = await fetch('/account/update', {
+            method: 'POST',
+            body: payload,
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || '업데이트 실패');
+          statusEl.textContent = '업데이트되었습니다.';
+        } catch (err) {
+          statusEl.textContent = err.message;
+        }
+      });
+    }
+  </script>
+  {% endif %}
+</body>
+</html>

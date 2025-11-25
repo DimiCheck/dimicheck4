@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-NX4P51JHZD"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-NX4P51JHZD');
+  </script>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DimiCheck 개인정보 처리방침</title>
+  <meta name="description" content="디미체크 서비스에서 수집·이용하는 개인정보 항목과 보유 기간, 권리 및 보호조치를 안내합니다." />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --bg-2: #0e1218;
+      --card: rgba(255, 255, 255, .08);
+      --card-2: rgba(255, 255, 255, .04);
+      --text: #e9eef6;
+      --muted: #a7b0c0;
+      --primary: #d04fff;
+      --primary-2: #ff6ad0;
+      --accent-soft: rgba(211, 108, 255, 0.18);
+      --border: color-mix(in oklab, #ffffff 14%, transparent);
+      --ring: 0 0 0 8px color-mix(in oklab, var(--primary) 30%, transparent);
+      --shadow: 0 18px 45px rgba(0, 0, 0, .45);
+      --radius: 26px;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f6f8fb;
+        --bg-2: #eef2f8;
+        --card: rgba(255, 255, 255, .9);
+        --card-2: rgba(255, 255, 255, .75);
+        --text: #0f172a;
+        --muted: #5b6475;
+        --primary: #d04fff;
+        --primary-2: #ff6ad0;
+        --accent-soft: rgba(208, 79, 255, 0.16);
+        --border: color-mix(in oklab, #0f172a 12%, transparent);
+        --shadow: 0 18px 45px rgba(57, 72, 103, .2);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Pretendard", system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 800px at 18% -15%, rgba(116, 96, 255, 0.16), transparent 60%),
+        radial-gradient(1100px 900px at 95% 5%, rgba(255, 96, 149, 0.14), transparent 60%),
+        var(--bg);
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    .blob-container {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .blob {
+      position: absolute;
+      filter: blur(40px);
+      opacity: .55;
+      animation: float 24s ease-in-out infinite;
+    }
+
+    .blob.b1 {
+      width: 48vw;
+      height: 48vw;
+      top: -10vh;
+      left: -8vw;
+      background: radial-gradient(circle, rgba(255, 106, 106, .6), transparent 70%);
+    }
+
+    .blob.b2 {
+      width: 42vw;
+      height: 42vw;
+      bottom: -12vh;
+      right: -10vw;
+      background: radial-gradient(circle, rgba(225, 0, 255, .5), transparent 70%);
+      animation-direction: reverse;
+      animation-duration: 28s;
+    }
+
+    .blob.b3 {
+      width: 36vw;
+      height: 36vw;
+      top: 38vh;
+      left: 12vw;
+      background: radial-gradient(circle, rgba(255, 106, 233, .5), transparent 70%);
+      animation-duration: 30s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(18px, -24px); }
+    }
+
+    main.shell {
+      position: relative;
+      z-index: 1;
+      width: min(1080px, 94vw);
+      margin: 0 auto;
+      padding: clamp(24px, 5vw, 54px) clamp(16px, 4vw, 32px) 64px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .card {
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, var(--card), var(--card-2));
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      backdrop-filter: saturate(140%) blur(18px);
+      padding: clamp(20px, 3vw, 36px);
+    }
+
+    .hero {
+      display: grid;
+      gap: 18px;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 5vw, 44px);
+      letter-spacing: -0.5px;
+    }
+
+    .lead {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 16px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .meta span {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 13px;
+      color: var(--muted);
+      background: color-mix(in oklab, var(--card-alt, var(--card-2)) 60%, transparent);
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .summary-item {
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      padding: 16px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .02));
+    }
+
+    .summary-item strong {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    nav.toc {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    nav.toc a {
+      text-decoration: none;
+      color: var(--text);
+      font-size: 13px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, .04);
+      transition: background .2s ease, transform .2s ease;
+    }
+
+    nav.toc a:hover,
+    nav.toc a:focus-visible {
+      background: var(--accent-soft);
+      outline: none;
+      transform: translateY(-1px);
+    }
+
+    section.card {
+      display: grid;
+      gap: 14px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 1.35rem;
+    }
+
+    p {
+      margin: 0;
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    p + p {
+      margin-top: 8px;
+    }
+
+    ul, ol {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    li + li {
+      margin-top: 6px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    code {
+      font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: 13px;
+      background: rgba(255, 255, 255, .08);
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
+
+    .note {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .contacts {
+      display: grid;
+      gap: 10px;
+    }
+
+    .contacts div {
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, .03);
+      line-height: 1.6;
+    }
+
+    .history {
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 640px) {
+      table, thead, tbody, th, td, tr {
+        display: block;
+      }
+      th {
+        border-bottom: none;
+      }
+      td {
+        border-top: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="blob-container" aria-hidden="true">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
+
+  <main class="shell">
+    <section class="card hero" aria-label="개인정보 처리방침 서문">
+      <p class="eyebrow">privacy</p>
+      <h1>DimiCheck 개인정보 처리방침</h1>
+      <p class="lead">
+        디미체크 운영팀(이하 “운영팀”)은 「개인정보 보호법」, 「정보통신망법」, 「청소년 보호법」 등 대한민국 관련 법령을 준수하며
+        학급 출결·채팅·개발자 API 등 모든 기능에서 취급되는 개인정보를 안전하게 처리합니다. 본 방침은 웹앱
+        <code>https://chec.kro.kr</code> 및 연결된 API·보드·교사용 도구 전체에 적용됩니다.
+      </p>
+      <div class="meta" role="list">
+        <span role="listitem">시행일: 2025.11.25</span>
+        <span role="listitem">버전: v1.0</span>
+        <span role="listitem">문의: hjun1052@dimigo.hs.kr</span>
+      </div>
+      <div class="summary" aria-label="핵심 요약">
+        <div class="summary-item">
+          <strong>처리 목적</strong>
+          디미고 학급 출결 관리, 보드/채팅/일정 운영, 교사용 현황판, 개발자 API 서비스 제공
+        </div>
+        <div class="summary-item">
+          <strong>주요 항목</strong>
+          이름, 학년·반·번호, 학교 이메일, 출결 상태·사유, 채팅·투표·API 기록, 기기·세션 정보
+        </div>
+        <div class="summary-item">
+          <strong>보유 기간</strong>
+          학사 운영 목적 달성 시까지, 법령·분쟁 대비 최대 3년, 자동 로그인 토큰 30일
+        </div>
+        <div class="summary-item">
+          <strong>권리 행사</strong>
+          계정 페이지 / 이메일을 통한 열람·정정·삭제·처리정지 요청, 법정대리인 포함
+        </div>
+      </div>
+    </section>
+
+    <nav class="card toc" aria-label="목차">
+      <a href="#scope">1. 총칙 및 적용 범위</a>
+      <a href="#collection">2. 수집 항목·방법</a>
+      <a href="#use">3. 이용 목적·보유 기간</a>
+      <a href="#sharing">4. 제3자 제공·위탁·국외 이전</a>
+      <a href="#rights">5. 이용자·법정대리인 권리</a>
+      <a href="#destruction">6. 파기 절차</a>
+      <a href="#security">7. 안전성 확보 조치</a>
+      <a href="#cookies">8. 쿠키·자동 수집</a>
+      <a href="#community">9. 공개 범위 및 학생 커뮤니티</a>
+      <a href="#changes">10. 방침 변경</a>
+      <a href="#contact">11. 개인정보 보호책임자</a>
+    </nav>
+
+    <section id="scope" class="card">
+      <h2>1. 총칙 및 적용 범위</h2>
+      <p>
+        운영팀은 「개인정보 보호법」 제30조에 따라 이용자에게 다음 사항을 고지하며, 본 방침을 디미체크 로그인 페이지와
+        <code>/privacy</code> 경로에 상시 공개합니다. 방침은 학생·교사·개발자 계정을 포함한 모든 이용자에게 동일하게 적용됩니다.
+      </p>
+      <ul>
+        <li>적용 서비스: 디미체크 웹앱, 실시간 보드, 교사용 대시보드, 채팅·투표·캘린더, Presence/Public API, OAuth 서비스</li>
+        <li>법적 근거: 개인정보 보호법 제15조(처리 목적), 제17조(제3자 제공), 제26조(위탁), 제39조의6(청소년 보호) 등</li>
+        <li>위치 정보, 생체 정보 등 민감정보는 처리하지 않으며, 학급 운영에 필요한 최소한의 식별·기록 정보만을 수집합니다.</li>
+      </ul>
+    </section>
+
+    <section id="collection" class="card">
+      <h2>2. 수집 항목 및 수집 방법</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>구분</th>
+            <th>수집 항목</th>
+            <th>수집 방법·처리 목적</th>
+            <th>보유 기간</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>회원 식별 및 로그인</td>
+            <td>
+              이름, 학교 이메일(@dimigo.hs.kr 등), 학년·반·번호, 사용자 유형(학생/교사), OAuth 식별자,
+              CSRF 토큰, 세션 ID, Remember me 토큰(device info 포함)
+            </td>
+            <td>
+              Google OAuth 또는 디미고 SSO 연동, 계정 생성, 2단계 인증(PIN) 유지, 장치별 로그인 유지, CSRF 방어
+            </td>
+            <td>
+              계정 유지 기간 + 30일 이내 파기<br />
+              Remember me 토큰 30일, OAuth refresh token 90일, 세션 쿠키 브라우저 종료 시 삭제
+            </td>
+          </tr>
+          <tr>
+            <td>서비스 이용 기록</td>
+            <td>
+              출결 상태·사유, 교실 보드 현황(좌석별 메모·표정·닉네임), 채팅/이미지 URL/이모지 반응,
+              투표 질문·응답, 급식 평점, 일정·루틴, 개발자 API 키 및 사용량, 교사용 PIN 세션, 로그(요청 ID, IP, User-Agent),
+              계정 수정 이력
+            </td>
+            <td>
+              학급 운영, 교사 확인, 실시간 알림, 수업 준비, 통계·남용 탐지, 분쟁 해결, 감사 로그 보관, 자동화 스크립트(gspread) 연동
+            </td>
+            <td>
+              출결·루틴 기록 3년, 채팅·보드 메시지 학사연도 종료 후 자동 삭제, API 로그 3년,
+              교사용 세션 12시간(기억하기 선택 시 30일)
+            </td>
+          </tr>
+          <tr>
+            <td>자동/필수 수집</td>
+            <td>
+              로그인을 통해 전달받은 사용자 학번, Socket.IO 연결 식별자
+            </td>
+            <td>
+              무단 접근 차단, 성능 모니터링, 지표 집계, 장애 대응, 스팸 탐지, API rate-limit
+            </td>
+          </tr>
+          <tr>
+            <td>외부 연동</td>
+            <td>
+              Google에서 제공하는 이름·이메일, auth.dimigo.net이 전송하는 학년·반·번호,
+              Google Sheets에 동기화되는 학급 현황(좌석 번호·상태), img.codz 업로드 URL, KLIPY GIF 검색어
+            </td>
+            <td>
+              간편 로그인, 교무실 공유용 시트 자동화, 이미지 첨부, GIF 검색 기능 제공 (원본 파일은 외부 서버에만 저장)
+            </td>
+            <td>
+              외부 사업자 정책에 따르며, 운영팀은 URL·메타데이터만 DB에 저장, 원본은 즉시 제3자 서버로 전송 후 삭제
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="note">
+        수집 방법: 홈페이지/모바일 UI 입력, 교사용 PIN 인증, 자동수집 스크립트, API 키 발급, 문의·신청 메일, 운영팀이 학사관리 목적상 직접 입력하는 경우.
+      </p>
+    </section>
+
+    <section id="use" class="card">
+      <h2>3. 개인정보 이용 목적 및 보유 기간</h2>
+      <ul>
+        <li>학생·교사 본인 확인 및 권한 검증: OAuth, 세션, Remember me, 교사용 PIN 세션.</li>
+        <li>출결·외출·보건 이동 관리: ClassState, PresenceLog, ClassConfig 데이터로 교무실/담임 확인.</li>
+        <li>학급 커뮤니케이션: 채팅·닉네임·이모지·이미지 URL 기록, 학사연도 종료 시 일괄 삭제.</li>
+        <li>편의 기능: 급식 투표, 일정·루틴, API 키 발급 및 사용량 통제(APIRateLimit, streak 계산).</li>
+        <li>보안/안정성: 요청·오류 로그, Prometheus 지표, Socket.IO 네임스페이스 인증, CSRF 토큰 발급.</li>
+        <li>법령 준수 및 분쟁 대응: 요청·처리 내역을 최대 3년 보관 후 파기.</li>
+      </ul>
+      <p>
+        운영 목적이 달성되거나 이용자가 삭제를 요청하면 지체 없이 파기하며, 단 관련 법령(전자상거래 등에서의 소비자보호에 관한 법률,
+        통신비밀보호법 등)에 따라 일정 기간 보존이 필요한 경우 별도 분리 보관 후 파기합니다.
+      </p>
+    </section>
+
+    <section id="sharing" class="card">
+      <h2>4. 제3자 제공·처리 위탁·국외 이전</h2>
+      <h3>4-1. 제3자 제공</h3>
+      <ul>
+        <li>담임/교사에게 학급 출결·보드 현황을 교내 계정으로 제공 (교사 권한 확인 후 제한된 범위만 열람).</li>
+        <li>Public API는 클래스별 통계·루틴 등 익명화된 정보만 응답하며, 이름·이메일 등 직접 식별 정보는 포함하지 않습니다.</li>
+        <li>법령에 따른 요청(수사기관·학교 행정요청 등)이 있을 때에는 최소 범위 내에서 제출합니다.</li>
+        <li>그 외 상업적·마케팅 목적으로 제3자에게 판매·공유하지 않습니다.</li>
+      </ul>
+      <h3>4-2. 처리 위탁 및 국외 이전</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>수탁자 / 이전국가</th>
+            <th>위탁 업무 및 이전 항목</th>
+            <th>이전 시점·방법 / 보호조치</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Google LLC (미국/EU)</td>
+            <td>OAuth 2.0 인증, Google Sheets(gspread)로 학급 요약 동기화 (이름, 학년·반·번호, 출결 상태)</td>
+            <td>로그인 시 TLS 암호화 전송, 서비스 계정 키 관리, 최소 권한 공유, 필요 시 표 제거</td>
+          </tr>
+          <tr>
+            <td>img.codz.me (당사) 및 Cloudflare (미국/EU)</td>
+            <td>채팅 이미지 업로드 (당사 서버에 저장 및 Cloudflare 캐싱)</td>
+            <td>사용자가 업로드 시 캐싱 및 서버 저장, 요청 시 삭제 처리 가능</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="note">
+        NEIS 급식/시간표, ANU QRNG 등 외부 공공 API로는 개인정보가 전달되지 않습니다. 위탁 업체나 국외 이전 대상이 추가·변경될 경우 사전 공지와 동의를 받습니다.
+      </p>
+    </section>
+
+    <section id="rights" class="card">
+      <h2>5. 이용자 및 법정대리인의 권리</h2>
+      <ul>
+        <li>열람/사본: <code>/account</code> 페이지 또는 이메일 요청을 통해 본인 정보 열람·다운로드가 가능합니다.</li>
+        <li>정정/삭제: 계정 페이지에서 연 1회 직접 수정 가능하며, 추가 수정이 필요하면 운영팀에 요청하면 10영업일 내 조치합니다.</li>
+        <li>처리 정지: 서비스 이용 제한에 따른 영향(출결 확인 제한 등)을 안내받은 후 처리 정지/동의 철회를 신청할 수 있습니다.</li>
+        <li>법정대리인: 재학생 법정대리인은 학생 본인 또는 담임 교사를 통해 본인증 후 요청할 수 있습니다.</li>
+        <li>권리행사 절차: 이메일 접수 → 본인/대리인 확인 → 처리 결과 회신(전자우편). 거절 시 사유와 구제수단을 안내합니다.</li>
+      </ul>
+    </section>
+
+    <section id="destruction" class="card">
+      <h2>6. 개인정보 파기 절차 및 방법</h2>
+      <ol>
+        <li>보유기간 만료 또는 목적 달성 시 파기 대상 선정 (예: 채팅 학사연도 종료, API 키 폐기).</li>
+        <li>DB 데이터는 논리 삭제 후 즉시 영구 삭제(SQL 삭제)하며, 파일·시트는 덮어쓰기 또는 비식별화 후 삭제합니다.</li>
+        <li>백업본은 분리 저장 후 30일 이내 덮어쓰기/파쇄하며, 물리 매체는 분쇄 또는 디가우징합니다.</li>
+      </ol>
+      <p>법령상 보존 의무가 있는 항목은 별도 DB 테이블에 분리 보관하고, 목적 달성 즉시 파기합니다.</p>
+    </section>
+
+    <section id="security" class="card">
+      <h2>7. 안전성 확보 조치</h2>
+      <ul>
+        <li>세션 쿠키 Secure/HttpOnly/SameSite=Lax 설정, Remember me 토큰은 난수화 후 서버 DB에만 보관.</li>
+        <li>교사용 PIN은 환경변수 기반으로만 검증하며, PIN 원문은 DB에 저장하지 않습니다.</li>
+        <li>접근권한 최소화: 운영 계정만 DB 접근, API 키 발급 시 사용자별 rate-limit와 스코프 제어.</li>
+        <li>전송 구간 TLS 암호화, CSRF 토큰 발급, 요청별 UUID 로깅으로 위·변조 탐지.</li>
+        <li>Prometheus 지표·로그를 통해 비정상 트래픽 감시, 1년 이내 로테이션.</li>
+        <li>Google Service Account 키는 서버 비공개 영역에 보관하며, 노출 시 즉시 키 회전.</li>
+      </ul>
+    </section>
+
+    <section id="cookies" class="card">
+      <h2>8. 쿠키 및 유사 기술</h2>
+      <ul>
+        <li>세션 쿠키: 로그인 상태 유지 (브라우저 종료 시 만료).</li>
+        <li><code>dimicheck_remember</code>: 사용자가 “로그인 유지”를 선택한 경우 30일간 저장, 취소 시 즉시 삭제.</li>
+        <li>교사용 세션: 최대 12시간(기억하기 선택 시 30일) 동안 브라우저별 세션에 보존.</li>
+        <li>Google Analytics 4 (gtag.js)는 비식별화된 통계 데이터를 수집하며, IP 익명화가 기본 적용됩니다.</li>
+      </ul>
+      <p>대부분의 브라우저 설정에서 쿠키 저장을 거부하거나 삭제할 수 있으나, 세션 쿠키를 차단하면 로그인 기능이 제한됩니다.</p>
+    </section>
+
+    <section id="community" class="card">
+      <h2>9. 공개 범위 및 학생 커뮤니티 안내</h2>
+      <ul>
+        <li>학급 보드·채팅·투표는 동일 학급 학생 및 권한이 부여된 교사만 열람·작성 가능합니다.</li>
+        <li>Public API 응답에는 학생 이름·이메일 등 직접 식별 정보가 포함되지 않도록 설계되어 있습니다.</li>
+        <li>사용자가 자발적으로 게시물에 민감 정보를 넣지 않도록 주의가 필요하며, 교사 신고 또는 운영팀 검토 시 즉시 삭제합니다.</li>
+        <li>미성년자 보호: 14세 이상의 재학생을 대상으로 하나, 사용 중 비속어·개인정보 노출이 감지되면 이용제한 등 청소년 보호조치를 시행합니다.</li>
+      </ul>
+    </section>
+
+    <section id="changes" class="card">
+      <h2>10. 개인정보 처리방침 변경</h2>
+      <p>
+        법령·서비스 변경에 따라 본 방침을 개정하는 경우, 시행 최소 7일 전에 로그인 페이지 공지 및 본 문서 최상단에 개정 사실과 시행일을 명시합니다.
+        이용자 권리에 중대한 변경이 있을 때에는 최소 30일 전에 별도 동의 절차를 진행합니다.
+      </p>
+      <div class="history">
+        <p>연혁</p>
+        <ul>
+          <li>2025.11.25 v1.0 - DimiCheck 개인정보 처리방침 최초 게시</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="contact" class="card">
+      <h2>11. 개인정보 보호책임자 및 문의</h2>
+      <div class="contacts">
+        <div>
+          <strong>개인정보 보호책임자</strong><br />
+          한준혁 (DimiCheck 운영팀)<br />
+          이메일: <a href="mailto:hjun1052@dimigo.hs.kr">hjun1052@dimigo.hs.kr</a>
+        </div>
+        <div>
+          <strong>개인정보 민원 접수</strong><br />
+          메일 제목에 [개인정보 요청] 표기 → 사실 확인 → 10영업일 이내 회신<br />
+          학교 행정실 또는 담임 교사를 통한 오프라인 민원도 가능합니다.
+        </div>
+        <div>
+          <strong>외부 구제방법</strong><br />
+          개인정보침해신고센터 (118), 개인정보분쟁조정위원회 (1833-6972), 대검찰청 사이버수사과 (1301) 등
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

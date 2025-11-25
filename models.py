@@ -17,10 +17,12 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
     type = db.Column(db.Enum(UserType), nullable=False)
+    email = db.Column(db.String(320), nullable=True, unique=True)
     grade = db.Column(db.Integer, nullable=True)
     class_no = db.Column(db.Integer, nullable=True)
     number = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    last_profile_update = db.Column(db.DateTime, nullable=True)
 
     def is_teacher(self) -> bool:
         return self.type == UserType.TEACHER
@@ -318,6 +320,58 @@ class CalendarEvent(db.Model):
     __table_args__ = (
         db.Index("idx_calendar_grade_section_date", "grade", "section", "event_date"),
     )
+
+
+class OAuthClient(db.Model):
+    __tablename__ = "oauth_clients"
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.String(128), unique=True, nullable=False)
+    client_secret = db.Column(db.String(128), nullable=False)
+    name = db.Column(db.String(120), nullable=False)
+    redirect_uris = db.Column(db.Text, nullable=False, default="")
+    scopes = db.Column(db.Text, nullable=False, default="")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class OAuthAuthorizationCode(db.Model):
+    __tablename__ = "oauth_authorization_codes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(128), unique=True, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    client_id = db.Column(db.Integer, db.ForeignKey("oauth_clients.id"), nullable=False)
+    redirect_uri = db.Column(db.String(1024), nullable=False)
+    scope = db.Column(db.String(255), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used = db.Column(db.Boolean, default=False, nullable=False)
+
+
+class OAuthRefreshToken(db.Model):
+    __tablename__ = "oauth_refresh_tokens"
+
+    id = db.Column(db.Integer, primary_key=True)
+    token = db.Column(db.String(128), unique=True, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    client_id = db.Column(db.Integer, db.ForeignKey("oauth_clients.id"), nullable=False)
+    scope = db.Column(db.String(255), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    revoked = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class RememberedSession(db.Model):
+    __tablename__ = "remembered_sessions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(64), unique=True, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    device_info = db.Column(db.String(512), nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship("User", backref=db.backref("remembered_sessions", lazy="dynamic"))
 
 
 class ChatReaction(db.Model):

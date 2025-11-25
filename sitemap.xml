@@ -27,6 +27,13 @@
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
+
+  <!-- 개인정보 처리방침 -->
+  <url>
+    <loc>https://chec.kro.kr/privacy</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
   
   <!-- Health Check -->
   <url>
