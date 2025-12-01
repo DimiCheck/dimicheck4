@@ -790,11 +790,6 @@ function createPlaceholder(num) {
   p.textContent = num;
   p.style.left = pos.left + 'px';
   p.style.top  = pos.top  + 'px';
-  p.style.background = 'linear-gradient(135deg,#666,#444)';
-  p.style.opacity = '0.5';
-  p.style.cursor = 'pointer';
-  p.style.pointerEvents = 'auto';
-  p.style.boxShadow = 'none';
   p.setAttribute('role', 'button');
   p.setAttribute('aria-label', `${num}번 자석 위치 찾기`);
   p.tabIndex = 0;
@@ -812,7 +807,7 @@ function createPlaceholder(num) {
 /* ===================== 자석 생성 ===================== */
 function createMagnets(end = 31, skipNumbers = [12]) {
   const container = document.getElementById('magnetContainer');
-  const rows = 7, cols = 5, size = 50, gap = 15;
+  const rows = 7, cols = 5, size = 56, gap = 15;
   let n = 1;
   const allowed = new Set();
   for (let i=1; i<=end; i++) if (!(skipNumbers||[]).includes(i)) allowed.add(i);
