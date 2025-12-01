@@ -38,7 +38,14 @@ def ensure_scopes_subset(requested: Iterable[str], allowed: Iterable[str]) -> bo
     return set(requested).issubset(allowed_set)
 
 
-def generate_authorization_code(user_id: int, client: OAuthClient, redirect_uri: str, scopes: List[str]) -> OAuthAuthorizationCode:
+def generate_authorization_code(
+    user_id: int,
+    client: OAuthClient,
+    redirect_uri: str,
+    scopes: List[str],
+    code_challenge: str | None = None,
+    code_challenge_method: str | None = None,
+) -> OAuthAuthorizationCode:
     code_value = secrets.token_urlsafe(32)
     expires_at = datetime.utcnow() + timedelta(seconds=current_app.config["OAUTH_AUTH_CODE_LIFETIME_SECONDS"])
     record = OAuthAuthorizationCode(
@@ -48,6 +55,8 @@ def generate_authorization_code(user_id: int, client: OAuthClient, redirect_uri:
         redirect_uri=redirect_uri,
         scope=" ".join(scopes),
         expires_at=expires_at,
+        code_challenge=code_challenge,
+        code_challenge_method=code_challenge_method,
     )
     db.session.add(record)
     db.session.commit()
@@ -76,17 +85,46 @@ def _build_claims(user: User, scopes: List[str]) -> dict:
     return claims
 
 
-def issue_access_token(user: User, scopes: List[str]) -> tuple[str, int]:
+def _resolve_client_secret(client: OAuthClient) -> str:
+    # Prefer dedicated JWT secret when set, otherwise use client secret, then fall back to app secret
+    return client.jwt_secret or client.client_secret or current_app.config["SECRET_KEY"]
+
+
+def issue_access_token(user: User, client: OAuthClient, scopes: List[str]) -> tuple[str, int]:
     claims = _build_claims(user, scopes)
-    secret = current_app.config["SECRET_KEY"]
+    claims["aud"] = client.client_id
+    secret = _resolve_client_secret(client)
     token = jwt.encode(claims, secret, algorithm="HS256")
     expires_in = int(ACCESS_TOKEN_LIFETIME.total_seconds())
     return token, expires_in
 
 
 def decode_access_token(token: str) -> dict:
+    # Decode without verification to learn client audience, then verify signature with per-client secret.
+    unverified = jwt.get_unverified_claims(token)
+    aud = unverified.get("aud")
     secret = current_app.config["SECRET_KEY"]
-    return jwt.decode(token, secret, algorithms=["HS256"], issuer=current_app.config["OAUTH_ISSUER"])
+    client = None
+    if aud:
+        client = OAuthClient.query.filter_by(client_id=aud).first()
+        if client:
+            secret = _resolve_client_secret(client)
+    try:
+        return jwt.decode(
+            token,
+            secret,
+            algorithms=["HS256"],
+            issuer=current_app.config["OAUTH_ISSUER"],
+            audience=aud,
+        )
+    except Exception:
+        # Fallback to legacy secret for existing tokens if client-based verification fails
+        return jwt.decode(
+            token,
+            current_app.config["SECRET_KEY"],
+            algorithms=["HS256"],
+            issuer=current_app.config["OAUTH_ISSUER"],
+        )
 
 
 def issue_refresh_token(user: User, client: OAuthClient, scopes: List[str]) -> OAuthRefreshToken:

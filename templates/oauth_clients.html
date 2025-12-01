@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OAuth 클라이언트 관리</title>
+  <style>
+    body { font-family: "Pretendard", system-ui, -apple-system, sans-serif; margin:0; padding:24px; background:#0b0f14; color:#e8eef6; }
+    h1 { margin:0 0 16px; }
+    .grid { display:grid; grid-template-columns:2fr 1fr; gap:16px; }
+    .card { background:rgba(255,255,255,0.08); border-radius:14px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,0.45); }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:8px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.08); }
+    th { color:#9fb1cc; font-weight:600; }
+    input, textarea { width:100%; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#e8eef6; margin:4px 0 10px; }
+    button { padding:10px 12px; border:none; border-radius:10px; background:linear-gradient(135deg,#d04fff,#ff6ad0); color:white; cursor:pointer; }
+    .muted { color:#9fb1cc; font-size:13px; }
+  </style>
+</head>
+<body>
+  <h1>OAuth 클라이언트 관리</h1>
+  <div class="grid">
+    <div class="card">
+      <h3>등록된 클라이언트</h3>
+      <table id="client-table">
+        <thead>
+          <tr><th>이름</th><th>Client ID</th><th>리다이렉트 URI</th><th>스코프</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>새 클라이언트 생성</h3>
+      <form id="create-form">
+        <label>이름<input name="name" required /></label>
+        <label>리다이렉트 URI(공백/개행/쉼표 구분)<textarea name="redirect_uris" rows="3" required></textarea></label>
+        <label>허용 스코프(공백 구분)<input name="scopes" placeholder="basic profile student_info" /></label>
+        <button type="submit">생성</button>
+        <div class="muted" id="create-result"></div>
+      </form>
+    </div>
+  </div>
+  <script>
+    async function fetchClients() {
+      const res = await fetch('/api/dev/oauth/clients');
+      if (!res.ok) { document.querySelector('#client-table tbody').innerHTML = '<tr><td colspan="5">로드 실패</td></tr>'; return; }
+      const data = await res.json();
+      const tbody = document.querySelector('#client-table tbody');
+      tbody.innerHTML = '';
+      data.clients.forEach(c => {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td>${c.name}</td><td>${c.client_id}</td><td>${c.redirect_uris}</td><td>${c.scopes}</td><td><button data-id="${c.id}">삭제</button></td>`;
+        row.querySelector('button').onclick = () => deleteClient(c.id);
+        tbody.appendChild(row);
+      });
+    }
+    async function deleteClient(id) {
+      if (!confirm('정말 삭제할까요?')) return;
+      const res = await fetch(`/api/dev/oauth/clients/${id}`, { method:'DELETE' });
+      if (res.ok) fetchClients();
+    }
+    document.querySelector('#create-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const payload = {
+        name: form.name.value,
+        redirect_uris: form.redirect_uris.value,
+        scopes: form.scopes.value,
+      };
+      const res = await fetch('/api/dev/oauth/clients', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+      const output = document.querySelector('#create-result');
+      if (!res.ok) { output.textContent = '생성 실패'; return; }
+      const data = await res.json();
+      output.textContent = `생성 완료. Client ID: ${data.client.client_id}, Secret: ${data.client_secret}`;
+      form.reset();
+      fetchClients();
+    });
+    fetchClients();
+  </script>
+</body>
+</html>

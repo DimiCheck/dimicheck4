@@ -34,6 +34,8 @@ class Config:
     REMEMBER_ME_DURATION_DAYS: int = int(os.getenv("REMEMBER_ME_DURATION_DAYS", "30"))
     OAUTH_AUTH_CODE_LIFETIME_SECONDS: int = int(os.getenv("OAUTH_AUTH_CODE_LIFETIME_SECONDS", "300"))
     OAUTH_REFRESH_TOKEN_DURATION_DAYS: int = int(os.getenv("OAUTH_REFRESH_TOKEN_DURATION_DAYS", "90"))
+    OAUTH_CLIENT_SECRET_ROTATE_DAYS: int = int(os.getenv("OAUTH_CLIENT_SECRET_ROTATE_DAYS", "90"))
+    OAUTH_JWT_SECRET_ROTATE_DAYS: int = int(os.getenv("OAUTH_JWT_SECRET_ROTATE_DAYS", "180"))
 
     # 프론트엔드 도메인 (CORS)
     FRONTEND_ORIGIN: str = os.getenv("FRONTEND_ORIGIN", "https://chec.kro.kr")

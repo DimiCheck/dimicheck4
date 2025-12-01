@@ -60,7 +60,13 @@ app.add_url_rule("/metrics", "metrics", metrics)
 
 db.init_app(app)
 socketio = SocketIO(app, cors_allowed_origins=config.FRONTEND_ORIGIN, async_mode="threading")
-CORS(app, origins=[config.FRONTEND_ORIGIN], supports_credentials=True)
+CORS(
+    app,
+    resources={
+        r"/public/*": {"origins": "*", "supports_credentials": False},
+        r"/*": {"origins": [config.FRONTEND_ORIGIN], "supports_credentials": True},
+    },
+)
 for ns in namespaces:
     socketio.on_namespace(ns)
 

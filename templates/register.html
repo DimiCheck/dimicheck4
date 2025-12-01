@@ -134,8 +134,35 @@
           <input id="number" name="number" type="number" min="1" max="40" required />
         </div>
       </div>
+      <div class="field" style="display:flex;gap:10px;align-items:flex-start">
+        <input id="privacy" name="privacy_agree" type="checkbox" required style="width:18px;height:18px;margin-top:3px" />
+        <label for="privacy" style="margin:0;font-weight:500">
+          <span style="display:block">DIMI Check 개인정보 처리방침에 동의합니다.</span>
+          <a href="/privacy" target="_blank" style="color:#d04fff;text-decoration:none">개인정보 처리방침 보기</a>
+        </label>
+      </div>
       <button type="submit">등록 완료</button>
     </form>
   </main>
+  <script>
+    (function autofill() {
+      const rawName = "{{ pending.name or '' }}".trim();
+      if (!rawName) return;
+      const nameField = document.getElementById('name');
+      const gradeField = document.getElementById('grade');
+      const classField = document.getElementById('class');
+      const numberField = document.getElementById('number');
+      const digits = (rawName.match(/\\d+/g) || []).join('');
+      const nameOnly = rawName.replace(/\\d+/g, '').trim();
+      if (nameField && nameOnly) nameField.value = nameOnly;
+      if (digits.length >= 3) {
+        if (gradeField) gradeField.value = digits[0];
+        if (classField) classField.value = digits[1];
+        if (numberField) numberField.value = digits.slice(2);
+      } else if (digits.length === 2) {
+        if (numberField) numberField.value = digits;
+      }
+    })();
+  </script>
 </body>
 </html>

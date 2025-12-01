@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DIMICheck OAuth 동의</title>
+  <style>
+    body { font-family: "Pretendard", system-ui, -apple-system, sans-serif; background:#0b0f14; color:#e8eef6; display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; padding:20px; }
+    .card { background:rgba(255,255,255,0.08); border-radius:18px; padding:28px; max-width:520px; width:100%; box-shadow:0 10px 30px rgba(0,0,0,0.45); }
+    h1 { margin:0 0 8px; font-size:26px; }
+    p { margin:6px 0 14px; color:#b5c1d6; }
+    .scope-list { background:rgba(255,255,255,0.06); border-radius:12px; padding:12px 14px; list-style:none; margin:0 0 16px; }
+    .scope-list li { margin:6px 0; }
+    .actions { display:flex; gap:10px; }
+    button { flex:1; padding:12px 14px; font-size:15px; border-radius:12px; border:none; cursor:pointer; transition:transform .08s ease, box-shadow .12s ease; }
+    button[type="submit"] { background:linear-gradient(135deg, #d04fff, #ff6ad0); color:white; box-shadow:0 8px 20px rgba(208,79,255,0.35); }
+    button[type="button"] { background:rgba(255,255,255,0.1); color:#e8eef6; border:1px solid rgba(255,255,255,0.08); }
+    button:hover { transform:translateY(-1px); }
+    .meta { font-size:13px; color:#8fa0be; display:flex; justify-content:space-between; align-items:center; }
+    .client-name { font-weight:600; color:#fff; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>권한 동의</h1>
+    <p><span class="client-name">{{ client.name }}</span> 앱이 다음 권한을 요청합니다.</p>
+    <ul class="scope-list">
+      {% for scope in scopes %}
+      <li><strong>{{ scope }}</strong> — {{ {'basic':'기본 프로필(이메일)', 'profile':'이름', 'student_info':'학번 정보'}.get(scope, '추가 권한') }}</li>
+      {% endfor %}
+    </ul>
+    <form method="POST" action="/oauth/authorize">
+      <input type="hidden" name="client_id" value="{{ client.client_id }}" />
+      <input type="hidden" name="redirect_uri" value="{{ redirect_uri }}" />
+      <input type="hidden" name="state" value="{{ state or '' }}" />
+      <input type="hidden" name="response_type" value="code" />
+      <input type="hidden" name="scope" value="{{ scope_param }}" />
+      {% if code_challenge %}
+      <input type="hidden" name="code_challenge" value="{{ code_challenge }}" />
+      <input type="hidden" name="code_challenge_method" value="{{ code_challenge_method }}" />
+      {% endif %}
+      <div class="actions">
+        <button type="button" onclick="handleDeny()">거부</button>
+        <button type="submit" name="decision" value="approve">동의하고 계속</button>
+      </div>
+    </form>
+    <div class="meta">
+      <span>DIMICheck OAuth</span>
+      <span>{{ redirect_uri }}</span>
+    </div>
+  </div>
+  <script>
+    function handleDeny() {
+      const params = new URLSearchParams({
+        error: 'access_denied',
+        state: '{{ state or '' }}'
+      });
+      window.location.href = '{{ redirect_uri }}' + '?' + params.toString();
+    }
+  </script>
+</body>
+</html>

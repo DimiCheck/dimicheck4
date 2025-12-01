@@ -240,6 +240,36 @@ class APIRateLimit(db.Model):
         backref=db.backref("rate_limit", uselist=False, cascade="all, delete-orphan"),
     )
 
+
+class APIUsageStat(db.Model):
+    __tablename__ = "api_usage_stats"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    hour_window_start = db.Column(db.DateTime, nullable=False)
+    count = db.Column(db.Integer, default=0, nullable=False)  # stored in scaled units
+    count_requests = db.Column(db.Integer, default=0, nullable=False)  # raw requests
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "hour_window_start", name="uq_usage_user_hour"),
+    )
+
+
+class Counter(db.Model):
+    __tablename__ = "counters"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    name = db.Column(db.String(80), nullable=False)
+    value = db.Column(db.BigInteger, default=0, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "name", name="uq_counter_user_name"),
+    )
+
 class UserNickname(db.Model):
     __tablename__ = "user_nicknames"
 
@@ -333,6 +363,9 @@ class OAuthClient(db.Model):
     scopes = db.Column(db.Text, nullable=False, default="")
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    jwt_secret = db.Column(db.String(128), nullable=True)
+    last_secret_rotated_at = db.Column(db.DateTime, nullable=True)
+    last_jwt_rotated_at = db.Column(db.DateTime, nullable=True)
 
 
 class OAuthAuthorizationCode(db.Model):
@@ -346,6 +379,8 @@ class OAuthAuthorizationCode(db.Model):
     scope = db.Column(db.String(255), nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
     used = db.Column(db.Boolean, default=False, nullable=False)
+    code_challenge = db.Column(db.String(255), nullable=True)
+    code_challenge_method = db.Column(db.String(10), nullable=True)
 
 
 class OAuthRefreshToken(db.Model):
@@ -359,6 +394,7 @@ class OAuthRefreshToken(db.Model):
     expires_at = db.Column(db.DateTime, nullable=False)
     revoked = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    revoked_at = db.Column(db.DateTime, nullable=True)
 
 
 class RememberedSession(db.Model):

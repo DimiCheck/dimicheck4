@@ -1556,17 +1556,19 @@
     @media (max-width: 768px) {
       .class-emoji-modal .modal-content {
         position: fixed;
-        bottom: 0;
+        bottom: calc(72px + env(safe-area-inset-bottom));
         left: 0;
         right: 0;
         max-width: unset;
         border-radius: 20px 20px 0 0;
         max-height: 70vh;
         margin: 0;
+        padding-bottom: calc(32px + env(safe-area-inset-bottom));
+        z-index: 1500;
       }
 
       .class-emoji-grid {
-        max-height: calc(70vh - 200px);
+        max-height: calc(70vh - 250px - env(safe-area-inset-bottom));
       }
     }
 

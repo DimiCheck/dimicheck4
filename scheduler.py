@@ -9,6 +9,10 @@ from datetime import datetime, timedelta
 
 from extensions import db
 from models import ChatMessage, ChatReaction, UserNickname, UserAvatar
+from config import config
+from models import OAuthClient
+import secrets
+from sqlalchemy import text
 
 
 def reset_chat_data_feb_28():
@@ -87,6 +91,8 @@ def schedule_daily_check():
 
                 # 2월 28일 체크 및 초기화
                 check_and_reset_if_feb_28()
+                # OAuth 클라이언트 키 자동 회전
+                rotate_oauth_keys_if_due()
 
             except Exception as e:
                 # 오류 발생 시 1시간 후 재시도
@@ -104,6 +110,50 @@ def start_scheduler():
     """스케줄러 시작"""
     # 앱 시작 시 즉시 한 번 체크
     check_and_reset_if_feb_28()
+    rotate_oauth_keys_if_due()
 
     # 백그라운드에서 매일 자정 체크
     schedule_daily_check()
+
+
+def _rotation_due(last_at: datetime | None, window_days: int) -> bool:
+    if window_days <= 0:
+        return False
+    ref = last_at or datetime.utcnow()
+    return datetime.utcnow() - ref >= timedelta(days=window_days)
+
+
+def rotate_oauth_keys_if_due():
+    """자동으로 OAuth client secret / jwt_secret을 회전"""
+    from app import app
+
+    with app.app_context():
+        _ensure_rotation_columns()
+        clients = OAuthClient.query.all()
+        rotated = 0
+        now = datetime.utcnow()
+        for client in clients:
+            last_secret_ref = client.last_secret_rotated_at or client.updated_at or client.created_at
+            last_jwt_ref = client.last_jwt_rotated_at or client.updated_at or client.created_at
+            if _rotation_due(last_secret_ref, config.OAUTH_CLIENT_SECRET_ROTATE_DAYS):
+                client.client_secret = secrets.token_urlsafe(48)
+                client.last_secret_rotated_at = now
+                rotated += 1
+            if _rotation_due(last_jwt_ref, config.OAUTH_JWT_SECRET_ROTATE_DAYS):
+                client.jwt_secret = secrets.token_urlsafe(48)
+                client.last_jwt_rotated_at = now
+                rotated += 1
+        if rotated:
+            db.session.commit()
+            app.logger.info("[Scheduler] Rotated %s OAuth client secrets/jwt keys", rotated)
+
+
+def _ensure_rotation_columns():
+    # SQLite fallback for deployments where migration was not applied
+    with db.engine.connect() as conn:
+        result = conn.execute(text("PRAGMA table_info('oauth_clients')")).fetchall()
+        cols = {row[1] for row in result}
+        if "last_secret_rotated_at" not in cols:
+            conn.execute(text("ALTER TABLE oauth_clients ADD COLUMN last_secret_rotated_at DATETIME"))
+        if "last_jwt_rotated_at" not in cols:
+            conn.execute(text("ALTER TABLE oauth_clients ADD COLUMN last_jwt_rotated_at DATETIME"))

@@ -5,12 +5,9 @@
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-NX4P51JHZD"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-
-    gtag('config', 'G-NX4P51JHZD');
+    function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'G-NX4P51JHZD');
   </script>
-
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>DimiCheck 개발자 콘솔</title>
@@ -20,481 +17,749 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg: #0f1117;
-      --panel: #151821;
-      --panel-alt: #1c1f2b;
-      --border: #262a38;
-      --text: #f4f6ff;
-      --muted: #a0a7c3;
-      --accent: #d36cff;
-      --accent-soft: rgba(211, 108, 255, 0.22);
+      --bg: #0b0c0f;
+      --surface: #0f1116;
+      --surface-2: #131722;
+      --border: #1f2430;
+      --text: #e9ecf5;
+      --muted: #98a0b5;
+      --accent: #9b7bff;
+      --accent-2: #6f5bff;
+      --radius: 14px;
+      --shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
     }
-
     * { box-sizing: border-box; }
-
     body {
       margin: 0;
       font-family: 'Pretendard', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: var(--bg);
+      background: linear-gradient(140deg, #0b0c0f 0%, #0f1320 80%);
       color: var(--text);
       min-height: 100vh;
-      display: flex;
+      display: grid;
+      grid-template-columns: 260px 1fr;
     }
-
-    .console-shell {
-      display: flex;
-      width: 100%;
-      min-height: 100vh;
-    }
-
     .sidebar {
-      width: 260px;
-      background: #0d0f15;
+      background: #0c0e13;
       border-right: 1px solid var(--border);
-      padding: 28px 20px;
-      display: flex;
-      flex-direction: column;
+      padding: 22px 18px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
       gap: 24px;
     }
-
-    .brand h1 {
-      margin: 0;
-      font-size: 20px;
-    }
-
-    .brand span {
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .nav {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand h1 { margin: 0; font-size: 18px; }
+    .brand span { color: var(--muted); font-size: 12px; }
+    .nav { display: flex; flex-direction: column; gap: 6px; }
     .nav button {
-      border: 1px solid var(--border);
+      border: none;
       background: transparent;
       color: var(--muted);
       font: inherit;
-      padding: 10px 14px;
-      border-radius: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius);
       text-align: left;
       cursor: pointer;
-      transition: background 0.2s, color 0.2s;
+      transition: 0.15s;
     }
-
+    .nav button:hover { border-color: #2a3040; color: var(--text); }
     .nav button.active {
-      background: var(--panel-alt);
+      background: linear-gradient(120deg, rgba(155,123,255,0.12), rgba(111,91,255,0.08));
       color: var(--text);
-      border-color: var(--accent-soft);
     }
-
-    .sidebar .btn-back {
+    .btn-back {
       border: 1px solid var(--border);
       background: transparent;
       color: var(--muted);
-      padding: 10px 14px;
-      border-radius: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius);
       cursor: pointer;
+      transition: 0.15s;
     }
+    .btn-back:hover { color: var(--text); border-color: #2a3040; }
 
-    main.content {
-      flex: 1;
-      padding: 32px clamp(20px, 4vw, 48px);
-      display: grid;
-      gap: 24px;
-      background: var(--panel-alt);
-    }
+    main.content { display: grid; grid-template-rows: auto 1fr; gap: 18px; padding: 22px clamp(20px, 3vw, 38px); }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: relative; }
+    .breadcrumbs { color: var(--muted); font-size: 13px; }
+    .profile-chip { display: flex; align-items: center; gap: 10px; background: var(--surface-2); border: 1px solid var(--border); padding: 8px 12px; border-radius: 999px; box-shadow: var(--shadow); cursor: pointer; position: relative; }
+    .avatar { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(140deg, #6f5bff, #9b7bff); display: grid; place-items: center; font-weight: 700; color: #0c0e13; overflow: hidden; }
+    .profile-meta { line-height: 1.2; }
+    .profile-meta small { color: var(--muted); }
+    .profile-menu { position: absolute; top: 48px; right: 0; min-width: 240px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; box-shadow: var(--shadow); display: none; z-index: 10; }
+    .profile-menu.active { display: block; }
+    .profile-menu h4 { margin: 0 0 6px; font-size: 15px; }
+    .profile-menu .muted { color: var(--muted); font-size: 13px; margin: 0 0 8px; }
+    .profile-menu .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; background: rgba(155,123,255,0.15); color: var(--text); font-size: 12px; }
+    .profile-menu .actions { display: grid; gap: 6px; margin-top: 8px; }
+    .profile-menu .actions a { text-decoration: none; color: var(--text); padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); }
 
-    .panel {
-      display: none;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 24px;
-      gap: 18px;
-    }
+    .panel { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+    .panel.active { display: block; }
+    h2 { margin: 0 0 6px; font-size: 20px; }
+    p.lead { margin: 0 0 12px; color: var(--muted); }
 
-    .panel.active {
-      display: block;
-    }
-
-    h2 {
-      margin: 0 0 8px;
-      font-size: 1.4rem;
-    }
-
-    p.lead { color: var(--muted); margin: 0 0 18px; }
-
-    form#createKeyForm {
-      display: grid;
-      gap: 12px;
-      background: var(--panel-alt);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 18px;
-    }
-
-    label { font-weight: 600; }
-
-    input[type="text"] {
-      padding: 10px 14px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: #0d1018;
-      color: var(--text);
-      font-size: 15px;
-    }
-
-    .btn-primary {
-      border: none;
-      border-radius: 10px;
-      padding: 10px 16px;
-      background: var(--accent);
-      color: #12041a;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .btn-ghost {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 8px 12px;
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-    }
-
-    .key-list { display: grid; gap: 14px; }
-
-    .key-card {
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
-      background: #0f131d;
-      display: grid;
-      gap: 12px;
-    }
-
-    .key-card header {
-      display: flex;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .badge {
-      border-radius: 999px;
-      padding: 2px 10px;
-      font-size: 12px;
-      text-transform: uppercase;
-    }
-
-    .badge.active { background: #1d3b2d; color: #6df2aa; }
-    .badge.inactive { background: #3b1d1d; color: #f48b8b; }
-
+    .card-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+    label { font-weight: 600; display: block; margin-bottom: 6px; }
+    input[type="text"], textarea, input[type="email"] { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: #0d1119; color: var(--text); font-size: 14px; }
+    textarea { resize: vertical; min-height: 90px; }
+    .btn-primary { border: none; border-radius: 10px; padding: 10px 14px; background: linear-gradient(130deg, var(--accent), var(--accent-2)); color: #0b0c0f; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(155,123,255,0.28); }
+    .btn-ghost { border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; background: transparent; color: var(--muted); cursor: pointer; }
+    .key-list { display: grid; gap: 10px; }
+    .key-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; background: #101320; display: grid; gap: 8px; }
+    .badge { border-radius: 999px; padding: 2px 10px; font-size: 12px; text-transform: uppercase; }
+    .badge.active { background: rgba(60, 189, 130, 0.16); color: #8df2c2; }
+    .badge.inactive { background: rgba(244, 139, 139, 0.16); color: #f99; }
     .key-token { font-family: 'JetBrains Mono', Consolas, monospace; word-break: break-all; }
     .key-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-    .usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
-    .usage-card {
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 14px;
-      background: #10131c;
-    }
-
-    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 14px; }
+    .usage-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; background: #0f1220; }
+    .chart-card { border:1px solid var(--border); border-radius: var(--radius); padding:14px; background:#0f1220; }
+    .chart-header { display:flex; justify-content: space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+    .chart-meta { color:var(--muted); font-size:12px; }
+    .chart-empty { color:var(--muted); font-size:13px; padding:16px 0; }
+    .chart-area { min-height: 200px; }
+    .progress-card { border:1px solid var(--border); border-radius: var(--radius); padding:14px; background:#0f1220; display:grid; gap:8px; }
+    .progress-meta { display:flex; gap:10px; flex-wrap:wrap; color:var(--muted); font-size:13px; }
+    .pill-status { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; font-size:12px; background:rgba(155,123,255,0.12); color:var(--text); }
+    .pill-bad { background: rgba(244,139,139,0.16); color: #f99; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th, td { padding: 10px; border-bottom: 1px solid var(--border); text-align: left; }
     th { color: var(--muted); font-weight: 600; }
-
-    .doc-grid { display: grid; gap: 14px; }
-    .doc-card {
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
-      background: #10131c;
-    }
-
-    .doc-card h3 { margin-top: 0; }
-
+    .doc-grid { display: grid; gap: 10px; }
+    .doc-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; background: #0f1220; }
+    .code-sample { display: grid; gap: 12px; }
+    .code-toolbar { display:flex; justify-content: space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+    .code-toolbar select { background:#0d1119; border:1px solid var(--border); color:var(--text); border-radius:10px; padding:8px 10px; }
+    .code-list { display: grid; gap: 10px; }
+    .code-item { border:1px solid var(--border); border-radius:12px; padding:10px; background:#0c0f19; }
+    .code-item__meta { display:flex; justify-content: space-between; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px; color:var(--muted); }
+    .badge.method { padding:2px 8px; border-radius:999px; font-size:11px; text-transform: uppercase; border:1px solid var(--border); }
+    .code-item pre { margin:8px 0 0; }
     ul { padding-left: 18px; color: var(--muted); }
-
-    pre {
-      margin: 10px 0 0;
-      padding: 14px;
-      border-radius: 10px;
-      background: #0c0f16;
-      border: 1px solid var(--border);
-      overflow-x: auto;
-      font-size: 13px;
-    }
-
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      background: #000;
-      color: #fff;
-      padding: 10px 16px;
-      border-radius: 999px;
-      opacity: 0;
-      transform: translateY(12px);
-      transition: 0.2s;
-    }
+    pre { margin: 10px 0 0; padding: 12px; border-radius: 10px; background: #0c0f19; border: 1px solid var(--border); overflow-x: auto; font-size: 12px; }
+    .toast { position: fixed; bottom: 20px; right: 20px; background: #0b0c0f; color: var(--text); padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border); opacity: 0; transform: translateY(8px); transition: 0.2s; box-shadow: var(--shadow); }
     .toast.show { opacity: 1; transform: translateY(0); }
-
-    @media (max-width: 900px) {
-      .console-shell { flex-direction: column; }
-      .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
-      .nav { flex-direction: row; flex-wrap: wrap; }
-      .nav button { flex: 1 1 120px; text-align: center; }
-    }
+    @media (max-width: 1024px) { body { grid-template-columns: 1fr; } .sidebar { grid-template-rows: auto auto; width: 100%; } }
   </style>
 </head>
 <body>
-  <div class="console-shell">
-    <aside class="sidebar">
-      <div class="brand">
+  <aside class="sidebar">
+    <div class="brand">
+      <div>
         <h1>DimiCheck</h1>
-        <span>Public API Console</span>
+        <span>Developer Console</span>
       </div>
-      <nav class="nav" aria-label="섹션 이동">
-        <button type="button" class="active" data-section="keys">API 키</button>
-        <button type="button" data-section="usage">사용량</button>
-        <button type="button" data-section="docs">문서</button>
-      </nav>
-      <button type="button" class="btn-back" onclick="window.location.href='/my.html'">← 마이 페이지</button>
-    </aside>
+    </div>
+    <nav class="nav" aria-label="섹션 이동">
+      <button type="button" class="active" data-section="keys">API 키</button>
+      <button type="button" data-section="usage">사용량</button>
+      <!-- <button type="button" data-section="oauth">OAuth</button> -->
+      <button type="button" data-section="docs">문서</button>
+      <button type="button" data-section="misc">기타 API</button>
+    </nav>
+    <button type="button" class="btn-back" onclick="window.location.href='/my.html'">← 마이 페이지</button>
+  </aside>
 
-    <main class="content">
-      <section id="section-keys" class="panel active" aria-live="polite">
-        <h2>API 키 관리</h2>
-        <p class="lead">최대 5개의 키를 발급할 수 있습니다. 새로 발급된 키는 한 번만 표시되므로 안전하게 보관하세요.</p>
-
-        <form id="createKeyForm">
-          <div>
-            <label for="keyLabel">키 이름</label>
-            <input type="text" id="keyLabel" name="label" placeholder="예: 자동 현황판" maxlength="60" />
+  <main class="content">
+    <div class="topbar">
+      <div class="breadcrumbs">개발자 콘솔 · Public API & OAuth</div>
+      <div class="profile-chip" id="profileChip" aria-live="polite">
+        <div class="avatar" id="profileAvatar">D</div>
+        <div class="profile-meta">
+          <strong id="profileName">DIMI 사용자</strong>
+        </div>
+        <div class="profile-menu" id="profileMenu">
+          <h4 id="menuName">DIMI 사용자</h4>
+          <div class="muted" id="menuEmail">-</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+            <span class="pill" id="menuTier">Tier -</span>
+            <span class="pill" id="menuRole">-</span>
           </div>
-          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <div class="actions">
+            <a href="/my.html">프로필/아바타 설정</a>
+            <a href="/logout">로그아웃</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section id="section-keys" class="panel active" aria-live="polite">
+      <h2>API 키 관리</h2>
+      <p class="lead">새 키 발급, 상태 토글, 삭제를 한 곳에서 관리합니다.</p>
+      <div class="card-grid">
+        <form id="createKeyForm" class="card">
+          <label for="keyLabel">키 이름</label>
+          <input type="text" id="keyLabel" name="label" placeholder="예: 출석판 자동화" maxlength="60" />
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <button type="submit" class="btn-primary">새 API 키 발급</button>
             <small style="color:var(--muted)">헤더: Dimicheck-API-Key</small>
           </div>
         </form>
-
-        <div id="keysList" class="key-list" aria-live="polite"></div>
-      </section>
-
-      <section id="section-usage" class="panel" aria-live="polite">
-        <h2>사용량 모니터링</h2>
-        <p class="lead">현재 분당·일일 제한 상태를 확인하세요. 모든 API 키를 합산한 계정 전체 한도가 적용됩니다.</p>
-        <div id="usageSummary" class="usage-grid"></div>
-        <div id="usageNote" style="color:var(--muted);font-size:12px">모든 키 사용량이 계정 전체로 합산되어 제한이 적용됩니다.</div>
-        <div style="overflow-x:auto">
-          <table id="usageTable" aria-label="API 키 사용량">
-            <thead>
-              <tr>
-                <th>키 이름</th>
-                <th>상태</th>
-                <th>티어</th>
-                <th>분당</th>
-                <th>일일</th>
-                <th>마지막 사용</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+        <div class="card">
+          <div class="key-list" id="keysList"></div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section id="section-docs" class="panel">
-        <h2>Public API 문서</h2>
-        <p class="lead">DimiCheck Public API는 읽기 전용이며 서버는 Raspberry Pi 4b 환경에서 동작합니다. 간혹 API 제공이 원활하지 않을 수 있습니다.</p>
-        <div class="doc-grid">
-          <article class="doc-card">
-            <h3>1. 인증</h3>
-            <ul>
-              <li>모든 요청에 <code>Dimicheck-API-Key</code> 헤더 필수</li>
-              <li>키는 개발자 콘솔에서 발급/비활성화 가능</li>
-              <li>세션 쿠키는 사용하지 않음 (완전한 헤더 기반)</li>
-            </ul>
-            <pre><code>curl https://chec.kro.kr/public/api/version \
-  -H "Dimicheck-API-Key: YOUR_KEY"</code></pre>
-          </article>
+    <section id="section-usage" class="panel" aria-live="polite">
+      <h2>사용량 모니터링</h2>
+      <p class="lead">계정 전체와 키별 현재 제한 상태를 확인하세요.</p>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <label style="color:var(--muted);font-size:13px">보기:
+          <select id="usageViewMode" style="background:#0d1119;border:1px solid var(--border);color:var(--text);border-radius:10px;padding:6px 10px;">
+            <option value="units">Usage Units</option>
+            <option value="requests">Request 수</option>
+          </select>
+        </label>
+      </div>
+      <div id="usageSummary" class="usage-grid"></div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div><strong>최근 7일 사용량 (시간별)</strong></div>
+          <div class="chart-meta" id="usageChartMeta"></div>
+        </div>
+        <div id="usageChart" class="chart-area"><canvas id="usageChartCanvas" height="200"></canvas></div>
+      </div>
+      <div id="tierProgressCard" class="progress-card"></div>
+      <div style="overflow-x:auto">
+        <table id="usageTable" aria-label="API 키 사용량">
+          <thead>
+            <tr><th>키 이름</th><th>상태</th><th>티어</th><th>일일 (U)</th><th>마지막 사용</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
 
-          <article class="doc-card">
-            <h3>2. 엔드포인트</h3>
-            <table style="font-size:13px">
-              <thead><tr><th>메서드</th><th>경로</th><th>설명</th></tr></thead>
-              <tbody>
-                <tr><td>GET</td><td>/public/api/version</td><td>현재 자산 버전 문자열</td></tr>
-                <tr><td>GET</td><td>/public/api/class/&lt;grade&gt;-&lt;section&gt;/status</td><td>단일 학급의 상태</td></tr>
-                <tr><td>GET</td><td>/public/api/status/overview</td><td>모든 학급의 상태 요약</td></tr>
-                <tr><td>GET</td><td>/public/api/class/&lt;grade&gt;-&lt;section&gt;/calendar/events</td><td>학급별 캘린더 이벤트 (month/year 쿼리 가능)</td></tr>
-              </tbody>
+    <section id="section-oauth" class="panel" aria-live="polite">
+      <h2>OAuth 클라이언트</h2>
+      <p class="lead">클라이언트 생성/수정, Secret·JWT 자동 회전(90일/180일) 관리.</p>
+      <div class="card-grid">
+        <div class="card" style="grid-column: span 2;">
+          <div style="overflow-x:auto">
+            <table id="oauthClientsTable" aria-label="OAuth 클라이언트">
+              <thead>
+                <tr><th>이름</th><th>Client ID</th><th>리다이렉트</th><th>스코프</th><th>최근 회전</th><th>관리</th></tr>
+              </thead>
+              <tbody></tbody>
             </table>
-          </article>
-
-          <article class="doc-card">
-            <h3>3. 레이트 리밋</h3>
-            <ul>
-              <li>Tier 1: 분당 10회 / 일일 50회 (계정 전체, 기본)</li>
-              <li>Tier 2: 분당 15회 / 일일 100회 (계정 전체, 업그레이드)</li>
-              <li>모든 API 키 호출이 계정 단위로 합산되어 제한이 적용됩니다.</li>
-              <li>한도 초과 시 HTTP 429 + JSON 에러</li>
-            </ul>
-            <pre><code>{
-  "error": {
-    "code": "429",
-    "message": "rate limit exceeded"
-  }
-}</code></pre>
-          </article>
-
-          <article class="doc-card">
-            <h3>4. 티어 업그레이드</h3>
-            <ul>
-              <li>7일 연속으로 하루 5회 이상 호출하면 Tier 2 신청 가능</li>
-              <li>콘솔에서 승급 버튼이 활성화되면 즉시 적용</li>
-              <li>Tier 2 이상이 필요하면 <a href="https://forms.gle/hQdf64mHYu1TdVh39" target="_blank" rel="noreferrer">추가 요청 폼</a>으로 문의</li>
-            </ul>
-          </article>
-
-          <article class="doc-card">
-            <h3>5. WebSocket</h3>
-            <p>/ws/public-status에서 학급 상태 업데이트를 push로 수신합니다.</p>
-            <ul>
-              <li><code>Dimicheck-API-Key</code> 헤더 또는 <code>?api_key</code> 쿼리 사용</li>
-              <li>이벤트 형식: <code>{ type, class, status }</code></li>
-            </ul>
-            <pre><code>const socket = io('/ws/public-status', {
-  extraHeaders: { 'Dimicheck-API-Key': 'YOUR_KEY' }
-});
-
-socket.on('status_update', (payload) => {
-  console.log(payload);
-});</code></pre>
-          </article>
-
-          <article class="doc-card">
-            <h3>6. 캘린더 이벤트</h3>
-            <p>학급 이벤트를 가져오는 읽기 전용 엔드포인트입니다.</p>
-            <ul>
-              <li>응답 필드: <code>id</code>, <code>title</code>, <code>description</code>, <code>date</code>, <code>createdBy</code>, <code>createdAt</code>, <code>updatedAt</code></li>
-              <li>옵션: <code>?month=MM&amp;year=YYYY</code>로 월 단위 필터링</li>
-              <li>최대 500건까지 반환하며 요청 자동 정렬</li>
-            </ul>
-            <pre><code>curl https://chec.kro.kr/public/api/class/2-3/calendar/events \
-  -H "Dimicheck-API-Key: YOUR_KEY" \
-  -G --data-urlencode "month=4" --data-urlencode "year=2025"</code></pre>
-          </article>
-
-          <article class="doc-card">
-            <h3>7. 응답 예시</h3>
-            <pre><code>GET /public/api/class/2-3/status
-{
-  "grade": 2,
-  "class": 3,
-  "status": "active"
-}</code></pre>
-            <pre><code>GET /public/api/status/overview
-{
-  "1-1": { "status": "active" },
-  "1-2": { "status": "stale" }
-}</code></pre>
-          </article>
+          </div>
         </div>
-      </section>
-    </main>
-  </div>
+        <form id="createOAuthClientForm" class="card">
+          <h3 style="margin:0 0 8px">새 클라이언트 발급</h3>
+          <label>앱 이름<input type="text" name="name" required maxlength="120" placeholder="예: 출석판 뷰어" /></label>
+          <label>리다이렉트 URI (줄바꿈/쉼표/공백 구분)
+            <textarea name="redirect_uris" required placeholder="https://app.example.com/callback&#10;https://localhost/cb"></textarea>
+          </label>
+          <div>
+            <div style="margin-bottom:6px;font-weight:600">허용 스코프</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;color:var(--muted)">
+              <label><input type="checkbox" name="scopes" value="basic" checked /> basic</label>
+              <label><input type="checkbox" name="scopes" value="profile" /> profile</label>
+              <label><input type="checkbox" name="scopes" value="student_info" /> student_info</label>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary">클라이언트 생성</button>
+          <small id="oauthCreateResult" style="color:var(--muted)"></small>
+        </form>
+        <form id="editOAuthClientForm" class="card">
+          <h3 style="margin:0 0 8px">클라이언트 수정</h3>
+          <div id="editSelectionHint" style="color:var(--muted);font-size:13px">표에서 편집할 클라이언트를 선택하세요.</div>
+          <label>앱 이름<input type="text" name="name" placeholder="선택 후 자동 입력" /></label>
+          <label>리다이렉트 URI
+            <textarea name="redirect_uris" placeholder="선택 후 자동 입력"></textarea>
+          </label>
+          <div>
+            <div style="margin-bottom:6px;font-weight:600">허용 스코프</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;color:var(--muted)">
+              <label><input type="checkbox" name="edit_scopes" value="basic" /> basic</label>
+              <label><input type="checkbox" name="edit_scopes" value="profile" /> profile</label>
+              <label><input type="checkbox" name="edit_scopes" value="student_info" /> student_info</label>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button type="submit" class="btn-primary" disabled>변경 저장</button>
+            <button type="button" class="btn-ghost" id="resetEdit" disabled>선택 해제</button>
+          </div>
+          <small id="oauthEditResult" style="color:var(--muted)"></small>
+        </form>
+      </div>
+    </section>
+
+    <section id="section-docs" class="panel">
+      <h2>공개 API & OAuth 가이드</h2>
+      <p class="lead">인증 방법, 주요 엔드포인트, OAuth 워크플로를 요약했습니다.</p>
+      <div class="doc-grid">
+        <article class="doc-card">
+          <h3>1. 인증</h3>
+          <ul>
+            <li>Public API: <code>Dimicheck-API-Key</code> 헤더 필수</li>
+            <li>OAuth API: Bearer 액세스 토큰 (HS256, aud = client_id)</li>
+          </ul>
+          <pre><code>curl https://chec.kro.kr/public/api/version \\
+  -H "Dimicheck-API-Key: YOUR_KEY"</code></pre>
+        </article>
+        <article class="doc-card">
+          <h3>2. 공개 엔드포인트</h3>
+          <table><thead><tr><th>메서드</th><th>경로</th><th>설명</th></tr></thead><tbody>
+            <tr><td>GET</td><td>/public/api/version</td><td>자산 버전</td></tr>
+            <tr><td>GET</td><td>/public/api/class/&lt;grade&gt;-&lt;section&gt;/status</td><td>단일 학급 상태</td></tr>
+            <tr><td>GET</td><td>/public/api/status/overview</td><td>전체 상태 요약</td></tr>
+            <tr><td>GET</td><td>/public/api/class/&lt;grade&gt;-&lt;section&gt;/calendar/events</td><td>학급 캘린더</td></tr>
+          </tbody></table>
+        </article>
+        <article class="doc-card">
+          <h3>3. OAuth</h3>
+          <ul>
+            <li>인가: <code>GET /oauth/authorize</code> (code, PKCE 지원)</li>
+            <li>토큰: <code>POST /oauth/token</code> (authorization_code/refresh_token)</li>
+            <li>인트로스펙션/리보크: <code>/oauth/introspect</code>, <code>/oauth/revoke</code></li>
+            <li>동의 UI는 자동 렌더, 클라이언트는 콘솔 OAuth 탭에서 발급/수정</li>
+          </ul>
+          <pre><code>curl -X POST https://chec.kro.kr/oauth/token \\
+  -u CLIENT_ID:CLIENT_SECRET \\
+  -d \"grant_type=authorization_code&code=...&redirect_uri=...\"</code></pre>
+        </article>
+        <article class="doc-card">
+          <h3>4. 레이트 리밋</h3>
+          <ul>
+            <li>Compute Units 기준 (1U = 경량 호출 1회): Tier 1 = 100U/일, Tier 2 = 300U/일, Super = 2000U/일</li>
+            <li>엔드포인트별 가중치 예: /api/version 0.1U, /api/status/overview 5U, /api/counters/add 3U</li>
+            <li>분당 제한은 완화, 일일 U를 기준으로 HTTP 429 반환</li>
+            <li>Super Tier 신청: <a href="https://forms.gle/hQdf64mHYu1TdVh39" target="_blank" rel="noreferrer">요청 폼</a></li>
+          </ul>
+        </article>
+        <article class="doc-card" style="grid-column: span 2;">
+          <h3>5. 엔드포인트별 Usage Unit</h3>
+          <table>
+            <thead><tr><th>메서드</th><th>경로</th><th>Unit</th><th>비고</th></tr></thead>
+            <tbody>
+              <tr><td>GET</td><td>/public/api/version</td><td>0.1U</td><td>초경량</td></tr>
+              <tr><td>GET</td><td>/public/api/class/&lt;grade&gt;-&lt;section&gt;/status</td><td>0.7U</td><td>경량 상태 조회</td></tr>
+              <tr><td>GET</td><td>/public/api/class/&lt;grade&gt;-&lt;section&gt;/calendar/events</td><td>1.0U</td><td>캘린더 조회</td></tr>
+              <tr><td>GET</td><td>/public/api/status/overview</td><td>5.0U</td><td>가장 무거움 (전체 클래스 루프)</td></tr>
+              <tr><td>GET</td><td>/public/api/counters/&lt;id&gt;</td><td>1.5U</td><td>카운터 읽기</td></tr>
+              <tr><td>POST</td><td>/public/api/counters</td><td>3.0U</td><td>카운터 생성</td></tr>
+              <tr><td>POST</td><td>/public/api/counters/&lt;id&gt;/increment</td><td>2.5U</td><td>+1</td></tr>
+              <tr><td>POST</td><td>/public/api/counters/&lt;id&gt;/decrement</td><td>2.5U</td><td>-1</td></tr>
+              <tr><td>POST</td><td>/public/api/counters/&lt;id&gt;/add</td><td>3.0U</td><td>특정 값 더하기</td></tr>
+              <tr><td>POST</td><td>/public/api/counters/&lt;id&gt;/set</td><td>3.0U</td><td>특정 값 설정</td></tr>
+              <tr><td>POST</td><td>/public/api/counters/&lt;id&gt;/reset</td><td>2.5U</td><td>0으로 초기화</td></tr>
+              <tr><td>DELETE</td><td>/public/api/counters/&lt;id&gt;</td><td>2.5U</td><td>삭제</td></tr>
+            </tbody>
+          </table>
+          <p style="color:var(--muted);font-size:12px;margin:6px 0 0">Tier 1: 100U/일 · Tier 2: 300U/일 · Super: 2000U/일</p>
+        </article>
+        <article class="doc-card" style="grid-column: span 2;">
+          <div class="code-sample">
+            <div class="code-toolbar">
+              <div><strong>언어별 코드 예제 (Public API)</strong></div>
+              <select id="publicCodeLang" aria-label="코드 예제 언어 선택">
+                <option value="curl">cURL</option>
+                <option value="javascript">JavaScript (fetch)</option>
+                <option value="python">Python (requests)</option>
+                <option value="node">Node.js (axios)</option>
+              </select>
+            </div>
+            <div id="publicCodeList" class="code-list"></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="section-misc" class="panel">
+      <h2>기타 API (실험적)</h2>
+      <p class="lead">가벼운 백엔드 기능이 필요한 학생 개발자용 카운터 API 예시입니다.</p>
+      <div class="doc-grid">
+        <article class="doc-card">
+          <h3>카운터 API 개요</h3>
+          <ul>
+            <li>목적: 뷰 카운트, 좋아요 수, 간단한 점수판 등 숫자 누적용</li>
+            <li>저장소: 계정·키 단위 격리, 기본 일일/분당 레이트 리밋 적용</li>
+            <li>형식: 카운터 값은 64비트 정수, 기본 0에서 시작</li>
+          </ul>
+          <pre><code>헤더: Dimicheck-API-Key: YOUR_KEY
+베이스: https://chec.kro.kr/public/api/counters</code></pre>
+        </article>
+        <article class="doc-card">
+          <h3>엔드포인트</h3>
+          <table><thead><tr><th>메서드</th><th>경로</th><th>설명</th></tr></thead><tbody>
+            <tr><td>POST</td><td>/public/api/counters</td><td>카운터 생성 (이름/초기값)</td></tr>
+            <tr><td>GET</td><td>/public/api/counters/&lt;id&gt;</td><td>단일 카운터 조회</td></tr>
+            <tr><td>POST</td><td>/public/api/counters/&lt;id&gt;/increment</td><td>+1 증가</td></tr>
+            <tr><td>POST</td><td>/public/api/counters/&lt;id&gt;/decrement</td><td>-1 감소</td></tr>
+            <tr><td>POST</td><td>/public/api/counters/&lt;id&gt;/add</td><td>특정 값 더하기 (양/음수)</td></tr>
+            <tr><td>POST</td><td>/public/api/counters/&lt;id&gt;/set</td><td>특정 값으로 설정</td></tr>
+            <tr><td>POST</td><td>/public/api/counters/&lt;id&gt;/reset</td><td>0으로 초기화</td></tr>
+            <tr><td>DELETE</td><td>/public/api/counters/&lt;id&gt;</td><td>카운터 삭제</td></tr>
+          </tbody></table>
+        </article>
+        <article class="doc-card">
+          <h3>요청/응답 예시</h3>
+          <pre><code># 생성
+curl -X POST https://chec.kro.kr/public/api/counters \
+  -H "Content-Type: application/json" \
+  -H "Dimicheck-API-Key: YOUR_KEY" \
+  -d '{"name":"like-counter","initial":0}'
+
+# +10
+curl -X POST https://chec.kro.kr/public/api/counters/{id}/add \
+  -H "Content-Type: application/json" \
+  -H "Dimicheck-API-Key: YOUR_KEY" \
+  -d '{"value":10}'
+
+# 42로 세팅
+curl -X POST https://chec.kro.kr/public/api/counters/{id}/set \
+  -H "Content-Type: application/json" \
+  -H "Dimicheck-API-Key: YOUR_KEY" \
+  -d '{"value":42}'
+
+# 조회
+curl https://chec.kro.kr/public/api/counters/{id} \
+  -H "Dimicheck-API-Key: YOUR_KEY"</code></pre>
+          <ul>
+            <li>응답 형태: <code>{ "id": "...", "name": "like-counter", "value": 10, "updated_at": "...Z" }</code></li>
+            <li>유효성: 이름 3~80자 영문/숫자/하이픈/언더스코어, value는 -9e15~9e15</li>
+            <li>초기값: <code>initial</code> 미입력 시 0부터 시작, <code>value</code>가 범위를 넘으면 400</li>
+            <li>안전성: <code>increment/decrement/add/set/reset</code> 는 요청 단위로 적용</li>
+          </ul>
+        </article>
+        <article class="doc-card" style="grid-column: span 2;">
+          <div class="code-sample">
+            <div class="code-toolbar">
+              <div><strong>언어별 코드 예제 (Counter API)</strong></div>
+              <select id="counterCodeLang" aria-label="카운터 코드 예제 언어 선택">
+                <option value="curl">cURL</option>
+                <option value="javascript">JavaScript (fetch)</option>
+                <option value="python">Python (requests)</option>
+                <option value="node">Node.js (axios)</option>
+              </select>
+            </div>
+            <div id="counterCodeList" class="code-list"></div>
+          </div>
+        </article>
+        <article class="doc-card">
+          <h3>권장 사용처</h3>
+          <ul>
+            <li>과제/동아리 웹앱의 좋아요/조회수/투표 수</li>
+            <li>이벤트 출석·점수판 간단 집계</li>
+            <li>프론트엔드만 있는 사이드 프로젝트의 임시 백엔드 스토리지</li>
+          </ul>
+          <p style="color:var(--muted)">추가 아이디어나 스펙 제안은 개발자 콘솔 문의 채널로 알려주세요.</p>
+        </article>
+      </div>
+    </section>
+  </main>
 
   <div id="consoleToast" class="toast" role="status" aria-live="polite"></div>
 
   <script>
-    const state = { keys: [], usage: null };
+    const state = { keys: [], usage: null, oauth: { clients: [], loaded: false, error: null, selected: null }, user: null, avatar: null, tierProgress: null, unitScale: 10, usageViewMode: 'units' };
+    const TIME_ZONE = 'Asia/Seoul';
+    const parseTimestamp = (value) => {
+      if (!value) return null;
+      if (value instanceof Date) return value;
+      const str = String(value).trim();
+      const hasZone = /[zZ]|[+-]\d{2}:?\d{2}$/.test(str);
+      const looksIso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(str);
+      try {
+        return new Date(looksIso && !hasZone ? `${str}Z` : str);
+      } catch {
+        return null;
+      }
+    };
+    const formatKSTDateTime = (value) => { const d = parseTimestamp(value); return d ? d.toLocaleString('ko-KR', { timeZone: TIME_ZONE }) : '-'; };
+    const formatKSTDate = (value) => { const d = parseTimestamp(value); return d ? d.toLocaleDateString('ko-KR', { timeZone: TIME_ZONE }) : '-'; };
+    const formatKSTTime = (value) => { const d = parseTimestamp(value); return d ? d.toLocaleTimeString('ko-KR', { timeZone: TIME_ZONE }) : '-'; };
+    const formatUnits = (value) => Number(value ?? 0).toFixed(1);
+    const API_BASE = 'https://chec.kro.kr';
+    const API_KEY_PLACEHOLDER = 'YOUR_KEY';
+    const CODE_LANGS = ['curl', 'javascript', 'python', 'node'];
 
-    document.querySelectorAll('.nav button').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.nav button').forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
-        const target = btn.dataset.section;
-        document.querySelectorAll('.panel').forEach((panel) => {
-          panel.classList.toggle('active', panel.id === `section-${target}`);
-        });
-      });
-    });
+    const publicCodeSamples = [
+      { id: 'version', title: '자산 버전 조회', method: 'GET', path: '/public/api/version' },
+      { id: 'classStatus', title: '학급 상태 조회', method: 'GET', path: '/public/api/class/1-1/status' },
+      { id: 'overview', title: '전체 상태 요약', method: 'GET', path: '/public/api/status/overview' },
+      { id: 'calendar', title: '학급 캘린더', method: 'GET', path: '/public/api/class/1-1/calendar/events?year=2024&month=12' },
+    ];
+
+    const counterCodeSamples = [
+      { id: 'createCounter', title: '카운터 생성', method: 'POST', path: '/public/api/counters', body: { name: 'like-counter', initial: 0 } },
+      { id: 'getCounter', title: '카운터 조회', method: 'GET', path: '/public/api/counters/123' },
+      { id: 'incrementCounter', title: '카운터 +1', method: 'POST', path: '/public/api/counters/123/increment' },
+      { id: 'decrementCounter', title: '카운터 -1', method: 'POST', path: '/public/api/counters/123/decrement' },
+      { id: 'addCounter', title: '특정 값 더하기', method: 'POST', path: '/public/api/counters/123/add', body: { value: 5 } },
+      { id: 'setCounter', title: '특정 값으로 설정', method: 'POST', path: '/public/api/counters/123/set', body: { value: 42 } },
+      { id: 'resetCounter', title: '0으로 초기화', method: 'POST', path: '/public/api/counters/123/reset' },
+      { id: 'deleteCounter', title: '카운터 삭제', method: 'DELETE', path: '/public/api/counters/123' },
+    ];
 
     const toastEl = document.getElementById('consoleToast');
-    function showToast(message) {
-      if (!toastEl) return;
-      toastEl.textContent = message;
-      toastEl.classList.add('show');
-      setTimeout(() => toastEl.classList.remove('show'), 2500);
-    }
-
-    async function fetchJSON(url, options = {}) {
-      const response = await fetch(url, { credentials: 'include', ...options });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        const message = data?.error?.message || `HTTP ${response.status}`;
-        throw new Error(message);
+    function showToast(message) { if (!toastEl) return; toastEl.textContent = message; toastEl.classList.add('show'); setTimeout(() => toastEl.classList.remove('show'), 2500); }
+    async function fetchJSON(url, options = {}) { const response = await fetch(url, { credentials: 'include', ...options }); if (!response.ok) { const data = await response.json().catch(() => ({})); const message = data?.error?.message || `HTTP ${response.status}`; throw new Error(message); } return response.json(); }
+    const escapeHTML = (str) => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const buildCurl = (sample) => {
+      const lines = [`curl -X ${sample.method} ${API_BASE}${sample.path}`];
+      const headers = [`-H "Dimicheck-API-Key: ${API_KEY_PLACEHOLDER}"`];
+      const needsBody = sample.method !== 'GET' && sample.method !== 'DELETE' && sample.body;
+      if (needsBody) headers.unshift('-H "Content-Type: application/json"');
+      if (headers.length) {
+        lines[0] += ' \\';
+        lines.push(`  ${headers.join(' \\\n  ')}`);
       }
-      return response.json();
+      if (needsBody) {
+        lines[lines.length - 1] += ' \\';
+        lines.push(`  -d '${JSON.stringify(sample.body)}'`);
+      }
+      return lines.join('\n');
+    };
+    const buildJavaScript = (sample) => {
+      const needsBody = sample.method !== 'GET' && sample.method !== 'DELETE' && sample.body;
+      const headers = [`"Dimicheck-API-Key": "${API_KEY_PLACEHOLDER}"`];
+      if (needsBody) headers.push('"Content-Type": "application/json"');
+      const bodyLine = needsBody ? `,\n  body: JSON.stringify(${JSON.stringify(sample.body, null, 2)})` : '';
+      return `const res = await fetch('${API_BASE}${sample.path}', {\n  method: '${sample.method}',\n  headers: { ${headers.join(', ')} }${bodyLine}\n});\nif (!res.ok) throw new Error(res.statusText);\nconst data = await res.json();\nconsole.log(data);`;
+    };
+    const buildPython = (sample) => {
+      const needsBody = sample.method !== 'GET' && sample.method !== 'DELETE' && sample.body;
+      const headers = needsBody ? `{"Content-Type": "application/json", "Dimicheck-API-Key": "${API_KEY_PLACEHOLDER}"}` : `{"Dimicheck-API-Key": "${API_KEY_PLACEHOLDER}"}`;
+      const jsonLine = needsBody ? `, json=${JSON.stringify(sample.body)}` : '';
+      return `import requests\n\nheaders = ${headers}\nresp = requests.request("${sample.method}", "${API_BASE}${sample.path}", headers=headers${jsonLine})\nprint(resp.json())`;
+    };
+    const buildNode = (sample) => {
+      const needsBody = sample.method !== 'GET' && sample.method !== 'DELETE' && sample.body;
+      const headerObj = needsBody ? `{"Content-Type": "application/json", "Dimicheck-API-Key": "${API_KEY_PLACEHOLDER}"}` : `{"Dimicheck-API-Key": "${API_KEY_PLACEHOLDER}"}`;
+      const dataLine = needsBody ? `,\n  data: ${JSON.stringify(sample.body, null, 2)}` : '';
+      return `import axios from 'axios';\n\nconst { data } = await axios({\n  method: '${sample.method.toLowerCase()}',\n  url: '${API_BASE}${sample.path}',\n  headers: ${headerObj}${dataLine}\n});\nconsole.log(data);`;
+    };
+    const buildCode = (lang, sample) => {
+      if (lang === 'javascript') return buildJavaScript(sample);
+      if (lang === 'python') return buildPython(sample);
+      if (lang === 'node') return buildNode(sample);
+      return buildCurl(sample);
+    };
+    function renderCodeSamples(langSelectId, listId, samples) {
+      const selectEl = document.getElementById(langSelectId);
+      const listEl = document.getElementById(listId);
+      if (!selectEl || !listEl) return;
+      const render = () => {
+        const lang = CODE_LANGS.includes(selectEl.value) ? selectEl.value : 'curl';
+        listEl.innerHTML = samples.map((sample) => {
+          const code = escapeHTML(buildCode(lang, sample));
+          return `
+            <div class="code-item">
+              <div class="code-item__meta">
+                <div>${sample.title}</div>
+                <span class="badge method">${sample.method}</span>
+              </div>
+              <pre><code>${code}</code></pre>
+            </div>`;
+        }).join('');
+      };
+      selectEl.addEventListener('change', render);
+      render();
     }
 
-    const formatTimestamp = (value) => value ? new Date(value).toLocaleString() : '-';
+    const sections = ['keys', 'usage', 'oauth', 'docs', 'misc'];
+    function activateSection(target, updateUrl = false) {
+      const section = sections.includes(target) ? target : 'keys';
+      document.querySelectorAll('.nav button').forEach((b) => b.classList.toggle('active', b.dataset.section === section));
+      document.querySelectorAll('.panel').forEach((panel) => { panel.classList.toggle('active', panel.id === `section-${section}`); });
+      if (section === 'oauth' && !state.oauth.loaded) loadOAuthClients();
+      if (updateUrl) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('section', section);
+        history.replaceState({}, '', `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
+      }
+    }
+    document.querySelectorAll('.nav button').forEach((btn) => {
+      btn.addEventListener('click', () => activateSection(btn.dataset.section, true));
+    });
+    (function initSectionFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const param = params.get('section');
+      const hash = (window.location.hash || '').replace('#', '');
+      const initial = sections.includes(param) ? param : (sections.includes(hash) ? hash : 'keys');
+      activateSection(initial, false);
+    }());
+    const profileChip = document.getElementById('profileChip');
+    const profileMenu = document.getElementById('profileMenu');
+    profileChip?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (profileMenu) profileMenu.classList.toggle('active');
+    });
+    document.addEventListener('click', () => { if (profileMenu) profileMenu.classList.remove('active'); });
 
-    async function loadKeys() {
-      const data = await fetchJSON('/api/dev/api-keys');
-      state.keys = data.keys || [];
-      renderKeys();
+    const formatTimestamp = (value) => formatKSTDateTime(value);
+    let usageChartInstance = null;
+    const renderUsageChart = () => {
+      const canvas = document.getElementById('usageChartCanvas');
+      const metaEl = document.getElementById('usageChartMeta');
+      const hourly = state.usage?.chart?.hourly || [];
+      if (!canvas || typeof Chart === 'undefined') return;
+      const ctx = canvas.getContext('2d');
+      if (!hourly.length) {
+        canvas.replaceWith(Object.assign(document.createElement('div'), { className: 'chart-empty', textContent: '지난 7일 데이터가 없습니다.' }));
+        if (metaEl) metaEl.textContent = '';
+        return;
+      }
+      const parsed = hourly.map((item) => {
+        const ts = parseTimestamp(item.ts);
+        return { ts, units: Number(item.units ?? 0), requests: Number(item.requests ?? 0) };
+      }).filter((p) => p.ts);
+      const kstHourFmt = new Intl.DateTimeFormat('ko-KR', { timeZone: TIME_ZONE, month: 'numeric', day: 'numeric', hour: '2-digit', hourCycle: 'h23' });
+      const labels = parsed.map((p) => kstHourFmt.format(p.ts));
+      const useRequests = state.usageViewMode === 'requests';
+      const data = parsed.map((p) => useRequests ? p.requests : p.units);
+      const maxCount = Math.max(...data, 0);
+      if (usageChartInstance) usageChartInstance.destroy();
+      usageChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: useRequests ? 'requests/h' : 'Units/h',
+            data,
+            fill: true,
+            tension: 0.25,
+            backgroundColor: 'rgba(155,123,255,0.18)',
+            borderColor: 'rgba(155,123,255,0.9)',
+            borderWidth: 2,
+            pointRadius: 2,
+            pointHoverRadius: 4,
+          }],
+        },
+        options: {
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              ticks: { color: '#98a0b5', maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+              grid: { color: 'rgba(255,255,255,0.04)' },
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { color: '#98a0b5', precision: 0 },
+              grid: { color: 'rgba(255,255,255,0.04)' },
+            },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0f1220',
+              borderColor: '#2a3040',
+              borderWidth: 1,
+              titleColor: '#fff',
+              bodyColor: '#e9ecf5',
+              displayColors: false,
+              callbacks: {
+                label: (ctx) => `${ctx.parsed.y} req`,
+              },
+            },
+          },
+        },
+      });
+      if (metaEl) {
+        const last = parsed[parsed.length - 1];
+        metaEl.textContent = useRequests
+          ? `최대 ${maxCount} req/h · 마지막: ${formatKSTDateTime(last.ts)}`
+          : `최대 ${formatUnits(maxCount)} U/h · 마지막: ${formatKSTDateTime(last.ts)}`;
+      }
+    };
+
+    function renderTierProgress() {
+      const el = document.getElementById('tierProgressCard');
+      if (!el) return;
+      const progress = state.tierProgress;
+      if (!progress) {
+        el.innerHTML = '<div class="chart-empty">업그레이드 진행 정보를 불러오지 못했습니다.</div>';
+        return;
+      }
+      const daysLine = `최근 7일 기준 하루 ${progress.daily_threshold}회 이상: ${progress.days_over_threshold}/${progress.required_days}일`;
+      const callsLine = `누적 전체 호출: ${progress.total_calls}/${progress.required_total}회`;
+      const remainDays = Math.max(0, progress.missing_days);
+      const remainCalls = Math.max(0, progress.missing_calls);
+      const eligibleText = progress.eligible ? '<span class="pill-status">Tier 2 신청 가능</span>' : `<span class="pill-status pill-bad">조건 미충족</span>`;
+      el.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <strong>Tier 2 업그레이드 조건</strong>
+          <div class="progress-meta">${eligibleText}</div>
+        </div>
+        <div class="progress-meta">${daysLine} · ${callsLine}</div>
+        <div class="progress-meta">남은 목표: ${remainDays}일, ${remainCalls}회</div>
+        <small style="color:var(--muted)">조건: 최근 7일 중 3일 이상 하루 20회+, 누적 150회 이상</small>
+      `;
     }
 
-    async function loadUsage() {
-      const data = await fetchJSON('/api/dev/usage');
-      state.usage = data;
-      renderUsage();
+    async function loadUser() {
+      try { const data = await fetchJSON('/me'); state.user = data; renderProfile(); } catch {}
+      try { const avatarRes = await fetchJSON('/api/classes/chat/avatar'); state.avatar = avatarRes.avatar || null; renderProfile(); } catch {}
+    }
+    function renderProfile() {
+      const nameEl = document.getElementById('profileName');
+      const avatar = document.getElementById('profileAvatar');
+      const name = state.user?.name || 'DIMI 사용자';
+      const email = state.user?.email || '-';
+      if (nameEl) nameEl.textContent = name;
+      if (avatar) {
+        avatar.innerHTML = '';
+        avatar.style.background = 'linear-gradient(140deg, #6f5bff, #9b7bff)';
+        const fallback = document.createElement('span');
+        fallback.textContent = name.charAt(0).toUpperCase();
+        if (state.avatar) {
+          avatar.style.background = state.avatar.bgColor || avatar.style.background;
+          const emoji = document.createElement('span');
+          emoji.textContent = state.avatar.emoji || fallback.textContent;
+          avatar.appendChild(emoji);
+        } else {
+          avatar.appendChild(fallback);
+        }
+      }
+      const menuName = document.getElementById('menuName');
+      const menuEmail = document.getElementById('menuEmail');
+      if (menuName) menuName.textContent = name;
+      if (menuEmail) menuEmail.textContent = email;
+      const menuRole = document.getElementById('menuRole');
+      if (menuRole) menuRole.textContent = state.user?.type || 'unknown';
+      const menuTier = document.getElementById('menuTier');
+      const tierLabel = state.usage?.summary?.account_tier_label || state.usage?.summary?.account_tier;
+      if (menuTier) menuTier.textContent = tierLabel ? `Tier ${tierLabel}` : 'Tier -';
+    }
+
+    async function loadKeys() { const data = await fetchJSON('/api/dev/api-keys'); state.keys = data.keys || []; renderKeys(); }
+    async function loadUsage() { const data = await fetchJSON('/api/dev/usage'); state.usage = data; state.tierProgress = data.tier2_progress || null; state.unitScale = data.summary?.unit_scale || 10; renderUsage(); renderProfile(); }
+    async function loadOAuthClients() {
+      try { const data = await fetchJSON('/api/dev/oauth/clients'); state.oauth.clients = data.clients || []; state.oauth.error = null; }
+      catch (err) { state.oauth.clients = []; state.oauth.error = err.message || '로드 실패'; showToast(state.oauth.error); }
+      finally { state.oauth.loaded = true; renderOAuthClients(); }
     }
 
     function renderKeys() {
-      const list = document.getElementById('keysList');
-      if (!list) return;
-      if (!state.keys.length) {
-        list.innerHTML = '<p style="color:var(--muted)">발급된 API 키가 없습니다.</p>';
-        return;
-      }
+      const list = document.getElementById('keysList'); if (!list) return;
+      if (!state.keys.length) { list.innerHTML = '<p style="color:var(--muted)">발급된 API 키가 없습니다.</p>'; return; }
       list.innerHTML = state.keys.map((key) => {
-        const minuteWindow = key.usage.minute_window_start ? new Date(key.usage.minute_window_start).toLocaleTimeString() : '-';
-        const tier = key.tier || {};
-        const tierLabel = tier.label || tier.name || 'Tier 1';
-        const streakGoal = tier.streak_goal || 7;
-        const streakDays = tier.streak_days || 0;
-        const remainingDays = Math.max(0, streakGoal - streakDays);
+        const minuteWindow = formatKSTTime(key.usage.minute_window_start);
+        const tier = key.tier || {}; const tierLabel = tier.label || tier.name || 'Tier 1';
+        const streakGoal = tier.streak_goal || 7; const streakDays = tier.streak_days || 0; const remainingDays = Math.max(0, streakGoal - streakDays);
         let upgradeMarkup = '';
         if (tier.name === 'tier1') {
-          if (tier.eligible_for_upgrade) {
+          if (state.tierProgress?.eligible) {
             upgradeMarkup = `<button class="btn-primary" type="button" data-action="upgrade" data-id="${key.id}">Tier 2 업그레이드</button>`;
           } else {
-            upgradeMarkup = `<small style="color:var(--muted)">Tier 2까지 ${remainingDays}일 연속 호출 필요</small>`;
+            const remainDays = Math.max(0, state.tierProgress?.missing_days ?? 3);
+            const remainCalls = Math.max(0, state.tierProgress?.missing_calls ?? 150);
+            upgradeMarkup = `<small style="color:var(--muted)">조건: 남은 ${remainDays}일 · ${remainCalls}회 (최근 7일 3일 20회+ & 누적 150회)</small>`;
           }
-        } else {
-          upgradeMarkup = `<a class="btn-ghost" target="_blank" rel="noreferrer" href="${key.upgrade?.form_url || 'https://forms.gle/hQdf64mHYu1TdVh39'}">추가 한도 요청</a>`;
         }
+        else { upgradeMarkup = `<a class="btn-ghost" target="_blank" rel="noreferrer" href="https://forms.gle/hQdf64mHYu1TdVh39">추가 한도 요청</a>`; }
         return `
           <article class="key-card" data-id="${key.id}">
-            <header>
-              <div>
-                <strong>${key.label || '미지정 키'}</strong>
-                <div style="color:var(--muted);font-size:13px">발급: ${formatTimestamp(key.created_at)}</div>
-              </div>
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+              <div><strong>${key.label || '미지정 키'}</strong><div style="color:var(--muted);font-size:13px">발급: ${formatTimestamp(key.created_at)}</div></div>
               <span class="badge ${key.is_active ? 'active' : 'inactive'}">${key.is_active ? 'active' : 'inactive'}</span>
-            </header>
+            </div>
             <div class="key-token">${key.key}</div>
-            <div style="color:var(--muted);font-size:13px">티어 ${tierLabel} · ${key.usage.minute_limit}/분 · ${key.usage.daily_limit}/일</div>
-            <div style="color:var(--muted);font-size:13px">분당 ${key.usage.minute_count}/${key.usage.minute_limit} (window ${minuteWindow}) · 일일 ${key.usage.day_count}/${key.usage.daily_limit}</div>
+            <div style="color:var(--muted);font-size:13px">티어 ${tierLabel} · ${formatUnits(key.usage.minute_limit)}U/분 · ${formatUnits(key.usage.daily_limit)}U/일</div>
+            <div style="color:var(--muted);font-size:13px">분당 ${formatUnits(key.usage.minute_count)}/${formatUnits(key.usage.minute_limit)}U (window ${minuteWindow}) · 일일 ${formatUnits(key.usage.day_count)}/${formatUnits(key.usage.daily_limit)}U</div>
             <div class="key-actions">
               <button class="btn-ghost" type="button" data-action="copy" data-token="${key.key}">복사</button>
               <button class="btn-ghost" type="button" data-action="toggle" data-active="${key.is_active}" data-id="${key.id}">${key.is_active ? '비활성화' : '활성화'}</button>
@@ -503,123 +768,69 @@ socket.on('status_update', (payload) => {
             </div>
           </article>`;
       }).join('');
-
-      list.querySelectorAll('[data-action="copy"]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const token = btn.getAttribute('data-token');
-          try {
-            await navigator.clipboard.writeText(token || '');
-            showToast('API 키를 복사했습니다.');
-          } catch {
-            showToast('복사 실패');
-          }
-        });
-      });
-
-      list.querySelectorAll('[data-action="toggle"]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const id = btn.getAttribute('data-id');
-          const current = btn.getAttribute('data-active') === 'true';
-          try {
-            await fetchJSON(`/api/dev/api-keys/${id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ is_active: !current }),
-            });
-            showToast('상태가 변경되었습니다.');
-            await Promise.all([loadKeys(), loadUsage()]);
-          } catch (err) {
-            showToast(err.message);
-          }
-        });
-      });
-
-      list.querySelectorAll('[data-action="delete"]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const id = btn.getAttribute('data-id');
-          if (!confirm('선택한 API 키를 삭제할까요?')) return;
-          try {
-            await fetchJSON(`/api/dev/api-keys/${id}`, { method: 'DELETE' });
-            showToast('삭제되었습니다.');
-            await Promise.all([loadKeys(), loadUsage()]);
-          } catch (err) {
-            showToast(err.message);
-          }
-        });
-      });
-
-      list.querySelectorAll('[data-action="upgrade"]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const id = btn.getAttribute('data-id');
-          try {
-            await fetchJSON(`/api/dev/api-keys/${id}/tier-upgrade`, { method: 'POST' });
-            showToast('Tier 2로 업그레이드되었습니다.');
-            await Promise.all([loadKeys(), loadUsage()]);
-          } catch (err) {
-            showToast(err.message);
-          }
-        });
-      });
+      list.querySelectorAll('[data-action="copy"]').forEach((btn) => btn.addEventListener('click', async () => { try { await navigator.clipboard.writeText(btn.getAttribute('data-token') || ''); showToast('API 키를 복사했습니다.'); } catch { showToast('복사 실패'); } }));
+      list.querySelectorAll('[data-action="toggle"]').forEach((btn) => btn.addEventListener('click', async () => { const id = btn.getAttribute('data-id'); const current = btn.getAttribute('data-active') === 'true'; try { await fetchJSON(`/api/dev/api-keys/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !current }) }); showToast('상태가 변경되었습니다.'); await Promise.all([loadKeys(), loadUsage()]); } catch (err) { showToast(err.message); } }));
+      list.querySelectorAll('[data-action="delete"]').forEach((btn) => btn.addEventListener('click', async () => { const id = btn.getAttribute('data-id'); if (!confirm('선택한 API 키를 삭제할까요?')) return; try { await fetchJSON(`/api/dev/api-keys/${id}`, { method: 'DELETE' }); showToast('삭제되었습니다.'); await Promise.all([loadKeys(), loadUsage()]); } catch (err) { showToast(err.message); } }));
+      list.querySelectorAll('[data-action="upgrade"]').forEach((btn) => btn.addEventListener('click', async () => { const id = btn.getAttribute('data-id'); try { await fetchJSON(`/api/dev/api-keys/${id}/tier-upgrade`, { method: 'POST' }); showToast('Tier 2로 업그레이드되었습니다.'); await Promise.all([loadKeys(), loadUsage()]); } catch (err) { showToast(err.message); } }));
     }
 
     function renderUsage() {
-      const summaryEl = document.getElementById('usageSummary');
-      const tableBody = document.querySelector('#usageTable tbody');
-      if (!summaryEl || !tableBody || !state.usage) return;
-
-      const summary = state.usage.summary || {};
-      const dailyCount = summary.requests_today ?? 0;
-      const accountMinuteCount = summary.account_minute_count ?? 0;
-      const accountDailyLimit = summary.per_account_daily_limit ?? "-";
-      const accountMinuteLimit = summary.per_account_minute_limit ?? "-";
-      const minuteWindowLabel = summary.account_minute_window_start
-        ? new Date(summary.account_minute_window_start).toLocaleTimeString()
-        : "-";
-
-      summaryEl.innerHTML = `
-        <div class="usage-card"><small>발급된 키</small><strong style="font-size:22px">${summary.total_keys ?? 0}</strong></div>
-        <div class="usage-card"><small>계정 일일 사용</small><strong style="font-size:22px">${dailyCount}</strong><div style="color:var(--muted);font-size:12px">일일 제한 ${accountDailyLimit}</div></div>
-        <div class="usage-card"><small>계정 분당 사용</small><strong style="font-size:22px">${accountMinuteCount}</strong><div style="color:var(--muted);font-size:12px">분당 제한 ${accountMinuteLimit} · window ${minuteWindowLabel}</div></div>`;
-
+      const summaryEl = document.getElementById('usageSummary'); const tableBody = document.querySelector('#usageTable tbody'); if (!summaryEl || !tableBody || !state.usage) return;
+      const summary = state.usage.summary || {}; const dailyUnits = formatUnits(summary.requests_today); const dailyLimitUnits = formatUnits(summary.per_account_daily_limit);
+      const totalRequests = summary.requests_today_raw ?? 0;
+      const viewMode = state.usageViewMode || 'units';
+      if (viewMode === 'requests') {
+        summaryEl.innerHTML = `
+          <div class="usage-card"><small>발급된 키</small><strong style="font-size:22px">${summary.total_keys ?? 0}</strong></div>
+          <div class="usage-card"><small>계정 일일 요청</small><strong style="font-size:22px">${totalRequests}</strong><div style="color:var(--muted);font-size:12px">무게 반영 없이 순수 요청 수</div></div>
+        `;
+      } else {
+        summaryEl.innerHTML = `
+          <div class="usage-card"><small>발급된 키</small><strong style="font-size:22px">${summary.total_keys ?? 0}</strong></div>
+          <div class="usage-card"><small>계정 일일 사용</small><strong style="font-size:22px">${dailyUnits}U</strong><div style="color:var(--muted);font-size:12px">일일 제한 ${dailyLimitUnits}U</div></div>`;
+      }
       tableBody.innerHTML = state.usage.keys.map((item) => {
-        const minuteInfo = item.minute_window_start ? `${item.minute_count}/${item.minute_limit} (window ${new Date(item.minute_window_start).toLocaleTimeString()})` : `${item.minute_count}/${item.minute_limit}`;
-        return `
-          <tr>
-            <td>${item.label}</td>
-            <td>${item.is_active ? 'Active' : 'Inactive'}</td>
-            <td>${item.tier_label || item.tier}</td>
-            <td>${minuteInfo}</td>
-            <td>${item.day_count}/${item.daily_limit}</td>
-            <td>${formatTimestamp(item.last_used_at)}</td>
-          </tr>`;
+        return `<tr><td>${item.label}</td><td>${item.is_active ? 'Active' : 'Inactive'}</td><td>${item.tier_label || item.tier}</td><td>${formatUnits(item.day_count)}/${formatUnits(item.daily_limit)}U</td><td>${formatTimestamp(item.last_used_at)}</td></tr>`;
       }).join('');
+      renderUsageChart();
+      renderTierProgress();
     }
 
-    document.getElementById('createKeyForm')?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const input = document.getElementById('keyLabel');
-      const label = input?.value.trim();
-      try {
-        await fetchJSON('/api/dev/api-keys', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ label }),
-        });
-        if (input) input.value = '';
-        showToast('새 API 키가 발급되었습니다.');
-        await Promise.all([loadKeys(), loadUsage()]);
-      } catch (err) {
-        showToast(err.message);
+    function renderOAuthClients() {
+      const tbody = document.querySelector('#oauthClientsTable tbody'); const resultEl = document.getElementById('oauthCreateResult'); const editResultEl = document.getElementById('oauthEditResult'); const editForm = document.getElementById('editOAuthClientForm');
+      if (!tbody) return;
+      if (state.oauth.error) { tbody.innerHTML = `<tr><td colspan="6" style="color:var(--muted)">${state.oauth.error}</td></tr>`; return; }
+      if (!state.oauth.clients.length) { tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted)">등록된 클라이언트가 없습니다.</td></tr>'; return; }
+      tbody.innerHTML = state.oauth.clients.map((client) => { const lastSecret = client.last_secret_rotated_at ? formatKSTDate(client.last_secret_rotated_at) : '-'; const lastJwt = client.last_jwt_rotated_at ? formatKSTDate(client.last_jwt_rotated_at) : '-'; return `<tr data-id="${client.id}" class="oauth-row"><td>${client.name}</td><td style="word-break:break-all">${client.client_id}</td><td style="max-width:220px;white-space:pre-wrap;word-break:break-word">${client.redirect_uris || '-'}</td><td>${client.scopes || '-'}</td><td style="font-size:12px;color:var(--muted)">Secret: ${lastSecret}<br/>JWT: ${lastJwt}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-ghost" type="button" data-action="rotate-secret" data-id="${client.id}">Secret 회전</button><button class="btn-ghost" type="button" data-action="rotate-jwt" data-id="${client.id}">JWT 회전</button><button class="btn-ghost" type="button" data-action="delete" data-id="${client.id}">삭제</button></div></td></tr>`; }).join('');
+      tbody.querySelectorAll('.oauth-row').forEach((row) => row.addEventListener('click', () => selectClientForEdit(row.getAttribute('data-id'))));
+      tbody.querySelectorAll('button[data-action]').forEach((btn) => btn.addEventListener('click', async (ev) => { ev.stopPropagation(); const id = btn.getAttribute('data-id'); const payload = {}; if (btn.dataset.action === 'rotate-secret') payload.rotate_secret = true; if (btn.dataset.action === 'rotate-jwt') payload.rotate_jwt_secret = true; if (btn.dataset.action === 'delete') { if (!confirm('클라이언트를 삭제할까요?')) return; try { await fetchJSON(`/api/dev/oauth/clients/${id}`, { method: 'DELETE' }); showToast('삭제되었습니다.'); await loadOAuthClients(); } catch (err) { showToast(err.message); } return; } try { await fetchJSON(`/api/dev/oauth/clients/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); showToast('갱신되었습니다.'); await loadOAuthClients(); } catch (err) { showToast(err.message); } }));
+      if (resultEl) resultEl.textContent = '';
+      if (editResultEl && editForm) { const submitBtn = editForm.querySelector('button[type="submit"]'); const resetBtn = document.getElementById('resetEdit'); if (submitBtn) submitBtn.disabled = !state.oauth.selected; if (resetBtn) resetBtn.disabled = !state.oauth.selected; if (!state.oauth.selected) { editResultEl.textContent = ''; editForm.reset(); document.getElementById('editSelectionHint').textContent = '표에서 편집할 클라이언트를 선택하세요.'; }
       }
+    }
+
+    function selectClientForEdit(id) {
+      const client = state.oauth.clients.find((c) => String(c.id) === String(id)); if (!client) return; state.oauth.selected = client; const form = document.getElementById('editOAuthClientForm'); if (!form) return; form.name.value = client.name || ''; form.redirect_uris.value = client.redirect_uris || ''; form.querySelectorAll('input[name="edit_scopes"]').forEach((cb) => { cb.checked = (client.scopes || '').split(/\s+/).includes(cb.value); }); document.getElementById('editSelectionHint').textContent = `선택됨: ${client.name}`; form.querySelector('button[type="submit"]').disabled = false; document.getElementById('resetEdit').disabled = false; }
+
+    document.getElementById('resetEdit')?.addEventListener('click', () => { state.oauth.selected = null; const form = document.getElementById('editOAuthClientForm'); if (form) { form.reset(); form.querySelector('button[type="submit"]').disabled = true; document.getElementById('resetEdit').disabled = true; document.getElementById('editSelectionHint').textContent = '표에서 편집할 클라이언트를 선택하세요.'; } });
+
+    document.getElementById('createKeyForm')?.addEventListener('submit', async (event) => { event.preventDefault(); const input = document.getElementById('keyLabel'); const label = input?.value.trim(); try { await fetchJSON('/api/dev/api-keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label }) }); if (input) input.value = ''; showToast('새 API 키가 발급되었습니다.'); await Promise.all([loadKeys(), loadUsage()]); } catch (err) { showToast(err.message); } });
+
+    document.getElementById('createOAuthClientForm')?.addEventListener('submit', async (event) => { event.preventDefault(); const form = event.target; const scopes = Array.from(form.querySelectorAll('input[name="scopes"]:checked')).map((el) => el.value.trim()).filter(Boolean); const payload = { name: form.name.value.trim(), redirect_uris: form.redirect_uris.value.trim(), scopes: scopes.join(' ') }; try { const data = await fetchJSON('/api/dev/oauth/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); form.reset(); const resultEl = document.getElementById('oauthCreateResult'); if (resultEl) resultEl.textContent = `Client ID: ${data.client.client_id} · Secret: ${data.client_secret}`; showToast('OAuth 클라이언트가 생성되었습니다.'); await loadOAuthClients(); } catch (err) { showToast(err.message); } });
+
+    document.getElementById('editOAuthClientForm')?.addEventListener('submit', async (event) => { event.preventDefault(); const form = event.target; if (!state.oauth.selected) return; const scopes = Array.from(form.querySelectorAll('input[name="edit_scopes"]:checked')).map((el) => el.value.trim()).filter(Boolean); const payload = { name: form.name.value.trim(), redirect_uris: form.redirect_uris.value.trim(), scopes: scopes.join(' ') }; try { await fetchJSON(`/api/dev/oauth/clients/${state.oauth.selected.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); showToast('클라이언트가 수정되었습니다.'); state.oauth.selected = null; form.reset(); form.querySelector('button[type="submit"]').disabled = true; document.getElementById('resetEdit').disabled = true; document.getElementById('editSelectionHint').textContent = '표에서 편집할 클라이언트를 선택하세요.'; await loadOAuthClients(); } catch (err) { showToast(err.message); }
     });
 
-    (async function init() {
-      try {
-        await Promise.all([loadKeys(), loadUsage()]);
-      } catch (err) {
-        showToast(err.message);
-      }
-    })();
+    document.getElementById('usageViewMode')?.addEventListener('change', (e) => {
+      state.usageViewMode = e.target.value === 'requests' ? 'requests' : 'units';
+      renderUsage();
+      renderUsageChart();
+    });
+
+    renderCodeSamples('publicCodeLang', 'publicCodeList', publicCodeSamples);
+    renderCodeSamples('counterCodeLang', 'counterCodeList', counterCodeSamples);
+
+    (async function init() { try { await Promise.all([loadUser(), loadKeys(), loadUsage()]); } catch (err) { showToast(err.message); } })();
   </script>
 </body>
 </html>

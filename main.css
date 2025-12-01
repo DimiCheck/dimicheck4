@@ -14,7 +14,22 @@ body {
   padding: 40px;
   overflow: hidden;
   position: relative;
+  margin: 0;
+  /* background: url('https://cdn.pixabay.com/photo/2024/09/30/16/36/background-9086186_1280.jpg') no-repeat center center;
+  background-size: cover; */
 }
+
+/* body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.15);
+  pointer-events: none;
+  z-index: -1;
+} */
 
 /* Magnet Container */
 .magnet-container {
@@ -467,7 +482,7 @@ body.fullscreen .fullscreen-btn {
 /* Attendance Info */
 .attendance-info {
   position: fixed;
-  right: 160px;
+  right: 130px;
   bottom: 80px;
   color: rgba(255, 255, 255, 0.6);
   font-size: 35px;
@@ -475,6 +490,10 @@ body.fullscreen .fullscreen-btn {
   letter-spacing: 1px;
   text-align: right;
   z-index: 100;
+  border-radius: 25px;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  padding: 0px 20px;
 }
 
 .attendance-info .label {

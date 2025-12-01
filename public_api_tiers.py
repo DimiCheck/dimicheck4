@@ -4,13 +4,18 @@ from typing import Tuple
 
 DEFAULT_TIER = "tier1"
 TIER2 = "tier2"
+SUPER_TIER = "super"
 GOOGLE_FORM_URL = "https://forms.gle/hQdf64mHYu1TdVh39"
-TIER2_MIN_DAILY_REQUESTS = 5
-TIER2_STREAK_DAYS = 7
+UNIT_SCALE = 10  # store usage as integer of tenth units
+TIER2_DAILY_THRESHOLD = 20
+TIER2_REQUIRED_DAYS = 3
+TIER2_REQUIRED_TOTAL = 150
 
 TIER_LIMITS: dict[str, dict[str, object]] = {
-    "tier1": {"minute": 10, "daily": 50, "label": "Tier 1"},
-    "tier2": {"minute": 15, "daily": 100, "label": "Tier 2"},
+    # minute/daily are stored in scaled units (UNIT_SCALE = 10 → 1U = 10)
+    "tier1": {"minute": 100 * UNIT_SCALE, "daily": 100 * UNIT_SCALE, "label": "Tier 1"},
+    "tier2": {"minute": 300 * UNIT_SCALE, "daily": 300 * UNIT_SCALE, "label": "Tier 2"},
+    "super": {"minute": 2000 * UNIT_SCALE, "daily": 2000 * UNIT_SCALE, "label": "Super Tier"},
 }
 
 

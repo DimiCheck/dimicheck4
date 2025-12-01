@@ -270,6 +270,15 @@ def register_submit():
     pending = session.get("pending_registration")
     if not pending:
         return redirect("/login.html")
+    if request.form.get("privacy_agree") not in {"on", "true", "1"}:
+        return (
+            render_template(
+                "register.html",
+                pending=pending,
+                error="개인정보 처리방침에 동의해야 가입할 수 있습니다.",
+            ),
+            400,
+        )
     try:
         grade = int(request.form.get("grade", "").strip())
         class_no = int(request.form.get("class", "").strip())
