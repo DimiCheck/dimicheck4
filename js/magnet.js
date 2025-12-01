@@ -807,7 +807,7 @@ function createPlaceholder(num) {
 /* ===================== 자석 생성 ===================== */
 function createMagnets(end = 31, skipNumbers = [12]) {
   const container = document.getElementById('magnetContainer');
-  const rows = 7, cols = 5, size = 60, gap = 15;
+  const rows = 7, cols = 5, size = 56, gap = 18;
   let n = 1;
   const allowed = new Set();
   for (let i=1; i<=end; i++) if (!(skipNumbers||[]).includes(i)) allowed.add(i);
