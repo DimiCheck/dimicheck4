@@ -723,43 +723,39 @@ body.fullscreen .fullscreen-btn {
 
 /* 색상 군 */
 .magnet.color-red {
-  --ornament-base: #d64545;
-  --ornament-sheen: #ffb0a8;
-  --ornament-glow: rgba(224, 90, 90, 0.55);
+  --ornament-base: #e30517;
+  --ornament-sheen: #e76345;
+  --ornament-glow: rgba(242, 71, 83, 0.6);
 }
 
 .magnet.color-orange {
-  --ornament-base: #c48a2f;
-  --ornament-sheen: #ffd78a;
-  --ornament-glow: rgba(237, 180, 92, 0.5);
-  color: #2c1c0f;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.4);
+  --ornament-base: #ff8000;
+  --ornament-sheen: #ffb44a;
+  --ornament-glow: rgba(251, 149, 24, 0.58);
 }
 
 .magnet.color-yellow {
-  --ornament-base: #d6b240;
-  --ornament-sheen: #ffeab0;
-  --ornament-glow: rgba(224, 196, 112, 0.48);
-  color: #2b1f12;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+  --ornament-base: #ffbb00;
+  --ornament-sheen: #ffc342;
+  --ornament-glow: rgba(255, 187, 0, 0.54);
 }
-
+/* wtf */
 .magnet.color-green {
-  --ornament-base: #1c7a4a;
-  --ornament-sheen: #9ee0b1;
-  --ornament-glow: rgba(79, 214, 148, 0.5);
+  --ornament-base: #5be98d;
+  --ornament-sheen: #8afda5;
+  --ornament-glow: rgba(84, 170, 114, 0.57);
 }
 
 .magnet.color-blue {
-  --ornament-base: #2e6ec5;
-  --ornament-sheen: #9acbff;
-  --ornament-glow: rgba(115, 170, 255, 0.5);
+  --ornament-base: #1781eb;
+  --ornament-sheen: #90b9ff;
+  --ornament-glow: rgba(96, 142, 210, 0.56);
 }
 
 .magnet.color-purple {
-  --ornament-base: #7b4dbe;
-  --ornament-sheen: #d1b9ff;
-  --ornament-glow: rgba(171, 132, 255, 0.5);
+  --ornament-base: #a838dc;
+  --ornament-sheen: #c583e6;
+  --ornament-glow: rgba(148, 53, 199, 0.56);
 }
 
 .badge.color-red {
@@ -1036,16 +1032,20 @@ body.fullscreen .fullscreen-btn {
 
 #progressbar {
   inline-size: 15em;
-  block-size: 2em;
+  block-size: 1.6em;
   width: 15em;
-  height: 2em;
+  height: 1.6em;
   appearance: none;
   -webkit-appearance: none;
-  border: 0;
-  border-radius: 24px;
-  background: rgba(40, 40, 40, 0.95);
+  border: 1px solid rgba(222, 180, 116, 0.55);
+  border-radius: 999px;
+  background: linear-gradient(145deg, rgba(22, 29, 25, 0.92), rgba(14, 18, 15, 0.9));
   position: relative;
   overflow: hidden;
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 18px rgba(189, 64, 74, 0.3);
 }
 
 #progressbar::-webkit-progress-bar {
@@ -1064,10 +1064,15 @@ body.fullscreen .fullscreen-btn {
   content: "";
   position: absolute;
   inset: 0;
-  background: #fff;
-  opacity: 0.7;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0)),
+    linear-gradient(135deg, #d63b4c, #c6283d 40%, #f2c078 100%);
+  opacity: 0.95;
   transform: translateX(-100%);
   transform-origin: left center;
+  box-shadow:
+    0 0 12px rgba(214, 59, 76, 0.45),
+    0 0 20px rgba(242, 192, 120, 0.35);
 }
 
 #progressbar[value]::before {
@@ -1078,6 +1083,7 @@ body.fullscreen .fullscreen-btn {
   position: absolute;
   right: 110px;
   top: 270px;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
 }
 
 /* ===== Reason Quick Buttons ===== */
