@@ -234,6 +234,7 @@ function ensureReactionBadge(magnet, emoji, expiresAtValue) {
   }, Math.max(0, expiresAtMs - now));
 }
 
+//D
 function updateMagnetReaction(magnet, data) {
   if (!magnet) return;
   const number = magnet.dataset.number;

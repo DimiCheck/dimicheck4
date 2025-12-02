@@ -6,6 +6,7 @@ from flask import session, request
 from flask_socketio import Namespace, emit
 
 from models import UserType, APIKey
+from utils import is_board_session_active, is_teacher_session_active
 HEADER_NAME = "Dimicheck-API-Key"
 
 
@@ -16,10 +17,19 @@ class ClassNamespace(Namespace):
         self.class_no = class_no
 
     def on_connect(self):  # type: ignore[override]
+        # Allow teachers or board-verified sessions without requiring user payload
+        if is_teacher_session_active():
+            emit("presence.subscribe", {"message": "connected"})
+            return
+        if is_board_session_active(self.grade, self.class_no):
+            emit("presence.subscribe", {"message": "connected"})
+            return
+
         user = session.get("user")
         if not user:
             return False
-        if user["type"] == UserType.STUDENT.value:
+        user_type = user.get("type")
+        if user_type == UserType.STUDENT.value:
             if user.get("grade") != self.grade or user.get("class") != self.class_no:
                 return False
         emit("presence.subscribe", {"message": "connected"})

@@ -132,27 +132,8 @@ def save_state():
     incoming_magnets = payload.get("magnets", {})
     normalized_magnets = {str(key): value for key, value in incoming_magnets.items()}
 
-    session_grade, session_section, session_number = _get_student_session_info()
-    if (
-        session_grade == grade
-        and session_section == section
-        and session_number is not None
-    ):
-        allowed_key = str(session_number)
-        allowed_value = None
-        for candidate in (allowed_key, allowed_key.zfill(2)):
-            if candidate in normalized_magnets:
-                allowed_value = normalized_magnets[candidate]
-                break
-
-        if allowed_value is None and session_number in normalized_magnets:
-            allowed_value = normalized_magnets[session_number]
-
-        if allowed_value is None:
-            return jsonify({"error": "invalid payload"}), 400
-
-        normalized_magnets = {allowed_key: allowed_value}
-
+    # Students are allowed to move any magnet within their class;
+    # payload is no longer restricted to the student's own number.
     new_magnets = normalized_magnets
 
     state = ClassState.query.filter_by(grade=grade, section=section).first()
