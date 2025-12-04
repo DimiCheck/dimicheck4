@@ -563,19 +563,26 @@ function renderMagnetMenuProfile(profile, studentNumber) {
   avatar.className = 'magnet-menu-avatar';
 
   if (profile && profile.avatar) {
-    if (profile.avatar.bgColor) {
-      avatar.style.background = `linear-gradient(135deg, ${profile.avatar.bgColor}, ${profile.avatar.bgColor}dd)`;
+    const { imageUrl, bgColor, emoji } = profile.avatar;
+
+    if (imageUrl) {
+      avatar.classList.add('has-image');
+      avatar.style.backgroundImage = `url(${imageUrl})`;
+      avatar.style.backgroundSize = 'cover';
+      avatar.style.backgroundPosition = 'center';
+    } else if (bgColor) {
+      avatar.style.background = `linear-gradient(135deg, ${bgColor}, ${bgColor}dd)`;
     }
-    if (profile.avatar.emoji) {
-      const emoji = document.createElement('span');
-      emoji.className = 'avatar-emoji';
-      emoji.textContent = profile.avatar.emoji;
-      avatar.appendChild(emoji);
-    } else {
+
+    if (emoji && !imageUrl) {
+      const emojiEl = document.createElement('span');
+      emojiEl.className = 'avatar-emoji';
+      emojiEl.textContent = emoji;
+      avatar.appendChild(emojiEl);
+    } else if (!imageUrl) {
       avatar.textContent = String(studentNumber).padStart(2, '0');
     }
   } else {
-    // 기본 아바타
     avatar.textContent = String(studentNumber).padStart(2, '0');
     avatar.classList.add(`avatar-color-${studentNumber % 10}`);
   }

@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 # .env 파일 로드 (환경 변수)
 load_dotenv()
 
-from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for, make_response
 from flask_cors import CORS, cross_origin
 from flask_smorest import Api
 from flask_socketio import SocketIO
@@ -37,6 +37,10 @@ from utils import (
     is_teacher_session_active,
     mark_teacher_session,
     metrics,
+    pin_guard_key,
+    pin_guard_register_failure,
+    pin_guard_reset,
+    pin_guard_status,
     setup_logging,
 )
 from ws import namespaces
@@ -205,12 +209,24 @@ def board():
     if not config:
         return send_from_directory(".", "404.html")
 
+    guard_key = pin_guard_key(f"board:{grade}:{section}")
+
     if request.method == "POST":
+        allowed, _, locked_for = pin_guard_status(guard_key, max_attempts=5, window_seconds=300, lock_seconds=900)
+        if not allowed:
+            return make_response("Too many attempts. 잠시 후 다시 시도해주세요.", 429)
+
         pin = request.form.get("pin")
         if str(config["pin"]) == pin:
             session[f"board_verified_{grade}_{section}"] = True
+            pin_guard_reset(guard_key)
             return render_template("index.html")
-        return send_from_directory(".", "enter_pin.html")
+
+        attempts_left, lock_remaining = pin_guard_register_failure(
+            guard_key, max_attempts=5, window_seconds=300, lock_seconds=900
+        )
+        status_code = 429 if lock_remaining else 401
+        return make_response("잘못된 PIN 입니다.", status_code)
 
     if session.get(f"board_verified_{grade}_{section}"):
         return render_template("index.html")
@@ -238,8 +254,18 @@ def teacher_dashboard():
         return render_template("teacher.html")
 
     error = None
+    guard_key = pin_guard_key("teacher")
 
     if request.method == "POST":
+        allowed, attempts_left, locked_for = pin_guard_status(guard_key, max_attempts=5, window_seconds=300, lock_seconds=900)
+        if not allowed:
+            error = f"시도가 잠겼어요. {locked_for}초 후 다시 시도하세요."
+            return render_template(
+                "teacher_pin.html",
+                error=error,
+                has_pin=bool(config.TEACHER_PINS),
+            )
+
         pin = (request.form.get("pin") or "").strip()
         remember = request.form.get("remember") == "on"
 
@@ -252,9 +278,18 @@ def teacher_dashboard():
                 else config.TEACHER_SESSION_DURATION_SECONDS
             )
             mark_teacher_session(duration_seconds=duration, remember=remember)
+            pin_guard_reset(guard_key)
             return redirect(url_for("teacher_dashboard"))
         else:
-            error = "PIN이 올바르지 않습니다. 다시 시도해주세요."
+            attempts_left, lock_remaining = pin_guard_register_failure(
+                guard_key, max_attempts=5, window_seconds=300, lock_seconds=900
+            )
+            if lock_remaining:
+                error = f"PIN이 여러 번 틀렸어요. {lock_remaining}초 후 다시 시도하세요."
+            elif attempts_left > 0:
+                error = f"PIN이 올바르지 않습니다. 다시 시도해주세요. (남은 시도 {attempts_left}회)"
+            else:
+                error = "PIN이 올바르지 않습니다. 잠시 후 다시 시도해주세요."
 
     return render_template(
         "teacher_pin.html",

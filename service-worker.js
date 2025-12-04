@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const STATIC_CACHE = `dimicheck-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `dimicheck-runtime-${CACHE_VERSION}`;
 const TIMETABLE_META_CACHE = 'dimicheck-timetable-meta';
@@ -9,7 +9,6 @@ const SD_SCHUL_CODE = '7530560';
 const NEIS_API_KEY = 'da82433f0f3a4351bda4ca9a0f11fc7d';
 const PRECACHE_URLS = [
   '/',
-  '/index.html',
   '/login.html',
   '/user.html',
   '/my.html',

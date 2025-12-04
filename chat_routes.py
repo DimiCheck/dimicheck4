@@ -622,7 +622,7 @@ def set_avatar():
         return jsonify({"error": "invalid avatar data"}), 400
 
     # 아바타 데이터 검증
-    allowed_keys = {"bgColor", "textColor", "emoji", "borderColor", "style"}
+    allowed_keys = {"bgColor", "textColor", "emoji", "borderColor", "style", "imageUrl"}
     if not all(key in allowed_keys for key in avatar_data.keys()):
         return jsonify({"error": "invalid avatar keys"}), 400
 

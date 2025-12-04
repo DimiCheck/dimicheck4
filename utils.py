@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
+from threading import Lock
 from typing import Any
 
 import requests
@@ -152,3 +153,89 @@ def send_ga4_event(
         response.raise_for_status()
     except requests.RequestException as exc:
         logging.debug("Failed to send GA4 event: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# PIN brute-force guard (in-memory, per-client)
+# ---------------------------------------------------------------------------
+_PIN_GUARD: dict[str, dict[str, float | int]] = {}
+_PIN_GUARD_LOCK = Lock()
+
+
+def _client_identifier() -> str:
+    for header in ("CF-Connecting-IP", "X-Real-IP", "X-Forwarded-For"):
+        value = request.headers.get(header)
+        if value:
+            return value.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
+def pin_guard_key(label: str) -> str:
+    return f"{label}:{_client_identifier()}"
+
+
+def pin_guard_status(
+    key: str,
+    *,
+    max_attempts: int = 5,
+    window_seconds: int = 300,
+    lock_seconds: int = 900,
+) -> tuple[bool, int, int]:
+    """
+    Returns (allowed, attempts_left, lock_remaining_seconds).
+    """
+    now = time.time()
+    with _PIN_GUARD_LOCK:
+        entry = _PIN_GUARD.get(key, {"count": 0, "first": now, "locked_until": 0})
+
+        # Reset window if expired
+        if now - entry.get("first", now) > window_seconds:
+            entry = {"count": 0, "first": now, "locked_until": 0}
+
+        locked_until = entry.get("locked_until", 0) or 0
+        if locked_until > now:
+            return False, 0, int(locked_until - now)
+
+        attempts_left = max(max_attempts - int(entry.get("count", 0)), 0)
+        _PIN_GUARD[key] = entry
+        return True, attempts_left, 0
+
+
+def pin_guard_register_failure(
+    key: str,
+    *,
+    max_attempts: int = 5,
+    window_seconds: int = 300,
+    lock_seconds: int = 900,
+) -> tuple[int, int]:
+    """
+    Records a failed attempt. Returns (attempts_left_before_lock, lock_remaining_seconds).
+    """
+    now = time.time()
+    with _PIN_GUARD_LOCK:
+        entry = _PIN_GUARD.get(key, {"count": 0, "first": now, "locked_until": 0})
+
+        if now - entry.get("first", now) > window_seconds:
+            entry = {"count": 0, "first": now, "locked_until": 0}
+
+        # If already locked, keep it
+        if entry.get("locked_until", 0) > now:
+            return 0, int(entry["locked_until"] - now)
+
+        entry["count"] = int(entry.get("count", 0)) + 1
+        attempts_left = max(max_attempts - entry["count"], 0)
+
+        if entry["count"] >= max_attempts:
+            entry["locked_until"] = now + lock_seconds
+            entry["count"] = 0
+            entry["first"] = now
+            attempts_left = 0
+
+        _PIN_GUARD[key] = entry
+        lock_remaining = max(int(entry.get("locked_until", 0) - now), 0)
+        return attempts_left, lock_remaining
+
+
+def pin_guard_reset(key: str) -> None:
+    with _PIN_GUARD_LOCK:
+        _PIN_GUARD.pop(key, None)

@@ -66,13 +66,16 @@ class ChatPageManager {
     // Audio elements
     this.sendAudio = new Audio('/src/send.mp3');
     this.receiveAudio = new Audio('/src/recieve.mp3');
+
+    // Internal state flags
+    this.isLoadingMessages = false;
+    this.pollingStarted = false;
   }
 
   init() {
     this.initElements();
-    this.loadAuthStatus();
     this.attachEventListeners();
-    this.startPolling();
+    this.loadAuthStatus();
   }
 
   initElements() {
@@ -177,6 +180,7 @@ class ChatPageManager {
         await window.gifPickerManager.init(this.grade, this.section, this.studentNumber);
       }
       this.loadMessages();
+      this.startPolling();
     } catch (err) {
       console.error('Failed to load auth status:', err);
       this.showToast('로그인 정보를 불러오지 못했습니다');
@@ -231,6 +235,8 @@ class ChatPageManager {
   }
 
   startPolling() {
+    if (this.pollingStarted) return;
+    this.pollingStarted = true;
     // Poll every 2 seconds
     this.pollingInterval = setInterval(() => {
       this.loadMessages();
@@ -246,7 +252,9 @@ class ChatPageManager {
 
   async loadMessages() {
     if (!this.grade || !this.section) return;
+    if (this.isLoadingMessages) return;
 
+    this.isLoadingMessages = true;
     try {
       const res = await fetch(
         `/api/classes/chat/today?grade=${this.grade}&section=${this.section}`,
@@ -286,6 +294,8 @@ class ChatPageManager {
       }
     } catch (err) {
       console.error('Failed to load messages:', err);
+    } finally {
+      this.isLoadingMessages = false;
     }
   }
 

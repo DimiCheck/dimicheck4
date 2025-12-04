@@ -121,7 +121,8 @@
     }
     .blob{position:absolute; filter:blur(40px); opacity:.6; pointer-events:none}
     .b1{width:48vw;height:48vw;background:radial-gradient(circle,#ff6a6a60,transparent 70%); top:-10vh; left:-10vw; animation:float 18s ease-in-out infinite}
-    .b2{width:42vw;height:42vw;background:radial-gradient(circle,#e100ff50,transparent 70%); bottom:-15vh; right:-10vw; animation:float 22s ease-in-out infinite reverse}
+    /* .b2{width:42vw;height:42vw;background:radial-gradient(circle,#e100ff50,transparent 70%); bottom:-15vh; right:-10vw; animation:float 22s ease-in-out infinite reverse} */
+    .b2{width:42vw;height:42vw;background:radial-gradient(circle,#038b2550,transparent 70%); bottom:-15vh; right:-10vw; animation:float 22s ease-in-out infinite reverse}
     .b3{width:36vw;height:36vw;background:radial-gradient(circle,#ff6ae950,transparent 70%); top:40vh; left:10vw; animation:float 26s ease-in-out infinite}
     @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-20px)}}
 
@@ -812,28 +813,28 @@
         <div class="section-head">내 위치/상태 선택</div>
         <div class="grid" id="statusGrid">
           <div class="status-card" data-status="화장실(물)" tabindex="0" role="button" aria-label="화장실(물)">
-            <div class="status-label">화장실(물)</div>
-            <div class="status-desc">급히 자리 비움</div>
+            <div class="status-label">변소(물)</div>
+            <div class="status-desc">화장실 환풍구로 산타 영접</div>
           </div>
           <div class="status-card" data-status="복도" tabindex="0" role="button" aria-label="복도">
             <div class="status-label">복도</div>
-            <div class="status-desc">교실 주변 이동</div>
+            <div class="status-desc">복도에서 루돌프 밥주기</div>
           </div>
           <div class="status-card" data-status="동아리" tabindex="0" role="button" aria-label="동아리">
             <div class="status-label">동아리</div>
-            <div class="status-desc">동아리실/활동</div>
+            <div class="status-desc">동아리에서 선물 주고받기</div>
           </div>
           <div class="status-card" data-status="방과후" tabindex="0" role="button" aria-label="방과후">
             <div class="status-label">방과후</div>
-            <div class="status-desc">방과후</div>
+            <div class="status-desc">산타와의 면담</div>
           </div>
           <div class="status-card" data-status="프로젝트" tabindex="0" role="button" aria-label="프로젝트">
             <div class="status-label">프로젝트</div>
-            <div class="status-desc">프로젝트실</div>
+            <div class="status-desc">산타의 선물 공장</div>
           </div>
           <div class="status-card" data-status="조기입실" tabindex="0" role="button" aria-label="조기입실">
             <div class="status-label">조기입실</div>
-            <div class="status-desc">아파요ㅠ</div>
+            <div class="status-desc">머리맡에 선물이 있나 확인하러 감</div>
           </div>
 
           <!-- 기타 -->
@@ -842,7 +843,7 @@
             <div class="status-desc">사유 직접 입력</div>
             <div class="etc-box" id="etcBox" aria-hidden="true">
               <div class="etc-row">
-                <input id="etcInput" class="input" type="text" placeholder="예: 병원 예약, 상담, 급한 용무 등 입력" />
+                <input id="etcInput" class="input" type="text" placeholder="예: 굴뚝 들어가기, 루돌프 조련 등 입력" />
                 <button id="etcAddBtn" class="btn ghost" type="button" style="min-width:72px">추가</button>
               </div>
               <div id="etcChips" class="chip-list" aria-live="polite"></div>
@@ -851,14 +852,14 @@
 
           <div class="status-card" data-status="결석(조퇴)" tabindex="0" role="button" aria-label="결석(조퇴)">
             <div class="status-label">결석(조퇴)</div>
-            <div class="status-desc">학교장 인정/사유 확인</div>
+            <div class="status-desc"> 우리집에 선물 있나 보러 루돌프 타고 감</div>
           </div>
         </div>
       </div>
 
       <div class="status-card" data-status="교실" tabindex="0" role="button" aria-label="교실">
           <div class="status-label">교실</div>
-          <div class="status-desc">교실에 있어요</div>
+          <div class="status-desc">굴뚝이 없네요</div>
       </div>
 
       <!-- 완료 -->
@@ -878,7 +879,7 @@
 
       <div class="bigcopy fade-up">
         <h1 class="h1">한 번의 탭으로<br/>내 상태를 정확히</h1>
-        <p class="p">디미고를 위한 새로운 출결·상태 플랫폼</p>
+        <p class="p">디미고를 위한 새로운 <s style="color: #4f4f4f; font-size: 0.8em">출결·상태 플랫폼</s> 산타 영접 플랫폼</p>
       </div>
 
       <div class="hero-cta fade-up" aria-label="하이라이트">

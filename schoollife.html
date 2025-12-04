@@ -117,7 +117,7 @@
     }
     .blob{position:absolute; filter:blur(40px); opacity:.6; pointer-events:none}
     .b1{width:48vw;height:48vw;background:radial-gradient(circle,#ff6a6a60,transparent 70%); top:-10vh; left:-10vw; animation:float 18s ease-in-out infinite}
-    .b2{width:42vw;height:42vw;background:radial-gradient(circle,#e100ff50,transparent 70%); bottom:-15vh; right:-10vw; animation:float 22s ease-in-out infinite reverse}
+    .b2{width:42vw;height:42vw;background:radial-gradient(circle,#038b2550,transparent 70%); bottom:-15vh; right:-10vw; animation:float 22s ease-in-out infinite reverse}
     .b3{width:36vw;height:36vw;background:radial-gradient(circle,#ff6ae950,transparent 70%); top:40vh; left:10vw; animation:float 26s ease-in-out infinite}
     @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-20px)}}
 
@@ -460,6 +460,32 @@
         flex: 1 1 calc(50% - 4px);
       }
     }
+    .holiday-card{
+      margin-top:16px;
+      padding:14px;
+      border-radius:14px;
+      border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      background:linear-gradient(135deg, color-mix(in oklab, #e5467c 55%, var(--card)), color-mix(in oklab, #2ec5d3 45%, var(--card-2)));
+      box-shadow:0 8px 22px rgba(0,0,0,.25);
+    }
+    .holiday-card .holiday-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      font-weight:700;
+      font-size:15px;
+    }
+    .holiday-card .holiday-count{
+      margin-top:8px;
+      font-size:clamp(22px,6vw,34px);
+      font-weight:800;
+    }
+    .holiday-card .holiday-note{
+      margin-top:6px;
+      font-size:13px;
+      color:color-mix(in oklab, var(--text) 88%, #fff);
+    }
   </style>
 </head>
 <body>
@@ -547,6 +573,14 @@
       귀가 시간을 설정해주세요
     </div>
     <div id="countdownMessage" style="margin-top:12px; text-align:center; font-size:clamp(13px, 3.5vw, 16px); color:var(--muted);"></div>
+    <div class="holiday-card" aria-live="polite">
+      <div class="holiday-head">
+        <span>🎄 크리스마스까지</span>
+        <span id="christmasTargetLabel" style="font-size:12px; font-weight:600; color:color-mix(in oklab, var(--text) 88%, #fff);"></span>
+      </div>
+      <div class="holiday-count" id="christmasCountdown">계산 중…</div>
+      <div class="holiday-note" id="christmasNote">다가오는 휴일을 기다리는 중입니다.</div>
+    </div>
   </section>
 
   <!-- 반별 공동 캘린더 -->
@@ -956,7 +990,7 @@
       if (res.totalCount === 0) {
         statsEl.textContent = '아직 투표한 학생이 없습니다';
       } else {
-        statsEl.textContent = `우리 학교 학생의 ${res.percentage}%가 맛있다고 표시했어요 (${res.positiveCount}/${res.totalCount}명)`;
+        statsEl.textContent = `우리 학교 학생의 ${res.percentage}%가 오늘 급식이 산타의 선물이라 생각해요 (${res.positiveCount}/${res.totalCount}명)`;
       }
 
       // Highlight user's vote
@@ -1146,6 +1180,7 @@
 
   // -------- Countdown Timer --------
   let countdownInterval = null;
+  let christmasInterval = null;
 
   function parseSavedHomeTime(raw){
     if (!raw && raw !== 0){
@@ -1172,6 +1207,19 @@
     return `${h}:${m}`;
   }
 
+  function formatRemaining(diffMs){
+    const total = Math.max(0, diffMs);
+    const days = Math.floor(total / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((total % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((total % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((total % (1000 * 60)) / 1000);
+
+    if (days > 0) return `${days}일 ${hours}시간 ${minutes}분 ${seconds}초`;
+    if (hours > 0) return `${hours}시간 ${minutes}분 ${seconds}초`;
+    if (minutes > 0) return `${minutes}분 ${seconds}초`;
+    return `${seconds}초`;
+  }
+
   function updateCountdown() {
     const targetDate = parseSavedHomeTime(loadData('homeTime'));
     if (!targetDate) {
@@ -1193,23 +1241,7 @@
       return;
     }
 
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-    let displayText = '';
-    if (days > 0) {
-      displayText = `${days}일 ${hours}시간 ${minutes}분 ${seconds}초`;
-    } else if (hours > 0) {
-      displayText = `${hours}시간 ${minutes}분 ${seconds}초`;
-    } else if (minutes > 0) {
-      displayText = `${minutes}분 ${seconds}초`;
-    } else {
-      displayText = `${seconds}초`;
-    }
-
-    document.getElementById('countdownDisplay').textContent = displayText;
+    document.getElementById('countdownDisplay').textContent = formatRemaining(diff);
 
     const dateStr = targetDate.toLocaleDateString('ko-KR', {
       year: 'numeric',
@@ -1230,6 +1262,48 @@
     }
     updateCountdown();
     countdownInterval = setInterval(updateCountdown, 1000);
+  }
+
+  function getNextChristmas(){
+    const now = new Date();
+    let target = new Date(`${now.getFullYear()}-12-25T00:00:00`);
+    if (target <= now) {
+      target = new Date(`${now.getFullYear() + 1}-12-25T00:00:00`);
+    }
+    return target;
+  }
+
+  function updateChristmasCountdown(){
+    const countdownEl = document.getElementById('christmasCountdown');
+    const noteEl = document.getElementById('christmasNote');
+    const targetLabel = document.getElementById('christmasTargetLabel');
+    if (!countdownEl || !noteEl) return;
+
+    const now = new Date();
+    const target = getNextChristmas();
+    const diff = target - now;
+
+    if (targetLabel) {
+      targetLabel.textContent = `${target.getFullYear()}년 12월 25일`;
+    }
+
+    if (diff <= 0) {
+      countdownEl.textContent = '🎅 메리 크리스마스!';
+      noteEl.textContent = '따뜻한 휴일 보내세요.';
+      return;
+    }
+
+    countdownEl.textContent = formatRemaining(diff);
+    const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    noteEl.textContent = `${daysLeft}일 남았습니다. 따뜻한 준비를 시작해볼까요?`;
+  }
+
+  function startChristmasCountdown(){
+    if (christmasInterval) {
+      clearInterval(christmasInterval);
+    }
+    updateChristmasCountdown();
+    christmasInterval = setInterval(updateChristmasCountdown, 1000);
   }
 
   document.getElementById('setHomeTimeBtn').addEventListener('click', () => {
@@ -1292,6 +1366,7 @@
   // initial kick
   loadAllSchoollifeData();
   initCountdown();
+  startChristmasCountdown();
 </script>
 
 <nav class="bottom-nav" aria-label="하단 내비게이션">

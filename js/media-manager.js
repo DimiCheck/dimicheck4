@@ -121,10 +121,14 @@ class MediaManager {
 
   async loadStudentNumber() {
     try {
-      const res = await fetch('/api/session');
+      const res = await fetch('/auth/status', { credentials: 'include' });
+      if (!res.ok) return;
       const data = await res.json();
-      if (data.user?.number) {
-        this.currentStudentNumber = data.user.number;
+      const number = Number(data?.number);
+      if (Number.isFinite(number)) {
+        this.currentStudentNumber = number;
+      } else if (Number.isFinite(data?.grade) && Number.isFinite(data?.section) && Number.isFinite(data?.number)) {
+        this.currentStudentNumber = Number(data.number);
       }
     } catch (err) {
       console.error('Failed to load student number:', err);

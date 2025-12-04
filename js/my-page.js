@@ -148,20 +148,26 @@ class MyPageController {
         return;
       }
 
-      if (!data.number) {
-        window.location.href = '/login.html';
-        return;
-      }
+      // 선호하는 응답 구조(grade/section/number)를 우선 사용하고,
+      // 하위 호환을 위해 기존 복합 number 형식도 처리한다.
+      const grade = Number(data.grade);
+      const section = Number(data.section);
+      const number = Number(data.number);
 
-      const identifier = Number(data.number);
-      if (!Number.isFinite(identifier)) {
-        window.location.href = '/login.html';
-        return;
+      if (Number.isFinite(grade) && Number.isFinite(section) && Number.isFinite(number)) {
+        this.grade = grade;
+        this.section = section;
+        this.number = number;
+      } else {
+        const identifier = Number(data.number);
+        if (!Number.isFinite(identifier)) {
+          window.location.href = '/login.html';
+          return;
+        }
+        this.number = Math.floor(identifier % 100);
+        this.section = Math.floor((identifier % 1000) / 100);
+        this.grade = Math.floor(identifier / 1000);
       }
-
-      this.number = Math.floor(identifier % 100);
-      this.section = Math.floor((identifier % 1000) / 100);
-      this.grade = Math.floor(identifier / 1000);
 
       await this.updateProfileCard();
       this.syncClassContext();
@@ -222,11 +228,39 @@ class MyPageController {
 
     // 기본 스타일 리셋
     this.avatarEl.style.background = '';
+    this.avatarEl.style.backgroundImage = '';
     this.avatarEl.textContent = '';
     this.avatarEl.innerHTML = '';
     this.avatarEl.style.display = 'flex';
     this.avatarEl.style.alignItems = 'center';
     this.avatarEl.style.justifyContent = 'center';
+    this.avatarEl.classList.remove('has-image');
+
+    if (avatarData.imageUrl) {
+      // 이미지 아바타
+      this.avatarEl.style.backgroundImage = `url(${avatarData.imageUrl})`;
+      this.avatarEl.style.backgroundSize = 'cover';
+      this.avatarEl.style.backgroundPosition = 'center';
+      this.avatarEl.classList.add('has-image');
+
+      const numberBadge = document.createElement('span');
+      numberBadge.style.position = 'absolute';
+      numberBadge.style.bottom = '0px';
+      numberBadge.style.right = '0px';
+      numberBadge.style.background = 'var(--bg)';
+      numberBadge.style.border = '2px solid var(--card)';
+      numberBadge.style.borderRadius = '8px';
+      numberBadge.style.fontSize = '13px';
+      numberBadge.style.fontWeight = '700';
+      numberBadge.style.padding = '3px 7px';
+      numberBadge.style.lineHeight = '1';
+      numberBadge.textContent = this.number?.toString().padStart(2, '0') || '--';
+      this.avatarEl.appendChild(numberBadge);
+
+      this.avatarEl.style.position = 'relative';
+      console.log('[MyPage] Image avatar rendered successfully');
+      return;
+    }
 
     // 배경 색상 적용
     if (avatarData.bgColor) {
@@ -243,7 +277,6 @@ class MyPageController {
       emojiSpan.textContent = avatarData.emoji;
       this.avatarEl.appendChild(emojiSpan);
 
-      // 학번 뱃지 추가
       const numberBadge = document.createElement('span');
       numberBadge.style.position = 'absolute';
       numberBadge.style.bottom = '0px';
@@ -258,7 +291,6 @@ class MyPageController {
       numberBadge.textContent = this.number?.toString().padStart(2, '0') || '--';
       this.avatarEl.appendChild(numberBadge);
 
-      // position relative 추가
       this.avatarEl.style.position = 'relative';
       console.log('[MyPage] Avatar rendered successfully');
     } else {

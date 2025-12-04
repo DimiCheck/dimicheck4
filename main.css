@@ -856,6 +856,12 @@ body.fullscreen .fullscreen-btn {
   position: relative;
 }
 
+.magnet-menu-avatar.has-image {
+  background-size: cover !important;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
 .magnet-menu-avatar .avatar-emoji {
   font-size: 28px;
 }

@@ -142,7 +142,7 @@
     .b2 {
       width: 42vw;
       height: 42vw;
-      background: radial-gradient(circle, #e100ff50, transparent 70%);
+      background: radial-gradient(circle, #038b2550, transparent 70%);
       bottom: -15vh;
       right: -10vw;
       animation: float 22s ease-in-out infinite reverse;
@@ -690,6 +690,27 @@
       transition: all 0.2s;
     }
 
+    .avatar-upload {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .avatar-upload button {
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .avatar-upload small {
+      color: var(--muted);
+    }
+
     .btn-primary {
       background: linear-gradient(135deg, var(--primary), var(--primary-2));
       border: none;
@@ -715,6 +736,16 @@
       font-weight: 700;
       font-size: 16px;
       flex-shrink: 0;
+    }
+
+    .message-avatar.has-image {
+      background-size: cover !important;
+      background-position: center;
+      color: #fff;
+    }
+
+    .message-avatar.has-image .avatar-emoji {
+      display: none;
     }
 
     .avatar-emoji {
@@ -912,6 +943,17 @@
           <button class="btn-secondary" style="background:linear-gradient(135deg,#43e97b,#38f9d7);height:44px" data-avatar-color="#43e97b"></button>
           <button class="btn-secondary" style="background:linear-gradient(135deg,#fa709a,#fee140);height:44px" data-avatar-color="#fa709a"></button>
         </div>
+      </div>
+
+      <div class="setting-group">
+        <label>이미지 업로드 (선택)</label>
+        <div class="avatar-upload">
+          <input type="file" id="avatarImageInput" accept="image/*" hidden />
+          <button type="button" id="avatarImageUploadBtn">이미지 선택</button>
+          <button type="button" id="avatarImageRemoveBtn" class="btn-secondary">이미지 제거</button>
+          <small id="avatarImageStatus"></small>
+        </div>
+        <small style="color:var(--muted)">최대 5MB, 정사각형 이미지가 가장 예쁘게 보여요.</small>
       </div>
 
       <div class="setting-group">

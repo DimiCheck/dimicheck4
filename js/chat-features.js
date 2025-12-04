@@ -7,14 +7,19 @@ function renderAvatar(studentNumber, avatarData) {
   const avatar = document.createElement('div');
   avatar.className = `message-avatar`;
 
-  if (avatarData && avatarData.bgColor) {
+  if (avatarData && avatarData.imageUrl) {
+    avatar.classList.add('has-image');
+    avatar.style.backgroundImage = `url(${avatarData.imageUrl})`;
+    avatar.style.backgroundSize = 'cover';
+    avatar.style.backgroundPosition = 'center';
+  } else if (avatarData && avatarData.bgColor) {
     avatar.style.background = avatarData.bgColor;
   } else {
     // 기본 그라데이션
     avatar.className += ` avatar-color-${studentNumber % 10}`;
   }
 
-  if (avatarData && avatarData.emoji) {
+  if (avatarData && avatarData.emoji && !avatarData.imageUrl) {
     const emojiSpan = document.createElement('span');
     emojiSpan.className = 'avatar-emoji';
     emojiSpan.textContent = avatarData.emoji;
@@ -79,9 +84,15 @@ class AvatarModalManager {
     this.preview = null;
     this.currentEmoji = '😀';
     this.currentColor = '#667eea';
+    this.currentImageUrl = null;
     this.studentNumber = null;
     this.grade = null;
     this.section = null;
+    this.imageUploadUrl = 'https://img.codz.me/upload';
+    this.imageInput = null;
+    this.imageUploadBtn = null;
+    this.imageRemoveBtn = null;
+    this.imageStatusEl = null;
   }
 
   init(grade, section, studentNumber) {
@@ -90,6 +101,10 @@ class AvatarModalManager {
     this.studentNumber = studentNumber;
     this.modal = document.getElementById('avatarModal');
     this.preview = document.getElementById('avatarPreview');
+    this.imageInput = document.getElementById('avatarImageInput');
+    this.imageUploadBtn = document.getElementById('avatarImageUploadBtn');
+    this.imageRemoveBtn = document.getElementById('avatarImageRemoveBtn');
+    this.imageStatusEl = document.getElementById('avatarImageStatus');
 
     // 이모지 선택
     document.querySelectorAll('[data-avatar-emoji]').forEach(btn => {
@@ -117,6 +132,26 @@ class AvatarModalManager {
       this.close();
     });
 
+    // 이미지 업로드 버튼
+    this.imageUploadBtn?.addEventListener('click', () => {
+      this.imageInput?.click();
+    });
+
+    // 이미지 제거 버튼
+    this.imageRemoveBtn?.addEventListener('click', () => {
+      this.currentImageUrl = null;
+      this.updatePreview();
+      this.setUploadStatus('이미지를 제거했어요.');
+    });
+
+    // 파일 선택
+    this.imageInput?.addEventListener('change', (event) => {
+      const file = event.target.files?.[0];
+      if (file) {
+        this.handleImageFile(file);
+      }
+    });
+
     // 현재 아바타 로드
     this.loadCurrentAvatar();
   }
@@ -129,6 +164,7 @@ class AvatarModalManager {
         if (data.avatar) {
           this.currentEmoji = data.avatar.emoji || '😀';
           this.currentColor = data.avatar.bgColor || '#667eea';
+          this.currentImageUrl = data.avatar.imageUrl || null;
           this.updatePreview();
         }
       }
@@ -141,13 +177,26 @@ class AvatarModalManager {
     if (!this.preview) return;
 
     this.preview.style.background = this.currentColor;
+    this.preview.style.backgroundImage = '';
+    this.preview.classList.remove('has-image');
+
+    // 이미지가 있으면 우선 적용
+    if (this.currentImageUrl) {
+      this.preview.style.backgroundImage = `url(${this.currentImageUrl})`;
+      this.preview.style.backgroundSize = 'cover';
+      this.preview.style.backgroundPosition = 'center';
+      this.preview.classList.add('has-image');
+    }
+
     const emojiEl = this.preview.querySelector('.avatar-emoji');
     if (emojiEl) {
       emojiEl.textContent = this.currentEmoji;
+      emojiEl.style.display = this.currentImageUrl ? 'none' : 'block';
     } else {
       const newEmoji = document.createElement('span');
       newEmoji.className = 'avatar-emoji';
       newEmoji.textContent = this.currentEmoji;
+      newEmoji.style.display = this.currentImageUrl ? 'none' : 'block';
       this.preview.appendChild(newEmoji);
     }
 
@@ -160,7 +209,8 @@ class AvatarModalManager {
   async saveAvatar() {
     const avatarData = {
       emoji: this.currentEmoji,
-      bgColor: this.currentColor
+      bgColor: this.currentColor,
+      imageUrl: this.currentImageUrl
     };
 
     try {
@@ -202,6 +252,48 @@ class AvatarModalManager {
     if (this.modal) {
       this.modal.hidden = true;
     }
+  }
+
+  async handleImageFile(file) {
+    if (!file.type.startsWith('image/')) {
+      this.setUploadStatus('이미지 파일을 선택해주세요.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      this.setUploadStatus('5MB 이하 이미지만 업로드할 수 있어요.');
+      return;
+    }
+
+    try {
+      this.setUploadStatus('업로드 중...');
+      const formData = new FormData();
+      formData.append('image', file);
+      const res = await fetch(this.imageUploadUrl, {
+        method: 'POST',
+        body: formData
+      });
+      if (!res.ok) {
+        throw new Error('이미지 업로드 실패');
+      }
+      const data = await res.json();
+      if (!data.url) {
+        throw new Error('업로드 응답이 올바르지 않습니다.');
+      }
+      this.currentImageUrl = data.url;
+      this.updatePreview();
+      this.setUploadStatus('업로드 완료!');
+    } catch (err) {
+      console.error('Avatar image upload failed:', err);
+      this.setUploadStatus(err.message || '업로드 실패');
+    } finally {
+      if (this.imageInput) this.imageInput.value = '';
+    }
+  }
+
+  setUploadStatus(message) {
+    if (!this.imageStatusEl) return;
+    this.imageStatusEl.textContent = message || '';
   }
 
   showToast(message) {
@@ -361,23 +453,38 @@ class ProfileModalManager {
     // 아바타
     const avatarEl = document.getElementById('profileAvatar');
     if (avatarEl) {
-      if (profile.avatar && profile.avatar.bgColor) {
-        avatarEl.style.background = profile.avatar.bgColor;
+      avatarEl.className = 'message-avatar';
+      avatarEl.style.width = '80px';
+      avatarEl.style.height = '80px';
+      avatarEl.style.fontSize = '40px';
+      avatarEl.style.margin = '0 auto';
+      avatarEl.style.background = '';
+      avatarEl.style.backgroundImage = '';
+      avatarEl.innerHTML = '';
+      avatarEl.classList.remove('has-image');
+
+      const avatarData = profile.avatar || {};
+      const imageUrl = avatarData.imageUrl;
+      const bgColor = avatarData.bgColor;
+      const emoji = avatarData.emoji;
+
+      if (imageUrl) {
+        avatarEl.classList.add('has-image');
+        avatarEl.style.backgroundImage = `url(${imageUrl})`;
+        avatarEl.style.backgroundSize = 'cover';
+        avatarEl.style.backgroundPosition = 'center';
+      } else if (bgColor) {
+        avatarEl.style.background = bgColor;
       } else {
-        avatarEl.className = `message-avatar avatar-color-${profile.studentNumber % 10}`;
-        avatarEl.style.width = '80px';
-        avatarEl.style.height = '80px';
-        avatarEl.style.fontSize = '40px';
-        avatarEl.style.margin = '0 auto';
+        avatarEl.classList.add(`avatar-color-${profile.studentNumber % 10}`);
       }
 
-      avatarEl.innerHTML = '';
-      if (profile.avatar && profile.avatar.emoji) {
-        const emoji = document.createElement('span');
-        emoji.className = 'avatar-emoji';
-        emoji.textContent = profile.avatar.emoji;
-        emoji.style.fontSize = '40px';
-        avatarEl.appendChild(emoji);
+      if (emoji && !imageUrl) {
+        const emojiEl = document.createElement('span');
+        emojiEl.className = 'avatar-emoji';
+        emojiEl.textContent = emoji;
+        emojiEl.style.fontSize = '40px';
+        avatarEl.appendChild(emojiEl);
       }
 
       const number = document.createElement('span');
