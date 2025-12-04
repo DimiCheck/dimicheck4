@@ -719,6 +719,10 @@ body.fullscreen .fullscreen-btn {
   color: #fff;
   opacity: 0.95;
   font-size: 14px;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 색상 군 */
@@ -864,6 +868,23 @@ body.fullscreen .fullscreen-btn {
 
 .magnet-menu-avatar .avatar-emoji {
   font-size: 28px;
+}
+
+.reaction-burst {
+  position: fixed;
+  pointer-events: none;
+  inset: 0;
+  z-index: 2000;
+  overflow: visible;
+}
+
+.reaction-burst-emoji {
+  position: absolute;
+  font-size: 22px;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.4);
+  transition: transform 0.6s ease-out, opacity 0.6s ease-out;
+  will-change: transform, opacity;
 }
 
 .magnet-menu-nickname {

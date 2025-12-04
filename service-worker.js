@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const STATIC_CACHE = `dimicheck-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `dimicheck-runtime-${CACHE_VERSION}`;
 const TIMETABLE_META_CACHE = 'dimicheck-timetable-meta';
@@ -105,7 +105,9 @@ async function handleNavigationRequest(request) {
   try {
     const networkResponse = await fetch(request);
     const runtime = await caches.open(RUNTIME_CACHE);
-    runtime.put(request, networkResponse.clone());
+    if (networkResponse && networkResponse.ok && networkResponse.status !== 206) {
+      runtime.put(request, networkResponse.clone());
+    }
     return networkResponse;
   } catch (error) {
     const cached = await caches.match(request);
@@ -130,7 +132,7 @@ function handleAssetRequest(event, request, url) {
 
     try {
       const networkResponse = await fetch(request);
-      if (networkResponse && networkResponse.ok) {
+      if (networkResponse && networkResponse.ok && networkResponse.status !== 206) {
         const runtime = await caches.open(RUNTIME_CACHE);
         await runtime.put(request, networkResponse.clone());
       }
@@ -150,7 +152,7 @@ function handleAssetRequest(event, request, url) {
 async function updateRuntimeCache(request) {
   try {
     const response = await fetch(request);
-    if (response && response.ok) {
+    if (response && response.ok && response.status !== 206) {
       const runtime = await caches.open(RUNTIME_CACHE);
       await runtime.put(request, response.clone());
     }

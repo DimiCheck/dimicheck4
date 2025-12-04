@@ -10,7 +10,7 @@ class ReactionsManager {
     this.myNumber = null;
     this.cooldownEnd = 0;
     this.cooldownInterval = null;
-    this.allowedEmojis = ["❤️", "😂", "😮", "😢", "🔥", "👍"];
+    this.allowedEmojis = ["❤️", "😂", "😮", "😢", "🔥", "👍", "👏", "🎉", "🤩", "🥳", "😎", "💯"];
   }
 
   init(grade, section, myNumber) {
@@ -68,6 +68,11 @@ class ReactionsManager {
 
       // 피드백 표시
       this.showFeedback(`${emoji} 반응을 보냈어요!`, 'success');
+
+      // 자석 폭죽 이펙트
+      if (typeof window.spawnReactionBurst === 'function' && this.myNumber) {
+        window.spawnReactionBurst(this.myNumber, emoji);
+      }
 
       // 팝업 자동 닫기
       setTimeout(() => {

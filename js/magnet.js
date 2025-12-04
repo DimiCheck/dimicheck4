@@ -24,6 +24,73 @@ const MAGNET_MENU_OPTIONS = [
 const thoughtBubbleRegistry = new Map(); // number -> { element, timeoutId, expiresAt, text }
 const reactionBadgeRegistry = new Map(); // number -> { element, timeoutId, expiresAt, emoji }
 
+// Category → burst emoji
+const CATEGORY_BURST_EMOJI = {
+  toilet: '🚽',
+  hallway: '🚪',
+  club: '🧑‍🤝‍🧑',
+  afterschool: '🕒',
+  project: '🔥',
+  early: '🛏️',
+  absence: '🏠'
+};
+
+// Reaction burst effect
+function spawnReactionBurst(number, emoji) {
+  const magnet = document.querySelector(`.magnet[data-number="${number}"]`);
+  if (!magnet) return;
+
+  const rect = magnet.getBoundingClientRect();
+  const originX = rect.left + rect.width / 2;
+  const originY = rect.top + rect.height / 2;
+
+  const burst = document.createElement('div');
+  burst.className = 'reaction-burst';
+  document.body.appendChild(burst);
+
+  const total = 20;
+  for (let i = 0; i < total; i++) {
+    const span = document.createElement('span');
+    span.className = 'reaction-burst-emoji';
+    span.textContent = emoji;
+
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 40 + Math.random() * 100;
+    const dx = Math.cos(angle) * distance;
+    const dy = Math.sin(angle) * distance;
+    const duration = 400 + Math.random() * 300;
+
+    span.style.left = `${originX}px`;
+    span.style.top = `${originY}px`;
+    span.style.transitionDuration = `${duration}ms`;
+
+    burst.appendChild(span);
+
+    requestAnimationFrame(() => {
+      span.style.transform = `translate(${dx}px, ${dy}px) scale(1)`;
+      span.style.opacity = '1';
+      setTimeout(() => {
+        span.style.opacity = '0';
+      }, duration * 0.7);
+    });
+  }
+
+  setTimeout(() => {
+    burst.remove();
+  }, 800);
+}
+
+window.spawnReactionBurst = spawnReactionBurst;
+
+function triggerCategoryBurst(target, category) {
+  if (!target) return;
+  const emoji = CATEGORY_BURST_EMOJI[category];
+  if (!emoji || typeof window.spawnReactionBurst !== 'function') return;
+  const num = Number(target.dataset.number);
+  if (!Number.isFinite(num)) return;
+  window.spawnReactionBurst(num, emoji);
+}
+
 function ensureThoughtLayer() {
   let layer = document.getElementById('thoughtLayer');
   if (!layer) {
@@ -223,6 +290,11 @@ function ensureReactionBadge(magnet, emoji, expiresAtValue) {
   if (entry.emoji !== sanitized) {
     magnet.textContent = sanitized;
     entry.emoji = sanitized;
+
+    // Burst effect when reaction changes
+    if (typeof window.spawnReactionBurst === 'function') {
+      window.spawnReactionBurst(Number(number), sanitized);
+    }
   }
 
   entry.expiresAt = expiresAtMs;
@@ -684,6 +756,7 @@ function applyMagnetQuickAction(target, action, options = {}) {
     target.style.transform = '';
     sectionEl.appendChild(target);
     sortSection(sectionEl);
+    triggerCategoryBurst(target, action);
 
     if (action === 'etc') {
       if (!target.dataset.reason && !deferReasonDialog) {
@@ -1040,6 +1113,40 @@ function updateEtcReasonPanel() {
       groups.delete(reason);
     }
 
+    // !snow command: change background to snow image
+    else if (reason === '!snow') {
+      document.body.style.backgroundImage = 'url(https://cdn.pixabay.com/photo/2024/11/27/05/42/ai-generated-9227230_1280.jpg)';
+      document.body.style.backgroundSize = 'cover';
+      document.body.style.backgroundPosition = 'center';
+      document.body.dataset.bgOverride = 'snow';
+      nums.forEach(n => {
+        const mag = document.querySelector(`.magnet[data-number="${n}"][data-reason="${reason}"]`);
+        if (mag) {
+          delete mag.dataset.reason;
+          mag.classList.remove('has-reason');
+          shouldSaveState = true;
+        }
+      });
+      groups.delete(reason);
+    }
+
+    // !christmas command: restore default background
+    else if (reason === '!christmas') {
+      document.body.style.backgroundImage = '';
+      document.body.style.backgroundSize = '';
+      document.body.style.backgroundPosition = '';
+      delete document.body.dataset.bgOverride;
+      nums.forEach(n => {
+        const mag = document.querySelector(`.magnet[data-number="${n}"][data-reason="${reason}"]`);
+        if (mag) {
+          delete mag.dataset.reason;
+          mag.classList.remove('has-reason');
+          shouldSaveState = true;
+        }
+      });
+      groups.delete(reason);
+    }
+
     else if (reason === '!reload') {
       window.location.reload();
     }
@@ -1114,6 +1221,7 @@ function updateEtcReasonPanel() {
     } else {
       text.textContent = reason;
     }
+    text.title = reason;
 
     row.appendChild(badges);
     row.appendChild(text);

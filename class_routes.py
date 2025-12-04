@@ -505,7 +505,7 @@ def send_reaction():
     emoji = (payload.get("emoji") or "").strip()
 
     # Validate emoji
-    allowed_emojis = ["❤️", "😂", "😮", "😢", "🔥", "👍"]
+    allowed_emojis = ["❤️", "😂", "😮", "😢", "🔥", "👍", "👏", "🎉", "🤩", "🥳", "😎", "💯"]
     if not emoji or emoji not in allowed_emojis:
         return jsonify({"error": "invalid emoji"}), 400
 
