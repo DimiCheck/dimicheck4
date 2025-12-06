@@ -14,7 +14,7 @@ def _serialize_user(user: User) -> Dict[str, Any]:
     return {
         "id": user.id,
         "email": user.email,
-        "name": user.name,
+        # 이름은 저장/전달하지 않음 (개인정보 최소화)
         "type": user.type.value if user.type else None,
         "grade": user.grade,
         "class": user.class_no,

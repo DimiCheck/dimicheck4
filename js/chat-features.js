@@ -24,7 +24,7 @@ function renderAvatar(studentNumber, avatarData) {
     emojiSpan.className = 'avatar-emoji';
     emojiSpan.textContent = avatarData.emoji;
     avatar.appendChild(emojiSpan);
-  } else {
+  } else if (!avatarData?.imageUrl) {
     avatar.textContent = String(studentNumber).padStart(2, '0');
   }
 

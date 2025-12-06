@@ -156,9 +156,9 @@ def _ensure_user_record(data: Dict[str, Any]) -> User:
         user = User()
         db.session.add(user)
     user.email = email or user.email
-    name = data.get("name") or data.get("nickname") or user.name
-    if name:
-        user.name = name
+    # 이름은 저장하지 않음 (개인정보 최소화)
+    if user.name:
+        user.name = ""
     user.type = _coerce_user_type(data.get("type"))
     if grade is not None:
         user.grade = grade
@@ -218,13 +218,15 @@ def callback() -> Response:
     if user and (user.grade is None or user.class_no is None or user.number is None):
         user = None
     if user:
-        user.name = id_info.get("name") or user.name
-        db.session.commit()
+        # 이름은 저장하지 않음
+        if user.name:
+            user.name = ""
+            db.session.commit()
         session.pop("remember_me_requested", None)
         return _finalize_login(user, remember)
     session["pending_registration"] = {
         "email": email,
-        "name": id_info.get("name", ""),
+        "name": "",
     }
     return redirect(url_for("auth.register_form"))
 
@@ -307,7 +309,8 @@ def register_submit():
     if not user:
         user = User(email=email)
         db.session.add(user)
-    user.name = name
+    # 이름은 저장하지 않음 (개인정보 최소화)
+    user.name = ""
     user.type = UserType.STUDENT
     user.grade = grade
     user.class_no = class_no
@@ -354,7 +357,7 @@ def dev_login():
     if not user:
         user = User(email=email)
         db.session.add(user)
-    user.name = "개발계정"
+    user.name = ""
     try:
         user.type = UserType(role)
     except ValueError:

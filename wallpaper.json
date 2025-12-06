@@ -1,0 +1,49 @@
+{
+  "wallpapers": [
+    {
+      "id": "city-night-2024",
+      "name": "크리스마스 풍경",
+      "url": "https://cdn.pixabay.com/photo/2024/09/30/16/36/background-9086186_1280.jpg"
+    },
+    {
+      "id": "ai-grid-2024",
+      "name": "눈과 장갑",
+      "url": "https://cdn.pixabay.com/photo/2024/11/27/05/42/ai-generated-9227230_1280.jpg"
+    },
+    {
+      "id": "ocean-blue-2024",
+      "name": "아름다운 해변",
+      "url": "https://cdn.pixabay.com/photo/2014/08/15/11/29/beach-418742_1280.jpg"
+    },
+    {
+      "id": "bonobono-2024",
+      "name": "보노보노 PPT",
+      "url": "https://i.pinimg.com/736x/35/d8/48/35d848a665f27f3c75f0e8234f7f69ce.jpg"
+    },
+    {
+      "id": "mit-campus-2024",
+      "name": "MIT 캠퍼스",
+      "url": "https://edunirvana.in/wp-content/uploads/2025/07/mit_16x9_0.jpg"
+    },
+    {
+      "id": "astronaut-2024",
+      "name": "우주 비행사",
+      "url": "https://cdn.pixabay.com/photo/2011/12/14/12/11/astronaut-11080_1280.jpg"
+    },
+    {
+      "id": "ngc-3324",
+      "name": "NGC 3324 성운",
+      "url": "https://assets.science.nasa.gov/dynamicimage/assets/science/astro/universe/2023/09/main_image_star-forming_region_carina_nircam_final-5mb.jpg?w=3600&h=2085&fit=crop&crop=faces%2Cfocalpoint"
+    },
+    {
+      "id": "just-black-2024",
+      "name": "단색 검정",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/5/50/Black_colour.jpg"
+    },
+    {
+      "id": "nix-os-2024",
+      "name": "NixOS 배경화면",
+      "url": "https://wallpapercave.com/wp/wp12329531.png"
+    }
+  ]
+}

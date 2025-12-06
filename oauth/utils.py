@@ -77,7 +77,8 @@ def _build_claims(user: User, scopes: List[str]) -> dict:
         claims["user_id"] = user.id
         claims["email"] = user.email
     if "profile" in scopes:
-        claims["name"] = user.name
+        # 이름은 반환하지 않음 (개인정보 최소화)
+        pass
     if "student_info" in scopes:
         claims["grade"] = user.grade
         claims["class"] = user.class_no

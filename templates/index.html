@@ -137,6 +137,7 @@
       <button class="fab-item" role="menuitem" id="foodItem">오늘 급식 보기</button>
       <button class="fab-item" role="menuitem" id="timeItem">오늘 시간표</button>
       <button class="fab-item" role="menuitem" id="scheduleChangeItem">시간표 변경</button>
+      <button class="fab-item" role="menuitem" id="wallpaperItem">배경화면 변경</button>
     </div>
   </div>
 
@@ -210,6 +211,15 @@
     </div>
   </div>
 
+  <div id="wallpaperModal" class="modal-overlay" hidden>
+    <div class="modal-content wallpaper-modal">
+      <button class="modal-close" id="wallpaperModalClose" aria-label="배경화면 선택 닫기">&times;</button>
+      <h2>배경화면 선택</h2>
+      <p class="wallpaper-subtitle">목록을 눌러 교실 배경을 바로 바꿔보세요.</p>
+      <div id="wallpaperGrid" class="wallpaper-grid" role="list"></div>
+    </div>
+  </div>
+
   <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
 
 
@@ -219,6 +229,7 @@
   <script src="js/magnet.js?v={{ asset_version }}"></script>
   <script src="js/time.js?v={{ asset_version }}"></script>
   <script src="js/etc.js?v={{ asset_version }}"></script>
+  <script src="js/wallpaper.js?v={{ asset_version }}"></script>
   <script src="js/info.js?v={{ asset_version }}"></script>
   <script src="js/reset.js?v={{ asset_version }}"></script>
 

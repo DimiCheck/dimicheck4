@@ -75,11 +75,11 @@ def account_update():
         number = int(payload.get("number"))
     except (TypeError, ValueError):
         return jsonify({"error": "invalid_input"}), 400
-    name = (payload.get("name") or "").strip() or user.name
     user.grade = grade
     user.class_no = class_no
     user.number = number
-    user.name = name
+    # 이름은 저장하지 않음 (개인정보 최소화)
+    user.name = ""
     user.last_profile_update = datetime.utcnow()
     db.session.commit()
     issue_session(user)

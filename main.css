@@ -4,8 +4,12 @@
   box-sizing: border-box;
 }
 
+:root {
+  --wallpaper-url: url('https://cdn.pixabay.com/photo/2024/09/30/16/36/background-9086186_1280.jpg');
+}
+
 body {
-  background: #000;
+  background-color: #000;
   min-height: 100vh;
   display: flex;
   justify-content: flex-end;
@@ -15,7 +19,9 @@ body {
   overflow: hidden;
   position: relative;
   margin: 0;
-  background: url('https://cdn.pixabay.com/photo/2024/09/30/16/36/background-9086186_1280.jpg') no-repeat center center;
+  background-image: var(--wallpaper-url);
+  background-repeat: no-repeat;
+  background-position: center center;
   background-size: cover;
 }
 
@@ -1401,6 +1407,127 @@ body.fullscreen .fullscreen-btn {
 #timetableContainer td {
   background-color: rgba(255, 255, 255, 0.05);
   height: 40px;
+}
+
+#wallpaperModal .modal-content {
+  max-width: 960px;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.wallpaper-subtitle {
+  margin: -6px 0 12px 0;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 14px;
+  text-align: center;
+}
+
+.wallpaper-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.wallpaper-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 230px;
+  transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.wallpaper-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45);
+}
+
+.wallpaper-card.selected {
+  border-color: rgba(89, 149, 255, 0.9);
+  box-shadow: 0 20px 40px rgba(38, 107, 255, 0.35);
+}
+
+.wallpaper-thumb {
+  width: 100%;
+  padding-top: 60%;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.wallpaper-thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 20%, rgba(0, 0, 0, 0.35) 100%);
+  opacity: 0.8;
+}
+
+.wallpaper-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px 14px;
+}
+
+.wallpaper-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: #fff;
+}
+
+.wallpaper-apply {
+  border: none;
+  background: linear-gradient(135deg, #437bff, #2446f5);
+  color: #fff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 10px 20px rgba(52, 120, 255, 0.35);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
+}
+
+.wallpaper-apply:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(52, 120, 255, 0.45);
+}
+
+.wallpaper-apply:active {
+  transform: translateY(0);
+  filter: brightness(0.95);
+}
+
+.wallpaper-apply:disabled {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+  cursor: default;
+}
+
+.wallpaper-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  backdrop-filter: blur(4px);
+}
+
+.wallpaper-empty {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 24px 0;
 }
 
 /* 초기화 FAB 컨테이너 (정보 버튼 왼쪽으로 배치) */

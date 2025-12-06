@@ -26,7 +26,7 @@ def register_userinfo_routes(bp):
         if "basic" in scopes:
             payload.update({"user_id": user.id, "email": user.email})
         if "profile" in scopes:
-            payload.update({"name": user.name})
+            pass  # 이름은 포함하지 않음 (개인정보 최소화)
         if "student_info" in scopes:
             payload.update({"grade": user.grade, "class": user.class_no, "number": user.number})
         return jsonify(payload)
