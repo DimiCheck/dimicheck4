@@ -624,6 +624,16 @@ function setActiveSlot(card, which /* 'total' | 'away' | 'present' */) {
       connectToGradeWebSockets(g); // WebSocket reconnect
     });
   });
+
+  // 세션 유지 하트비트 (iOS Safari 대응)
+  (function startHeartbeat() {
+    const HEARTBEAT_MS = 3 * 60 * 60 * 1000;
+    const ping = () => {
+      fetch('/auth/status', { method: 'GET', credentials: 'include', cache: 'no-store', keepalive: true }).catch(() => {});
+    };
+    ping();
+    setInterval(ping, HEARTBEAT_MS);
+  })();
 </script>
 </body>
 </html>

@@ -68,9 +68,9 @@ def persist_remembered_session(user: User, response: Response, device_info: str 
         cookie_name,
         token,
         max_age=max_age,
-        secure=True,
+        secure=current_app.config.get("SESSION_COOKIE_SECURE", True),
         httponly=True,
-        samesite="Lax",
+        samesite=current_app.config.get("SESSION_COOKIE_SAMESITE", "None"),
     )
 
 

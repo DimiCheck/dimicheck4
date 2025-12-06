@@ -112,6 +112,18 @@
       min-height:18px;
     }
     .verify-msg.error{color:#ff8a8a;}
+    .retry-card{
+      margin:12px auto 18px;
+      padding:14px;
+      border-radius:14px;
+      background:rgba(255,255,255,0.08);
+      border:1px dashed var(--border);
+      color:var(--text);
+      font-weight:700;
+      cursor:pointer;
+      max-width:320px;
+      display:none;
+    }
     h1{
       margin:0 0 10px;
       font-size:clamp(24px,4vw,30px);
@@ -274,8 +286,9 @@
     </div>
     <div class="verify-msg" id="verifyMsg"></div>
     {% if success %}
-      <h1>{{ status_label or "상태" }} 상태를 적용했어요.</h1>
-      <p>요청한 상태가 서버에 저장됐습니다.</p>
+      <h1 id="primaryTitle">{{ status_label or "상태" }} 상태를 적용했어요.</h1>
+      <p id="primaryDesc">요청한 상태가 서버에 저장됐습니다.</p>
+      <div class="retry-card" id="retryCard" onclick="retryVerify()">탭하여 재시도</div>
       <div class="pill">상태: {{ status_label }}</div>
       {% if reason %}
         <div class="pill">사유: {{ reason }}</div>
@@ -293,10 +306,16 @@
           <div class="swipe-hint">한 번에 오른쪽 끝까지 밀면 교실 상태로 전환됩니다.</div>
         </div>
       {% endif %}
-      <div class="actions">
-        <button type="button" onclick="location.href='/set?status=class'">교실로 변경</button>
-        <button type="button" class="secondary" onclick="closeTab()">닫기</button>
-      </div>
+      {% if status_code != "section" %}
+        <div class="actions">
+          <button type="button" onclick="location.href='/set?status=class'">교실로 변경</button>
+          <button type="button" class="secondary" onclick="closeTab()">닫기</button>
+        </div>
+      {% else %}
+        <div class="actions">
+          <button type="button" class="secondary" onclick="closeTab()">닫기</button>
+        </div>
+      {% endif %}
     {% else %}
       <h1>상태를 적용하지 못했어요.</h1>
       {% if error == "invalid_status" %}
@@ -335,11 +354,18 @@
       const spinner = document.getElementById('logoSpinner');
       const logo = document.getElementById('logoImg');
       const msg = document.getElementById('verifyMsg');
+      const retryCard = document.getElementById('retryCard');
+      const title = document.getElementById('primaryTitle');
+      const desc = document.getElementById('primaryDesc');
       if (!spinner || !logo || !msg) return;
       spinner.style.display = 'block';
       logo.style.visibility = 'hidden';
       msg.textContent = '적용 확인 중...';
       msg.classList.remove('error');
+      if (retryCard) retryCard.style.display = 'none';
+      if (title) title.style.display = '';
+      if (desc) desc.style.display = '';
+      logo.src = '/logo.png';
 
       try {
         const authRes = await fetch('/auth/status', { credentials: 'include' });
@@ -366,10 +392,20 @@
         console.error(err);
         msg.textContent = err?.message || '적용 상태를 확인하지 못했습니다.';
         msg.classList.add('error');
+        logo.src = '/no.png';
+        if (title) title.style.display = 'none';
+        if (desc) desc.style.display = 'none';
+        if (retryCard) retryCard.style.display = 'block';
       } finally {
         spinner.style.display = 'none';
         logo.style.visibility = 'visible';
       }
+    }
+
+    function retryVerify() {
+      const desiredStatus = "{{ status_code }}";
+      const desiredReason = "{{ reason or '' }}";
+      verifyApplied(desiredStatus, desiredReason);
     }
 
     document.addEventListener('DOMContentLoaded', () => {

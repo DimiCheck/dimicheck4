@@ -13,7 +13,7 @@ class Config:
     SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-secret")
     SESSION_COOKIE_HTTPONLY: bool = True
     SESSION_COOKIE_SECURE: bool = _env_bool("SESSION_COOKIE_SECURE", True)
-    SESSION_COOKIE_SAMESITE: str = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
+    SESSION_COOKIE_SAMESITE: str = os.getenv("SESSION_COOKIE_SAMESITE", "None")
     PERMANENT_SESSION_LIFETIME: timedelta = timedelta(days=30)
     SESSION_REFRESH_EACH_REQUEST: bool = True
 

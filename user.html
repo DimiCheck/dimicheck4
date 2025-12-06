@@ -1479,8 +1479,19 @@
       location.href = '/auth/logout';
     });
 
+    // ===== 세션 유지 하트비트 =====
+    function startHeartbeat() {
+      const HEARTBEAT_MS = 3 * 60 * 60 * 1000; // 3시간
+      const ping = () => {
+        fetch('/auth/status', { method: 'GET', credentials: 'include', cache: 'no-store', keepalive: true }).catch(() => {});
+      };
+      ping();
+      setInterval(ping, HEARTBEAT_MS);
+    }
+
     // 진입 시 로그인 확인
     checkLogin();
+    startHeartbeat();
   </script>
   <nav class="bottom-nav" aria-label="하단 내비게이션">
     <a href="/schoollife.html" class="nav-item">
