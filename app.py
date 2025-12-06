@@ -22,13 +22,13 @@ from class_routes import blueprint as class_bp
 from exports_routes import blueprint as export_bp
 from chat_routes import blueprint as chat_bp
 from vote_routes import blueprint as vote_bp
-from public_api import public_api_bp
+from public_api import public_api_bp, broadcast_public_status_update
 from developer_routes import blueprint as developer_bp
 from oauth import blueprint as oauth_bp
 from account import blueprint as account_bp
 from config import config
 from extensions import db
-from models import ClassConfig, ClassPin
+from models import ClassConfig, ClassPin, ClassState
 from config_loader import load_class_config
 from utils import (
     after_request,
@@ -146,6 +146,56 @@ QRNG_ENDPOINT = "https://qrng.anu.edu.au/API/jsonI.php"
 QRNG_ALLOWED_TYPES = {"uint8", "uint16", "hex16"}
 QRNG_MAX_LENGTH = 1024
 
+# 단축 상태 코드 → 내부 상태 키 매핑
+STATUS_ALIASES = {
+    "class": "section",
+    "classroom": "section",
+    "room": "section",
+    "section": "section",
+    "교실": "section",
+    "toilet": "toilet",
+    "화장실": "toilet",
+    "bathroom": "toilet",
+    "hallway": "hallway",
+    "복도": "hallway",
+    "club": "club",
+    "동아리": "club",
+    "afterschool": "afterschool",
+    "after-school": "afterschool",
+    "방과후": "afterschool",
+    "project": "project",
+    "프로젝트": "project",
+    "early": "early",
+    "조기입실": "early",
+    "etc": "etc",
+    "기타": "etc",
+    "absence": "absence",
+    "absent": "absence",
+    "결석": "absence",
+    "조퇴": "absence",
+}
+
+STATUS_LABELS = {
+    "section": "교실",
+    "toilet": "화장실",
+    "hallway": "복도",
+    "club": "동아리",
+    "afterschool": "방과후",
+    "project": "프로젝트",
+    "early": "조기입실",
+    "etc": "기타",
+    "absence": "결석(조퇴)",
+}
+
+PRESERVE_STATE_FIELDS = [
+    "reaction",
+    "reactionPostedAt",
+    "reactionExpiresAt",
+    "thought",
+    "thoughtPostedAt",
+    "thoughtExpiresAt",
+]
+
 
 def _fallback_qrng(length: int, qtype: str) -> dict[str, Any]:
     if qtype == "uint16":
@@ -156,6 +206,116 @@ def _fallback_qrng(length: int, qtype: str) -> dict[str, Any]:
         data = list(secrets.token_bytes(length))
 
     return {"success": True, "data": data, "source": "fallback"}
+
+
+def _coerce_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _split_student_identifier(value: Any) -> tuple[int | None, int | None, int | None]:
+    if value is None:
+        return None, None, None
+    digits = "".join(ch for ch in str(value) if ch.isdigit())
+    if not digits:
+        return None, None, None
+    if len(digits) >= 3:
+        grade = _coerce_int(digits[0])
+        seat = _coerce_int(digits[-2:])
+        section_digits = digits[1:-2]
+        section = _coerce_int(section_digits) if section_digits else None
+        return grade, section, seat
+    return None, None, _coerce_int(digits)
+
+
+def _derive_student_session() -> tuple[int | None, int | None, int | None]:
+    user = session.get("user") or {}
+    if str(user.get("type", "")).lower() != "student":
+        return None, None, None
+
+    grade = _coerce_int(user.get("grade") or user.get("grade_no") or user.get("gradeNo"))
+    section = _coerce_int(
+        user.get("class")
+        or user.get("class_no")
+        or user.get("classNo")
+        or user.get("section")
+        or user.get("section_no")
+        or user.get("sectionNo")
+    )
+    identifier = (
+        user.get("number")
+        or user.get("student_number")
+        or user.get("studentNumber")
+        or user.get("student_no")
+        or user.get("studentNo")
+    )
+    derived_grade, derived_section, seat = _split_student_identifier(identifier)
+    if grade is None:
+        grade = derived_grade
+    if section is None:
+        section = derived_section
+    if seat is None:
+        _, _, seat = _split_student_identifier(user.get("seat_number") or user.get("seatNumber") or user.get("number_only"))
+    return grade, section, seat
+
+
+def _normalize_status_param(raw_status: str | None) -> str | None:
+    if not raw_status:
+        return None
+    cleaned = str(raw_status).strip().strip('"\'').lower()
+    canonical = STATUS_ALIASES.get(cleaned, cleaned)
+    if canonical in STATUS_LABELS:
+        return canonical
+    return None
+
+
+def _load_magnet_payload(state: ClassState | None) -> dict[str, dict[str, object]]:
+    if not state or not state.data:
+        return {"magnets": {}}
+    try:
+        raw = json.loads(state.data)
+    except json.JSONDecodeError:
+        return {"magnets": {}}
+    if not isinstance(raw, dict):
+        return {"magnets": {}}
+    magnets = raw.get("magnets")
+    if not isinstance(magnets, dict):
+        magnets = {}
+    return {"magnets": magnets}
+
+
+def _persist_magnet_state(state: ClassState | None, grade: int, section: int, magnets: dict[str, dict[str, object]]) -> ClassState:
+    if not state:
+        state = ClassState(grade=grade, section=section, data="")
+        db.session.add(state)
+    state.data = json.dumps({"magnets": magnets})
+    db.session.commit()
+    return state
+
+
+def _upsert_student_status(
+    magnets: dict[str, dict[str, object]],
+    student_number: int,
+    status_code: str,
+    reason: str | None,
+) -> dict[str, dict[str, object]]:
+    normalized_reason = reason.strip() if reason else None
+    payload: dict[str, object] = {"attachedTo": status_code}
+    if status_code == "etc" and normalized_reason:
+        payload["reason"] = normalized_reason
+    elif status_code != "etc":
+        payload.pop("reason", None)
+
+    key = str(student_number)
+    existing = magnets.get(key, {}) if isinstance(magnets, dict) else {}
+    for field in PRESERVE_STATE_FIELDS:
+        if field in existing and field not in payload:
+            payload[field] = existing[field]
+
+    magnets[key] = payload
+    return magnets
 
 
 @app.get("/api/qrng")
@@ -317,6 +477,111 @@ def index():  # type: ignore[override]
 @app.get("/privacy")
 def privacy():
     return send_from_directory(".", "privacy.html")
+
+
+@app.get("/set")
+def quick_apply_status():
+    raw_status = request.args.get("status")
+    reason = (request.args.get("reason") or "").strip() or None
+    status_code = _normalize_status_param(raw_status)
+    allowed_codes = sorted(STATUS_LABELS.keys())
+
+    if not status_code:
+        return (
+            render_template(
+                "set_status.html",
+                success=False,
+                status_code=raw_status,
+                status_label=None,
+                allowed_codes=allowed_codes,
+                labels=STATUS_LABELS,
+                error="invalid_status",
+            ),
+            400,
+        )
+
+    user = session.get("user")
+    if not user:
+        return redirect(url_for("auth.login", next=request.url))
+
+    if str(user.get("type", "")).lower() != "student":
+        return (
+            render_template(
+                "set_status.html",
+                success=False,
+                status_code=status_code,
+                status_label=None,
+                allowed_codes=allowed_codes,
+                labels=STATUS_LABELS,
+                error="unsupported_user",
+            ),
+            403,
+        )
+
+    grade, section, seat = _derive_student_session()
+    if grade is None or section is None or seat is None:
+        return (
+            render_template(
+                "set_status.html",
+                success=False,
+                status_code=status_code,
+                status_label=None,
+                allowed_codes=allowed_codes,
+                labels=STATUS_LABELS,
+                error="missing_profile",
+            ),
+            400,
+        )
+
+    try:
+        state = ClassState.query.filter_by(grade=grade, section=section).first()
+        payload = _load_magnet_payload(state)
+        magnets = payload.get("magnets", {})
+        _upsert_student_status(magnets, seat, status_code, reason)
+        state = _persist_magnet_state(state, grade, section, magnets)
+    except Exception as exc:
+        db.session.rollback()
+        app.logger.exception("Failed to apply status via /set: %s", exc)
+        return (
+            render_template(
+                "set_status.html",
+                success=False,
+                status_code=status_code,
+                status_label=None,
+                allowed_codes=allowed_codes,
+                labels=STATUS_LABELS,
+                error="save_failed",
+            ),
+            500,
+        )
+
+    try:
+        if socketio:
+            socketio.emit(
+                "state_updated",
+                {"grade": grade, "section": section, "magnets": magnets},
+                namespace=f"/ws/classes/{grade}/{section}",
+            )
+    except Exception as exc:
+        app.logger.warning("Websocket broadcast failed for /set: %s", exc)
+
+    try:
+        broadcast_public_status_update(grade, section)
+    except Exception as exc:
+        app.logger.warning("Public status broadcast failed for /set: %s", exc)
+
+    status_label = STATUS_LABELS.get(status_code, status_code)
+    return render_template(
+        "set_status.html",
+        success=True,
+        status_code=status_code,
+        status_label=status_label,
+        reason=reason if status_code == "etc" else None,
+        allowed_codes=allowed_codes,
+        labels=STATUS_LABELS,
+        grade=grade,
+        section=section,
+    )
 
 
 @app.route("/reload-configs")

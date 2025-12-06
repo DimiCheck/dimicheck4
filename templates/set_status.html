@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>상태 적용</title>
+  <style>
+    :root{
+      color-scheme: light dark;
+      --bg: #0b0f14;
+      --bg-2: #0e1218;
+      --card: rgba(255,255,255,.08);
+      --card-2: rgba(255,255,255,.06);
+      --text: #e9eef6;
+      --muted: #a7b0c0;
+      --primary: #d04fff;
+      --primary-2: #ff6ad0;
+      --shadow: 0 10px 30px rgba(0, 0, 0, .45);
+      --border: rgba(255,255,255,0.12);
+    }
+    :root[data-theme="light"]{
+      --bg: #f6f8fb;
+      --bg-2: #eef2f8;
+      --card: rgba(255,255,255,.75);
+      --card-2: rgba(255,255,255,.6);
+      --text: #0f172a;
+      --muted: #5b6475;
+      --primary: #d04fff;
+      --primary-2: #ff6ad0;
+      --shadow: 0 10px 30px rgba(57,72,103,.15);
+      --border: #e2e8f0;
+    }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) {
+        --bg: #f6f8fb;
+        --bg-2: #eef2f8;
+        --card: rgba(255,255,255,.75);
+        --card-2: rgba(255,255,255,.6);
+        --text: #0f172a;
+        --muted: #5b6475;
+        --primary: #d04fff;
+        --primary-2: #ff6ad0;
+        --shadow: 0 10px 30px rgba(57,72,103,.15);
+        --border: #e2e8f0;
+      }
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:"Pretendard",system-ui,-apple-system,Segoe UI,Roboto,Noto Sans KR,sans-serif;
+      color:var(--text);
+      background:var(--bg);
+      display:grid;
+      place-items:center;
+      overflow:auto;
+      padding:28px 14px;
+    }
+    .blob-container{
+      position:fixed; inset:0; overflow:hidden; z-index:-1;
+      background: radial-gradient(1200px 800px at 10% -10%, #5a6cff20, transparent 60%),
+                  radial-gradient(1200px 800px at 110% 10%, #ff009025, transparent 60%),
+                  radial-gradient(1000px 700px at 50% 120%, #ff00b325, transparent 60%);
+    }
+    .blob{position:absolute; filter:blur(40px); opacity:.6; pointer-events:none}
+    .b1{width:48vw;height:48vw;background:radial-gradient(circle,#ff6a6a60,transparent 70%); top:-10vh; left:-10vw; animation:float 18s ease-in-out infinite}
+    .b2{width:42vw;height:42vw;background:radial-gradient(circle,#038b2550,transparent 70%); bottom:-15vh; right:-10vw; animation:float 22s ease-in-out infinite reverse}
+    .b3{width:36vw;height:36vw;background:radial-gradient(circle,#ff6ae950,transparent 70%); top:40vh; left:10vw; animation:float 26s ease-in-out infinite}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-20px)}}
+    main{
+      width:min(560px, 100%);
+      background:linear-gradient(180deg,var(--card),var(--card-2));
+      backdrop-filter:saturate(140%) blur(14px);
+      border:1px solid var(--border);
+      border-radius:20px;
+      padding:28px;
+      text-align:center;
+      box-shadow:var(--shadow);
+      position:relative;
+    }
+    img.logo{
+      width:90px;
+      height:auto;
+      margin-bottom:12px;
+    }
+    .logo-wrap{
+      position:relative;
+      width:90px;
+      height:90px;
+      margin:0 auto 12px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .spinner{
+      width:64px;
+      height:64px;
+      border:6px solid rgba(255,255,255,0.15);
+      border-top-color:var(--primary);
+      border-radius:50%;
+      animation:spin 0.85s linear infinite;
+      position:absolute;
+      inset:0;
+      margin:auto;
+      display:none;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .verify-msg{
+      margin-top:6px;
+      font-size:13px;
+      color:var(--muted);
+      min-height:18px;
+    }
+    .verify-msg.error{color:#ff8a8a;}
+    h1{
+      margin:0 0 10px;
+      font-size:clamp(24px,4vw,30px);
+      letter-spacing:-0.02em;
+    }
+    p{
+      margin:0 0 18px;
+      color:var(--muted);
+      line-height:1.6;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:10px 14px;
+      border-radius:12px;
+      background:rgba(255,255,255,0.08);
+      color:var(--text);
+      font-weight:600;
+      border:1px solid var(--border);
+      margin:6px 4px 0;
+    }
+    .error{background:rgba(248,113,113,0.12); border-color:rgba(248,113,113,0.28);}
+    .actions{
+      margin-top:20px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    button{
+      flex:1 1 180px;
+      padding:14px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background:linear-gradient(120deg,var(--primary),var(--primary-2));
+      color:#0b1222;
+      font-weight:800;
+      cursor:pointer;
+      transition:transform .12s ease, box-shadow .12s ease;
+    }
+    button.secondary{
+      background:rgba(255,255,255,0.08);
+      color:var(--text);
+      border:1px solid var(--border);
+    }
+    button:hover{transform:translateY(-1px); box-shadow:0 12px 24px rgba(0,0,0,0.18);}
+    button:active{transform:translateY(0);}
+    .codes{
+      margin-top:18px;
+      text-align:left;
+      font-size:14px;
+      color:var(--muted);
+    }
+    .code{
+      font-family:"SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      background:rgba(15, 23, 42, 0.06);
+      padding:2px 8px;
+      border-radius:8px;
+    }
+    .swipe-card{
+      margin-top:20px;
+      padding:14px;
+      border-radius:16px;
+      background:rgba(255,255,255,0.04);
+      border:1px solid var(--border);
+      text-align:left;
+    }
+    .swipe-label{
+      font-weight:700;
+      margin-bottom:10px;
+      color:var(--text);
+    }
+    .swipe-track{
+      position:relative;
+      width:100%;
+      height:54px;
+      border-radius:54px;
+      background:linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      overflow:hidden;
+      border:1px solid var(--border);
+      backdrop-filter:saturate(120%) blur(6px);
+      touch-action:pan-x;
+      user-select:none;
+    }
+    .swipe-fill{
+      position:absolute;
+      top:0;
+      bottom:0;
+      left:0;
+      background:linear-gradient(120deg,var(--primary),var(--primary-2));
+      width:0;
+      opacity:.9;
+      pointer-events:none;
+      border-radius:0;
+    }
+    .swipe-handle{
+      position:absolute;
+      top:0;
+      left:0;
+      width:52px;
+      height:52px;
+      border-radius:50%;
+      background:#fff;
+      color:#0b1222;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      letter-spacing:-0.02em;
+      box-shadow:0 12px 25px rgba(0,0,0,0.16);
+      transition:transform .15s ease;
+      cursor:pointer;
+      touch-action:none;
+      user-select:none;
+    }
+    .swipe-hint{
+      margin-top:10px;
+      font-size:13px;
+      color:var(--muted);
+    }
+    .close-btn{
+      position:fixed;
+      top:14px;
+      right:14px;
+      width:48px;
+      height:48px;
+      background:transparent;
+      color:var(--text);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:200;
+      font-size:24px;
+      cursor:pointer;
+      border:none;
+      z-index:3;
+    }
+    .close-btn:hover{transform:translateY(-1px);}
+    .close-btn:active{transform:translateY(0);}
+    @media (max-width: 768px){
+      .actions{display:none;}
+    }
+    @media (min-width: 769px){
+      .swipe-card{display:none;}
+      .close-btn{display:none;}
+    }
+  </style>
+</head>
+<body>
+  <div class="blob-container" aria-hidden="true">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
+  <button class="close-btn" type="button" aria-label="닫기" onclick="closeTab()">×</button>
+  <main>
+    <div class="logo-wrap">
+      <div class="spinner" id="logoSpinner"></div>
+      <img class="logo" id="logoImg" src="/logo.png" alt="DIMICHECK 로고" loading="lazy" decoding="async" />
+    </div>
+    <div class="verify-msg" id="verifyMsg"></div>
+    {% if success %}
+      <h1>{{ status_label or "상태" }} 상태를 적용했어요.</h1>
+      <p>요청한 상태가 서버에 저장됐습니다.</p>
+      <div class="pill">상태: {{ status_label }}</div>
+      {% if reason %}
+        <div class="pill">사유: {{ reason }}</div>
+      {% endif %}
+      {% if grade and section %}
+        <div class="pill">{{ grade }}학년 {{ section }}반</div>
+      {% endif %}
+      {% if status_code != "section" %}
+        <div class="swipe-card">
+          <div class="swipe-label" id="swipeLabel">스와이프하여 교실로 변경</div>
+          <div class="swipe-track" id="swipeTrack">
+            <div class="swipe-fill" id="swipeFill"></div>
+            <div class="swipe-handle" id="swipeHandle">→</div>
+          </div>
+          <div class="swipe-hint">한 번에 오른쪽 끝까지 밀면 교실 상태로 전환됩니다.</div>
+        </div>
+      {% endif %}
+      <div class="actions">
+        <button type="button" onclick="location.href='/set?status=class'">교실로 변경</button>
+        <button type="button" class="secondary" onclick="closeTab()">닫기</button>
+      </div>
+    {% else %}
+      <h1>상태를 적용하지 못했어요.</h1>
+      {% if error == "invalid_status" %}
+        <p>status 파라미터가 없거나 지원하지 않는 값입니다.</p>
+      {% elif error == "unsupported_user" %}
+        <p>학생 계정에서만 빠른 상태 적용을 사용할 수 있어요.</p>
+      {% elif error == "missing_profile" %}
+        <p>학년/반/번호를 확인할 수 없습니다. 다시 로그인해 주세요.</p>
+      {% else %}
+        <p>요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.</p>
+      {% endif %}
+      <div class="pill error">요청 값: {{ status_code or "없음" }}</div>
+      <div class="codes">
+        사용 가능: {% for code in allowed_codes or [] %}<span class="code">{{ code }}</span>{% if not loop.last %}, {% endif %}{% endfor %}
+      </div>
+      <div class="actions">
+        <button type="button" onclick="location.href='{{ url_for('auth.login', next=request.url) }}'">교실로 변경</button>
+        <button type="button" class="secondary" onclick="closeTab()">닫기</button>
+      </div>
+    {% endif %}
+  </main>
+  <script>
+    function closeTab() {
+      try {
+        window.close();
+      } catch (err) {
+        // ignore
+      }
+      // Fallback to a replace (no back stack) so we don't return to the current page
+      setTimeout(() => {
+        window.location.replace('/user.html');
+      }, 50);
+    }
+
+    async function verifyApplied(desiredStatus, desiredReason) {
+      const spinner = document.getElementById('logoSpinner');
+      const logo = document.getElementById('logoImg');
+      const msg = document.getElementById('verifyMsg');
+      if (!spinner || !logo || !msg) return;
+      spinner.style.display = 'block';
+      logo.style.visibility = 'hidden';
+      msg.textContent = '적용 확인 중...';
+      msg.classList.remove('error');
+
+      try {
+        const authRes = await fetch('/auth/status', { credentials: 'include' });
+        if (!authRes.ok) throw new Error('로그인 정보를 불러올 수 없습니다.');
+        const auth = await authRes.json();
+        if (!auth?.grade || !auth?.section || !auth?.number) throw new Error('학년/반/번호를 확인할 수 없습니다.');
+
+        const stateRes = await fetch(`/api/classes/state/load?grade=${auth.grade}&section=${auth.section}`, { credentials: 'include' });
+        if (!stateRes.ok) throw new Error('상태를 불러올 수 없습니다.');
+        const state = await stateRes.json();
+        const magnets = state?.magnets || {};
+        const mine = magnets[auth.number];
+
+        const matches = !!mine && mine.attachedTo === desiredStatus && (
+          desiredStatus !== 'etc' || !desiredReason || (mine.reason || '').trim() === desiredReason.trim()
+        );
+
+        if (matches) {
+          msg.textContent = '서버 적용 확인됨';
+        } else {
+          throw new Error('서버에 적용되지 않았습니다.');
+        }
+      } catch (err) {
+        console.error(err);
+        msg.textContent = err?.message || '적용 상태를 확인하지 못했습니다.';
+        msg.classList.add('error');
+      } finally {
+        spinner.style.display = 'none';
+        logo.style.visibility = 'visible';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const desiredStatus = "{{ status_code }}";
+      const desiredReason = "{{ reason or '' }}";
+      {% if success %}
+      verifyApplied(desiredStatus, desiredReason);
+      {% endif %}
+    });
+    (function initSwipe() {
+      const track = document.getElementById('swipeTrack');
+      const handle = document.getElementById('swipeHandle');
+      const fill = document.getElementById('swipeFill');
+      const label = document.getElementById('swipeLabel');
+      if (!track || !handle || !fill) return;
+
+      const PADDING = 0;
+      const redirectToClass = () => {
+        handle.style.transition = 'transform 0.2s ease';
+        fill.style.transition = 'width 0.2s ease';
+        const max = track.clientWidth - PADDING * 2 - handle.clientWidth;
+        handle.style.transform = `translateX(${PADDING + max}px)`;
+        fill.style.width = `${PADDING + max + handle.clientWidth / 2}px`;
+        if (label) label.textContent = '교실로 변경 중...';
+        setTimeout(() => { window.location.href = "/set?status=class"; }, 180);
+      };
+
+      let dragging = false;
+      let startX = 0;
+      let current = 0;
+      let max = 0;
+
+      const clamp = (val, min, maxVal) => Math.min(Math.max(val, min), maxVal);
+
+      const reset = () => {
+        handle.style.transition = 'transform 0.18s ease';
+        fill.style.transition = 'width 0.18s ease';
+        handle.style.transform = `translateX(${PADDING}px)`;
+        fill.style.width = `${PADDING + handle.clientWidth / 2}px`;
+        current = 0;
+        if (label) label.textContent = '스와이프하여 교실로 변경';
+      };
+
+      const start = (e) => {
+        const pointX = e.touches ? e.touches[0].clientX : e.clientX;
+        dragging = true;
+        const trackRect = track.getBoundingClientRect();
+        max = track.clientWidth - PADDING * 2 - handle.clientWidth;
+        const tentative = clamp(pointX - trackRect.left - handle.clientWidth / 2 - PADDING, 0, max);
+        current = tentative;
+        startX = pointX - (current + PADDING);
+        handle.style.transition = 'none';
+        fill.style.transition = 'none';
+        handle.style.transform = `translateX(${current + PADDING}px)`;
+        fill.style.width = `${PADDING + current + handle.clientWidth / 2}px`;
+      };
+
+      const move = (e) => {
+        if (!dragging) return;
+        const pointX = e.touches ? e.touches[0].clientX : e.clientX;
+        const next = clamp(pointX - startX, 0, max);
+        current = next;
+        handle.style.transform = `translateX(${current + PADDING}px)`;
+        fill.style.width = `${PADDING + current + handle.clientWidth / 2}px`;
+      };
+
+      const end = () => {
+        if (!dragging) return;
+        dragging = false;
+        const ratio = current / (max || 1);
+        if (ratio >= 0.85) {
+          redirectToClass();
+        } else {
+          reset();
+        }
+      };
+
+      const bindPointer = (el) => {
+        el.addEventListener('pointerdown', (e) => { e.preventDefault(); el.setPointerCapture?.(e.pointerId); start(e); });
+        el.addEventListener('pointermove', move);
+        el.addEventListener('pointerup', end);
+        el.addEventListener('pointercancel', end);
+      };
+      const bindTouch = (el) => {
+        el.addEventListener('touchstart', (e) => { start(e); });
+        el.addEventListener('touchmove', (e) => { move(e); });
+        el.addEventListener('touchend', end);
+        el.addEventListener('touchcancel', end);
+      };
+
+      bindPointer(handle);
+      bindPointer(track);
+      bindTouch(handle);
+      bindTouch(track);
+    })();
+  </script>
+</body>
+</html>
