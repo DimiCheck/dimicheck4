@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-NX4P51JHZD"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-NX4P51JHZD');
+  </script>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DimiCheck 이용약관</title>
+  <meta name="description" content="디미체크 서비스 이용에 필요한 권리·의무, 금지행위, 면책, 분쟁 해결 기준을 안내합니다." />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --bg-2: #0e1218;
+      --card: rgba(255, 255, 255, .08);
+      --card-2: rgba(255, 255, 255, .04);
+      --text: #e9eef6;
+      --muted: #a7b0c0;
+      --primary: #d04fff;
+      --primary-2: #ff6ad0;
+      --accent-soft: rgba(211, 108, 255, 0.18);
+      --border: color-mix(in oklab, #ffffff 14%, transparent);
+      --ring: 0 0 0 8px color-mix(in oklab, var(--primary) 30%, transparent);
+      --shadow: 0 18px 45px rgba(0, 0, 0, .45);
+      --radius: 26px;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f6f8fb;
+        --bg-2: #eef2f8;
+        --card: rgba(255, 255, 255, .9);
+        --card-2: rgba(255, 255, 255, .75);
+        --text: #0f172a;
+        --muted: #5b6475;
+        --primary: #d04fff;
+        --primary-2: #ff6ad0;
+        --accent-soft: rgba(208, 79, 255, 0.16);
+        --border: color-mix(in oklab, #0f172a 12%, transparent);
+        --shadow: 0 18px 45px rgba(57, 72, 103, .2);
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Pretendard", system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 800px at 18% -15%, rgba(116, 96, 255, 0.16), transparent 60%),
+        radial-gradient(1100px 900px at 95% 5%, rgba(255, 96, 149, 0.14), transparent 60%),
+        var(--bg);
+      min-height: 100vh;
+    }
+
+    .blob-container {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .blob {
+      position: absolute;
+      filter: blur(40px);
+      opacity: .55;
+      animation: float 24s ease-in-out infinite;
+    }
+
+    .blob.b1 { width: 48vw; height: 48vw; top: -10vh; left: -8vw; background: radial-gradient(circle, rgba(255, 106, 106, .6), transparent 70%); }
+    .blob.b2 { width: 42vw; height: 42vw; bottom: -12vh; right: -10vw; background: radial-gradient(circle, rgba(225, 0, 255, .5), transparent 70%); animation-direction: reverse; animation-duration: 28s; }
+    .blob.b3 { width: 36vw; height: 36vw; top: 38vh; left: 12vw; background: radial-gradient(circle, rgba(255, 106, 233, .5), transparent 70%); animation-duration: 30s; }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(18px, -24px); }
+    }
+
+    main.shell {
+      position: relative;
+      z-index: 1;
+      width: min(1080px, 94vw);
+      margin: 0 auto;
+      padding: 56px 0 96px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    header.hero {
+      background: linear-gradient(180deg, var(--card), var(--card-2));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      box-shadow: var(--shadow);
+    }
+
+    header.hero h1 {
+      margin: 0 0 8px 0;
+      font-size: clamp(22px, 4vw, 30px);
+      letter-spacing: .2px;
+    }
+
+    header.hero p { margin: 4px 0 14px 0; color: var(--muted); }
+
+    .meta { display: flex; flex-wrap: wrap; gap: 10px; color: var(--muted); font-size: 14px; }
+    .meta span { background: var(--card-2); padding: 6px 10px; border-radius: 12px; border: 1px solid var(--border); }
+
+    nav.toc {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 8px;
+    }
+    nav.toc a {
+      display: block;
+      padding: 10px 12px;
+      border-radius: 14px;
+      text-decoration: none;
+      color: var(--text);
+      background: var(--card);
+      border: 1px solid var(--border);
+      transition: transform .18s ease, border-color .18s ease;
+    }
+    nav.toc a:hover { transform: translateY(-2px); border-color: color-mix(in oklab, var(--primary) 40%, var(--border)); }
+
+    section.card {
+      background: linear-gradient(180deg, var(--card), var(--card-2));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      box-shadow: var(--shadow);
+    }
+    section.card h2 { margin-top: 0; margin-bottom: 6px; }
+    section.card p { margin: 8px 0; line-height: 1.65; color: var(--text); }
+    section.card ul { margin: 8px 0 8px 18px; color: var(--text); }
+    section.card code { background: var(--card-2); padding: 2px 6px; border-radius: 8px; }
+
+    @media (max-width: 640px) {
+      main.shell { padding: 32px 0 72px; }
+      header.hero, section.card { padding: 18px; }
+      nav.toc { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="blob-container" aria-hidden="true">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
+
+  <main class="shell">
+    <header class="hero">
+      <h1>DimiCheck 이용약관</h1>
+      <p>디미고 학생·교사를 위한 학급 상태/출결 관리, 채팅·보드·API 제공 서비스의 이용 조건을 규정합니다.</p>
+      <div class="meta" role="list">
+        <span role="listitem">시행일: 2025.11.26</span>
+        <span role="listitem">버전: v1.0</span>
+        <span role="listitem">문의: hjun1052@dimigo.hs.kr</span>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="목차">
+      <a href="#scope">1. 목적 및 적용 범위</a>
+      <a href="#account">2. 계정·인증</a>
+      <a href="#service">3. 서비스 내용</a>
+      <a href="#rules">4. 이용자 의무·금지행위</a>
+      <a href="#content">5. 이용자 콘텐츠·지식재산</a>
+      <a href="#data">6. 개인정보·기록 처리</a>
+      <a href="#availability">7. 서비스 변경·중단</a>
+      <a href="#liability">8. 책임 제한·면책</a>
+      <a href="#termination">9. 이용 제한·해지</a>
+      <a href="#law">10. 준거법·분쟁 해결</a>
+      <a href="#contact">11. 문의처</a>
+    </nav>
+
+    <section class="card" id="scope">
+      <h2>1. 목적 및 적용 범위</h2>
+      <p>이 약관은 디미체크(이하 “서비스”)를 운영하는 개발·운영팀과 이용자 간 권리·의무, 이용 조건을 규정합니다. 웹앱 <code>https://chec.kro.kr</code> 및 연동된 API, 교사용/보드 화면, 모바일 PWA에 모두 적용됩니다.</p>
+      <p>서비스는 디미고 재학생·교사 등 학내 구성원을 대상으로 하며, 학교 규정과 대한민국 법령(「개인정보 보호법」, 「정보통신망법」, 「청소년 보호법」 등)을 준수합니다.</p>
+    </section>
+
+    <section class="card" id="account">
+      <h2>2. 계정·인증</h2>
+      <ul>
+        <li>학교 계정 또는 OAuth로 본인 인증된 사용자만 이용할 수 있습니다. 인증 정보 도용·대여·공유는 금지됩니다.</li>
+        <li>학생은 자신의 학년·반·번호로만 출결/채팅을 사용할 수 있으며, 교사·학생회는 부여된 관리 범위 내에서만 조회·제어할 수 있습니다.</li>
+        <li>부정 사용이 확인되면 즉시 이용을 제한할 수 있습니다.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="service">
+      <h2>3. 서비스 내용</h2>
+      <ul>
+        <li>학급 상태(교실·화장실·복도 등) 기록, 출결·보드 현황 공유</li>
+        <li>채팅/투표/반 이모티콘·GIF 등 학급 커뮤니티 기능</li>
+        <li>API·개발자 콘솔 제공, OAuth 기반 외부 연동</li>
+        <li>서비스는 학사 운영과 학교 생활 편의를 위한 부가 도구이며, 공식 행정 기록과 차이가 있을 수 있습니다.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="rules">
+      <h2>4. 이용자 의무·금지행위</h2>
+      <ul>
+        <li>학교 규정, 관련 법령, 본 약관·개인정보처리방침을 준수해야 합니다.</li>
+        <li>다음 행위는 금지됩니다.
+          <ul>
+            <li>타인 정보 도용, 무단 로그인 시도, 권한 초과 접근</li>
+            <li>욕설·비방·차별·허위정보 유포, 사생활 침해, 불법·유해 콘텐츠 게시</li>
+            <li>개인정보(본인·타인) 무단 공유, 광고·스팸 발송</li>
+            <li>크롤링·자동화·트래픽 과부하, 취약점 악용·리버스엔지니어링</li>
+            <li>학교 수업·생활을 방해하거나 보안에 위해가 되는 행위</li>
+          </ul>
+        </li>
+        <li>게시물·업로드 파일에 대한 책임은 게시자에게 있으며, 운영팀은 학교 규정·법령 위반 또는 민원·신고가 접수된 경우 사전 통보 없이 삭제·제한할 수 있습니다.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="content">
+      <h2>5. 이용자 콘텐츠·지식재산</h2>
+      <ul>
+        <li>이용자가 게시한 채팅·이모티콘·업로드 콘텐츠의 권리는 이용자에게 있습니다. 다만 서비스 제공·품질 개선·불법행위 대응을 위해 무상·비독점적으로 저장·복제·전송·표시할 수 있는 권한을 부여한 것으로 봅니다.</li>
+        <li>서비스 로고, UI, 코드, 데이터베이스 등은 운영팀의 지식재산이며, 허가 없이 복제·변경·배포할 수 없습니다.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="data">
+      <h2>6. 개인정보·기록 처리</h2>
+      <ul>
+        <li>개인정보의 수집·이용·보유·제3자 제공·파기 등은 별도 <a href="/privacy.html">개인정보처리방침</a>을 따릅니다.</li>
+        <li>출결·채팅·투표 등 이용 기록은 학사연도 내 보관 후 정기 삭제되며, 법령상 보존 의무가 있는 경우 예외적으로 보관할 수 있습니다.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="availability">
+      <h2>7. 서비스 변경·중단</h2>
+      <ul>
+        <li>운영팀은 필요 시 기능을 추가·수정·중단할 수 있으며, 학사 일정·보안 업데이트 등으로 일시 중단될 수 있습니다.</li>
+        <li>법령·보안·시스템 안정성을 위해 긴급 조치가 필요한 경우 사전 고지 없이 제한할 수 있습니다.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="liability">
+      <h2>8. 책임 제한·면책</h2>
+      <ul>
+        <li>서비스는 학사 보조 도구로 제공되며, 행정상 최종 효력은 학교·담당 교사 판단을 따릅니다.</li>
+        <li>천재지변, 네트워크 장애, 학교 정책 변경, 불가항력으로 인한 손해에 대해 운영팀은 책임을 지지 않습니다.</li>
+        <li>이용자 과실·약관 위반으로 발생한 손해는 이용자가 부담합니다.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="termination">
+      <h2>9. 이용 제한·해지</h2>
+      <ul>
+        <li>약관·법령·학교 규정 위반 시 사전 통보 없이 이용을 제한하거나 데이터 삭제, 계정 정지·탈퇴 조치를 할 수 있습니다.</li>
+        <li>학년 종료·전학·졸업 등으로 학생 자격이 상실되면 서비스 이용이 제한될 수 있습니다.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="law">
+      <h2>10. 준거법·분쟁 해결</h2>
+      <ul>
+        <li>본 약관은 대한민국 법률을 준거법으로 하며, 분쟁은 우선 협의로 해결을 시도합니다.</li>
+        <li>협의가 이루어지지 않을 경우 「민사소송법」에 따른 관할 법원(수원지방법원 안산지원 등)에 제기할 수 있습니다.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="contact">
+      <h2>11. 문의처</h2>
+      <p>약관 및 서비스 이용 문의: <a href="mailto:hjun1052@dimigo.hs.kr">hjun1052@dimigo.hs.kr</a></p>
+      <p>개인정보 처리 관련 문의는 <a href="/privacy.html">개인정보처리방침</a>의 연락처를 따릅니다.</p>
+    </section>
+  </main>
+</body>
+</html>

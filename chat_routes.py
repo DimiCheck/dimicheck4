@@ -6,11 +6,93 @@ import json
 from flask import Blueprint, jsonify, request, session
 
 from extensions import db
-from models import ChatMessage, UserNickname, ClassState, ChatReaction, UserAvatar, ClassEmoji
+from models import ChatMessage, UserNickname, ClassState, ChatReaction, UserAvatar, ClassEmoji, ChatMessageRead, ChatConsent
 from utils import is_board_session_active, is_teacher_session_active
 import re
+from sqlalchemy import or_, and_, func
+from sqlalchemy.exc import IntegrityError
 
 blueprint = Blueprint("chat", __name__, url_prefix="/api/classes/chat")
+
+DEFAULT_CHANNEL = "home"
+MAX_CHANNEL_NAME_LENGTH = 30
+MAX_CHANNELS_PER_CLASS = 20
+CHANNEL_NAME_PATTERN = re.compile(r"^[A-Za-z0-9가-힣 _\\-]+$")
+CHAT_CONSENT_VERSION = "v1"
+
+
+def _is_valid_channel_name(name: str) -> bool:
+    return bool(name) and bool(CHANNEL_NAME_PATTERN.match(name))
+
+
+def _normalize_channel_memberships(raw_memberships, channels: list[str], default_grade: int | None, default_section: int | None) -> dict[str, list[dict]]:
+    memberships = raw_memberships if isinstance(raw_memberships, dict) else {}
+    result: dict[str, list[dict]] = {}
+
+    for ch in channels:
+        entries = []
+        seen_keys = set()
+        raw_entries = memberships.get(ch) if isinstance(memberships.get(ch), list) else []
+        for entry in raw_entries:
+            if not isinstance(entry, dict):
+                continue
+            g = _normalize_class_value(entry.get("grade"))
+            s = _normalize_class_value(entry.get("section"))
+            if g is None or s is None:
+                continue
+            key = f"{g}-{s}"
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            entries.append({"grade": g, "section": s})
+
+        if default_grade is not None and default_section is not None:
+            default_key = f"{default_grade}-{default_section}"
+            if default_key not in seen_keys:
+                entries.append({"grade": default_grade, "section": default_section})
+
+        result[ch] = entries
+
+    return result
+
+
+def _normalize_channel_owners(raw_owners, channels: list[str]) -> dict[str, list[dict]]:
+    owners = raw_owners if isinstance(raw_owners, dict) else {}
+    result: dict[str, list[dict]] = {}
+
+    for ch in channels:
+        entries = []
+        seen = set()
+        raw_entries = owners.get(ch) if isinstance(owners.get(ch), list) else []
+        for entry in raw_entries:
+            if not isinstance(entry, dict):
+                continue
+            g = _normalize_class_value(entry.get("grade"))
+            s = _normalize_class_value(entry.get("section"))
+            n = _normalize_class_value(entry.get("studentNumber"))
+            if g is None or s is None or n is None:
+                continue
+            key = f"{g}-{s}-{n}"
+            if key in seen:
+                continue
+            seen.add(key)
+            entries.append({"grade": g, "section": s, "studentNumber": n})
+        result[ch] = entries
+
+    return result
+
+
+def _is_channel_owner(grade: int | None, section: int | None, number: int | None, owners: dict, channel: str) -> bool:
+    if grade is None or section is None or number is None:
+        return False
+    for entry in owners.get(channel, []):
+        if (
+            _normalize_class_value(entry.get("grade")) == grade
+            and _normalize_class_value(entry.get("section")) == section
+            and _normalize_class_value(entry.get("studentNumber")) == number
+        ):
+            return True
+    return False
 
 
 def _normalize_class_value(value: int | str | None) -> int | None:
@@ -43,6 +125,81 @@ def _split_student_identifier(value: int | str | None) -> tuple[int | None, int 
         return grade, section, number
 
     return None, None, _normalize_class_value(digits)
+
+
+def _normalize_channel_name(value: str | None) -> str:
+    name = (value or "").strip()
+    if not name:
+        return DEFAULT_CHANNEL
+
+    # Collapse repeated spaces and clamp length
+    name = re.sub(r"\s+", " ", name)
+    if len(name) > MAX_CHANNEL_NAME_LENGTH:
+        name = name[:MAX_CHANNEL_NAME_LENGTH]
+    return name
+
+
+def _normalize_channel_list(raw_list) -> list[str]:
+    channels = raw_list if isinstance(raw_list, list) else []
+    normalized: list[str] = []
+    seen = set()
+
+    for ch in channels:
+        if not isinstance(ch, str):
+            continue
+        name = _normalize_channel_name(ch)
+        key = name.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(name)
+
+    if DEFAULT_CHANNEL.casefold() not in seen:
+        normalized.insert(0, DEFAULT_CHANNEL)
+    return normalized
+
+
+def _channel_exists(channels: list[str], name: str) -> bool:
+    target = name.casefold()
+    return any(ch.casefold() == target for ch in channels)
+
+
+def _serialize_channels_for_class(channels: list[str], memberships: dict, owners: dict, grade: int, section: int, session_info: tuple[int | None, int | None, int | None] | None = None) -> list[dict]:
+    sg = ss = sn = None
+    if session_info:
+        sg, ss, sn = session_info
+    serialized = []
+    for ch in channels:
+        if any(
+            _normalize_class_value(m.get("grade")) == grade and _normalize_class_value(m.get("section")) == section
+            for m in memberships.get(ch, [])
+        ):
+            can_delete = False
+            if ch != DEFAULT_CHANNEL:
+                can_delete = (
+                    is_teacher_session_active()
+                    or is_board_session_active(grade, section)
+                    or _is_channel_owner(sg, ss, sn, owners, ch)
+                )
+            # Latest message id for this channel across member classes
+            member_conditions = []
+            for m in memberships.get(ch, []):
+                g = _normalize_class_value(m.get("grade"))
+                s = _normalize_class_value(m.get("section"))
+                if g is None or s is None:
+                    continue
+                member_conditions.append(and_(ChatMessage.grade == g, ChatMessage.section == s))
+
+            latest_id = None
+            if member_conditions:
+                latest_id = (
+                    db.session.query(func.max(ChatMessage.id))
+                    .filter(ChatMessage.channel == ch, or_(*member_conditions))
+                    .scalar()
+                )
+
+            serialized.append({"name": ch, "canDelete": can_delete, "latestMessageId": latest_id})
+    return serialized
 
 
 def _get_student_session_info() -> tuple[int | None, int | None, int | None]:
@@ -135,9 +292,31 @@ def _cleanup_expired_messages():
         db.session.commit()
 
 
+def _today_start_utc() -> datetime:
+    """Return today's 00:00 KST in UTC"""
+    kst_now = _get_kst_now()
+    today_kst = datetime(kst_now.year, kst_now.month, kst_now.day)
+    return today_kst - timedelta(hours=9)
+
+
+def _get_chat_consent(grade: int | None, section: int | None, number: int | None) -> ChatConsent | None:
+    if grade is None or section is None or number is None:
+        return None
+    return ChatConsent.query.filter_by(
+        grade=grade,
+        section=section,
+        student_number=number,
+    ).first()
+
+
 def _load_state_blob(state: ClassState | None) -> dict:
     if not state or not state.data:
-        return {"magnets": {}}
+        return {
+            "magnets": {},
+            "channels": [DEFAULT_CHANNEL],
+            "channelMemberships": {DEFAULT_CHANNEL: []},
+            "channelOwners": {DEFAULT_CHANNEL: []},
+        }
     try:
         data = json.loads(state.data)
     except (TypeError, json.JSONDecodeError):
@@ -148,16 +327,53 @@ def _load_state_blob(state: ClassState | None) -> dict:
     if not isinstance(magnets, dict):
         magnets = {}
     data["magnets"] = magnets
+    channels = _normalize_channel_list(data.get("channels"))
+    data["channels"] = channels
+    data["channelMemberships"] = _normalize_channel_memberships(
+        data.get("channelMemberships"),
+        channels,
+        getattr(state, "grade", None),
+        getattr(state, "section", None),
+    )
+    data["channelOwners"] = _normalize_channel_owners(data.get("channelOwners"), channels)
     return data
 
 
 def _ensure_class_state(grade: int, section: int) -> tuple[ClassState, dict]:
     state = ClassState.query.filter_by(grade=grade, section=section).first()
     if not state:
-        state = ClassState(grade=grade, section=section, data=json.dumps({"magnets": {}}))
+        payload = {
+            "magnets": {},
+            "channels": [DEFAULT_CHANNEL],
+            "channelMemberships": {
+                DEFAULT_CHANNEL: [{"grade": grade, "section": section}]
+            },
+            "channelOwners": {DEFAULT_CHANNEL: []},
+        }
+        state = ClassState(grade=grade, section=section, data=json.dumps(payload, ensure_ascii=False))
         db.session.add(state)
-        return state, {"magnets": {}}
+        return state, payload
     return state, _load_state_blob(state)
+
+
+def _ensure_channels_for_class(grade: int, section: int, *, persist: bool = False) -> tuple[list[str], ClassState, dict, dict, dict]:
+    state, payload = _ensure_class_state(grade, section)
+    existing = payload.get("channels") if isinstance(payload, dict) else None
+    existing_memberships = payload.get("channelMemberships") if isinstance(payload, dict) else None
+    existing_owners = payload.get("channelOwners") if isinstance(payload, dict) else None
+    channels = _normalize_channel_list(existing)
+    payload["channels"] = channels
+    memberships = _normalize_channel_memberships(payload.get("channelMemberships"), channels, grade, section)
+    payload["channelMemberships"] = memberships
+    owners = _normalize_channel_owners(payload.get("channelOwners"), channels)
+    payload["channelOwners"] = owners
+
+    if persist and (channels != existing or memberships != existing_memberships or owners != existing_owners):
+        state.data = json.dumps(payload, ensure_ascii=False)
+        db.session.add(state)
+        db.session.commit()
+
+    return channels, state, payload, memberships, owners
 
 
 def _apply_thought_preview(grade: int, section: int, number: int, text: str | None, duration_seconds: int = THOUGHT_PREVIEW_DURATION_SECONDS) -> None:
@@ -205,6 +421,7 @@ def get_today_messages():
     """Get academic-year chat messages for a specific class"""
     grade = request.args.get("grade", type=int)
     section = request.args.get("section", type=int)
+    requested_channel = _normalize_channel_name(request.args.get("channel"))
 
     if grade is None or section is None:
         return jsonify({"error": "missing grade or section"}), 400
@@ -212,15 +429,36 @@ def get_today_messages():
     if not _is_authorized(grade, section):
         return jsonify({"error": "forbidden"}), 403
 
+    channels, _, _, memberships, owners = _ensure_channels_for_class(grade, section, persist=True)
+    channel = requested_channel if _channel_exists(channels, requested_channel) else DEFAULT_CHANNEL
+    member_classes = memberships.get(channel) or [{"grade": grade, "section": section}]
+
     # Get messages from current academic year start (UTC)
     today_start_utc = _academic_year_start_utc()
+    today_midnight_utc = _today_start_utc()
 
-    messages = ChatMessage.query.filter(
-        ChatMessage.grade == grade,
-        ChatMessage.section == section,
-        ChatMessage.created_at >= today_start_utc,
-        ChatMessage.deleted_at == None  # Filter out deleted messages
-    ).order_by(ChatMessage.created_at.asc()).all()
+    from sqlalchemy import or_, and_
+    member_conditions = []
+    for m in member_classes:
+        g = _normalize_class_value(m.get("grade"))
+        s = _normalize_class_value(m.get("section"))
+        if g is None or s is None:
+            continue
+        member_conditions.append(and_(ChatMessage.grade == g, ChatMessage.section == s))
+
+    if not member_conditions:
+        return jsonify({"error": "forbidden"}), 403
+
+    messages = (
+        ChatMessage.query.filter(
+            ChatMessage.channel == channel,
+            ChatMessage.created_at >= today_start_utc,
+            ChatMessage.deleted_at == None,  # Filter out deleted messages
+            or_(*member_conditions)
+        )
+        .order_by(ChatMessage.created_at.asc())
+        .all()
+    )
 
     # 메시지 ID 목록
     message_ids = [msg.id for msg in messages]
@@ -252,6 +490,19 @@ def get_today_messages():
         except (TypeError, json.JSONDecodeError):
             pass
 
+    # Read counts for messages created today only
+    read_counts = {}
+    if message_ids:
+        todays_ids = [msg.id for msg in messages if msg.created_at >= today_midnight_utc]
+        if todays_ids:
+            read_rows = (
+                db.session.query(ChatMessageRead.message_id, func.count(ChatMessageRead.id))
+                .filter(ChatMessageRead.message_id.in_(todays_ids))
+                .group_by(ChatMessageRead.message_id)
+                .all()
+            )
+            read_counts = {row[0]: row[1] for row in read_rows}
+
     return jsonify({
         "messages": [
             {
@@ -259,10 +510,12 @@ def get_today_messages():
                 "studentNumber": msg.student_number,
                 "message": msg.message,
                 "timestamp": msg.created_at.isoformat(),
+                "channel": msg.channel or DEFAULT_CHANNEL,
                 "imageUrl": msg.image_url,
                 "replyToId": msg.reply_to_id,
                 "nickname": msg.nickname,
                 "avatar": avatars_by_student.get(msg.student_number),
+                "readCount": read_counts.get(msg.id) if msg.created_at >= today_midnight_utc else None,
                 "reactions": [
                     {
                         "emoji": emoji,
@@ -275,6 +528,211 @@ def get_today_messages():
             for msg in messages
         ]
     })
+
+
+@blueprint.get("/channels")
+def get_channels():
+    """List channels for a class"""
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+    session_grade, session_section, session_number = _get_student_session_info()
+
+    if grade is None or section is None:
+        return jsonify({"error": "missing grade or section"}), 400
+
+    if not _is_authorized(grade, section):
+        return jsonify({"error": "forbidden"}), 403
+
+    channels, _, _, memberships, owners = _ensure_channels_for_class(grade, section, persist=True)
+    serialized = _serialize_channels_for_class(channels, memberships, owners, grade, section, (session_grade, session_section, session_number))
+    return jsonify({"channels": serialized})
+
+
+@blueprint.post("/channels")
+def create_channel():
+    """Create a new channel for the class"""
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+    payload = request.get_json() or {}
+    session_grade, session_section, session_number = _get_student_session_info()
+
+    if grade is None or section is None:
+        return jsonify({"error": "missing grade or section"}), 400
+
+    if not _is_authorized(grade, section):
+        return jsonify({"error": "forbidden"}), 403
+
+    raw_name = payload.get("name") or payload.get("channel") or ""
+    name = _normalize_channel_name(raw_name)
+    if not _is_valid_channel_name(name):
+        return jsonify({"error": "invalid channel name"}), 400
+
+    channels, state, state_payload, memberships, owners = _ensure_channels_for_class(grade, section)
+    raw_classes = payload.get("classes") or []
+    member_tuples = set()
+    for item in raw_classes:
+        if not isinstance(item, dict):
+            continue
+        g = _normalize_class_value(item.get("grade"))
+        s = _normalize_class_value(item.get("section"))
+        if g is None or s is None:
+            continue
+        member_tuples.add((g, s))
+    member_tuples.add((grade, section))
+
+    target_classes = [{"grade": g, "section": s} for g, s in sorted(member_tuples)]
+    owner_entry = None
+    if session_grade is not None and session_section is not None and session_number is not None:
+        owner_entry = {
+            "grade": session_grade,
+            "section": session_section,
+            "studentNumber": session_number
+        }
+
+    if _channel_exists(channels, name):
+        # Update memberships if necessary
+        existing_members = memberships.get(name, [])
+        existing_set = {(m.get("grade"), m.get("section")) for m in existing_members if isinstance(m, dict)}
+        if not member_tuples.issubset(existing_set):
+            memberships[name] = target_classes
+            state_payload["channelMemberships"] = memberships
+            state_payload["channels"] = channels
+            if owner_entry:
+                channel_owners = _normalize_channel_owners(state_payload.get("channelOwners"), channels)
+                existing_owners = channel_owners.get(name, [])
+                existing_owner_keys = {(o.get("grade"), o.get("section"), o.get("studentNumber")) for o in existing_owners}
+                key = (owner_entry["grade"], owner_entry["section"], owner_entry["studentNumber"])
+                if key not in existing_owner_keys:
+                    existing_owners.append(owner_entry)
+                channel_owners[name] = existing_owners
+                state_payload["channelOwners"] = channel_owners
+            state.data = json.dumps(state_payload, ensure_ascii=False)
+            db.session.add(state)
+            # Propagate to all member classes
+            for target in target_classes:
+                st, pl = _ensure_class_state(target["grade"], target["section"])
+                chs = _normalize_channel_list(pl.get("channels"))
+                if name not in chs:
+                    chs.append(name)
+                mems = _normalize_channel_memberships(pl.get("channelMemberships"), chs, target["grade"], target["section"])
+                mems[name] = target_classes
+                channel_owners = _normalize_channel_owners(pl.get("channelOwners"), chs)
+                if owner_entry:
+                    owner_list = channel_owners.get(name, [])
+                    owner_keys = {(o.get("grade"), o.get("section"), o.get("studentNumber")) for o in owner_list}
+                    key = (owner_entry["grade"], owner_entry["section"], owner_entry["studentNumber"])
+                    if key not in owner_keys:
+                        owner_list.append(owner_entry)
+                    channel_owners[name] = owner_list
+                pl["channels"] = chs
+                pl["channelMemberships"] = mems
+                pl["channelOwners"] = channel_owners
+                st.data = json.dumps(pl, ensure_ascii=False)
+                db.session.add(st)
+            db.session.commit()
+        return jsonify({"ok": True, "channel": name, "channels": channels, "created": False})
+
+    if len(channels) >= MAX_CHANNELS_PER_CLASS:
+        return jsonify({"error": "channel limit reached"}), 400
+
+    # Apply to all member classes
+    def _update_class_state(target_grade: int, target_section: int):
+        st, pl = _ensure_class_state(target_grade, target_section)
+        chs = _normalize_channel_list(pl.get("channels"))
+        if name not in chs:
+            chs.append(name)
+        mems = _normalize_channel_memberships(pl.get("channelMemberships"), chs, target_grade, target_section)
+        mems[name] = target_classes
+        channel_owners = _normalize_channel_owners(pl.get("channelOwners"), chs)
+        if owner_entry:
+            owner_list = channel_owners.get(name, [])
+            owner_keys = {(o.get("grade"), o.get("section"), o.get("studentNumber")) for o in owner_list}
+            key = (owner_entry["grade"], owner_entry["section"], owner_entry["studentNumber"])
+            if key not in owner_keys:
+                owner_list.append(owner_entry)
+            channel_owners[name] = owner_list
+        pl["channels"] = chs
+        pl["channelMemberships"] = mems
+        pl["channelOwners"] = channel_owners
+        st.data = json.dumps(pl, ensure_ascii=False)
+        db.session.add(st)
+        return chs, mems
+
+    for target in target_classes:
+        _update_class_state(target["grade"], target["section"])
+    db.session.commit()
+
+    # Return the caller's channel list
+    refreshed_channels, _, _, refreshed_mems, refreshed_owners = _ensure_channels_for_class(grade, section, persist=True)
+    serialized = _serialize_channels_for_class(
+        refreshed_channels,
+        refreshed_mems,
+        refreshed_owners,
+        grade,
+        section,
+        (session_grade, session_section, session_number)
+    )
+    return jsonify({"ok": True, "channel": name, "channels": serialized, "members": target_classes, "created": True})
+
+
+@blueprint.delete("/channels/<path:channel_name>")
+def delete_channel(channel_name):
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+    if grade is None or section is None:
+        return jsonify({"error": "missing grade or section"}), 400
+
+    if not _is_authorized(grade, section):
+        return jsonify({"error": "forbidden"}), 403
+
+    channel = _normalize_channel_name(channel_name)
+    if channel == DEFAULT_CHANNEL:
+        return jsonify({"error": "cannot delete default channel"}), 400
+    channels, state, state_payload, memberships, owners = _ensure_channels_for_class(grade, section, persist=True)
+    if not _channel_exists(channels, channel):
+        return jsonify({"error": "channel not found"}), 404
+
+    member_classes = memberships.get(channel) or [{"grade": grade, "section": section}]
+
+    # Permission: owner or teacher/board
+    session_grade, session_section, session_number = _get_student_session_info()
+    is_owner = _is_channel_owner(session_grade, session_section, session_number, owners, channel)
+    if not (is_owner or is_teacher_session_active() or is_board_session_active(grade, section)):
+        return jsonify({"error": "forbidden"}), 403
+
+    # Remove from all member classes
+    for m in member_classes:
+        g = _normalize_class_value(m.get("grade"))
+        s = _normalize_class_value(m.get("section"))
+        if g is None or s is None:
+            continue
+        st, pl = _ensure_class_state(g, s)
+        chs = _normalize_channel_list(pl.get("channels"))
+        mems = _normalize_channel_memberships(pl.get("channelMemberships"), chs, g, s)
+        channel_owners = _normalize_channel_owners(pl.get("channelOwners"), chs)
+
+        if channel in chs:
+            chs = [c for c in chs if c.casefold() != channel.casefold()]
+        mems.pop(channel, None)
+        channel_owners.pop(channel, None)
+
+        pl["channels"] = chs if chs else [DEFAULT_CHANNEL]
+        pl["channelMemberships"] = mems
+        pl["channelOwners"] = channel_owners
+        st.data = json.dumps(pl, ensure_ascii=False)
+        db.session.add(st)
+    db.session.commit()
+
+    refreshed_channels, _, _, refreshed_mems, refreshed_owners = _ensure_channels_for_class(grade, section, persist=True)
+    serialized = _serialize_channels_for_class(
+        refreshed_channels,
+        refreshed_mems,
+        refreshed_owners,
+        grade,
+        section,
+        (session_grade, session_section, session_number)
+    )
+    return jsonify({"ok": True, "channels": serialized})
 
 
 @blueprint.post("/send")
@@ -293,6 +751,45 @@ def send_message():
         return jsonify({"error": "forbidden"}), 403
 
     payload = request.get_json() or {}
+    requested_channel = _normalize_channel_name(
+        request.args.get("channel") or payload.get("channel")
+    )
+    if not _is_valid_channel_name(requested_channel):
+        requested_channel = DEFAULT_CHANNEL
+
+    target_raw = payload.get("target") or ""
+    target = target_raw.lower().strip() if isinstance(target_raw, str) else ""
+    board_preview_raw = payload.get("boardPreview")
+    send_board_preview = True
+    if isinstance(board_preview_raw, bool):
+        send_board_preview = board_preview_raw
+    elif isinstance(board_preview_raw, (int, float)):
+        send_board_preview = bool(board_preview_raw)
+    elif isinstance(board_preview_raw, str):
+        send_board_preview = board_preview_raw.lower() not in ("false", "0", "no", "off")
+    elif target in ("chat", "chat-only", "chat_only"):
+        send_board_preview = False
+
+    channels, state, state_payload, memberships, owners = _ensure_channels_for_class(grade, section)
+    if not _channel_exists(channels, requested_channel):
+        if len(channels) >= MAX_CHANNELS_PER_CLASS:
+            return jsonify({"error": "채널을 더 만들 수 없습니다"}), 400
+        channels.append(requested_channel)
+        state_payload["channels"] = channels
+        memberships = _normalize_channel_memberships(
+            state_payload.get("channelMemberships"),
+            channels,
+            grade,
+            section,
+        )
+        state_payload["channelMemberships"] = memberships
+        state.data = json.dumps(state_payload, ensure_ascii=False)
+        db.session.add(state)
+        db.session.commit()
+    channel = requested_channel
+    member_classes = memberships.get(channel) or [{"grade": grade, "section": section}]
+    if not any(_normalize_class_value(m.get("grade")) == grade and _normalize_class_value(m.get("section")) == section for m in member_classes):
+        return jsonify({"error": "forbidden"}), 403
     message_text = (payload.get("message") or "").strip()
 
     image_url = payload.get("imageUrl")
@@ -347,6 +844,7 @@ def send_message():
     new_message = ChatMessage(
         grade=grade,
         section=section,
+        channel=channel,
         student_number=session_number,
         message=message_text if message_text else "",
         image_url=image_url if image_url else None,
@@ -357,7 +855,7 @@ def send_message():
     preview_text = message_text or None
     if not preview_text and image_url:
         preview_text = "이미지를 보냈습니다."
-    if preview_text:
+    if preview_text and send_board_preview:
         _apply_thought_preview(grade, section, session_number, preview_text)
 
     db.session.add(new_message)
@@ -373,9 +871,11 @@ def send_message():
             "studentNumber": new_message.student_number,
             "message": new_message.message,
             "timestamp": new_message.created_at.isoformat(),
+            "channel": new_message.channel or DEFAULT_CHANNEL,
             "imageUrl": new_message.image_url,
             "replyToId": new_message.reply_to_id,
-            "nickname": new_message.nickname
+            "nickname": new_message.nickname,
+            "readCount": None
         }
     })
 
@@ -664,6 +1164,17 @@ def get_user_profile(student_number):
     if not _is_authorized(grade, section):
         return jsonify({"error": "forbidden"}), 403
 
+    requested_channel = request.args.get("channel")
+    channel_filter = None
+    if requested_channel:
+        normalized = _normalize_channel_name(requested_channel)
+        channels, _, _, memberships, owners = _ensure_channels_for_class(grade, section)
+        if _channel_exists(channels, normalized) and any(
+            _normalize_class_value(m.get("grade")) == grade and _normalize_class_value(m.get("section")) == section
+            for m in memberships.get(normalized, [])
+        ):
+            channel_filter = normalized
+
     # 닉네임 가져오기
     nickname_obj = UserNickname.query.filter_by(
         grade=grade,
@@ -687,13 +1198,17 @@ def get_user_profile(student_number):
 
     # 최근 메시지 가져오기 (최대 20개)
     today_start_utc = _academic_year_start_utc()
-    messages = ChatMessage.query.filter(
+    message_query = ChatMessage.query.filter(
         ChatMessage.grade == grade,
         ChatMessage.section == section,
         ChatMessage.student_number == student_number,
         ChatMessage.created_at >= today_start_utc,
         ChatMessage.deleted_at == None
-    ).order_by(ChatMessage.created_at.desc()).limit(20).all()
+    )
+    if channel_filter:
+        message_query = message_query.filter(ChatMessage.channel == channel_filter)
+
+    messages = message_query.order_by(ChatMessage.created_at.desc()).limit(20).all()
 
     # 마지막 메시지 정보
     last_message = None
@@ -714,6 +1229,7 @@ def get_user_profile(student_number):
                 "id": msg.id,
                 "message": msg.message,
                 "timestamp": msg.created_at.isoformat(),
+                "channel": msg.channel or DEFAULT_CHANNEL,
                 "imageUrl": msg.image_url
             }
             for msg in messages
@@ -866,3 +1382,140 @@ def delete_class_emoji(emoji_id: int):
     db.session.commit()
 
     return jsonify({"success": True})
+
+
+@blueprint.post("/read")
+def mark_read():
+    """Mark messages as read up to a given ID for the current channel (today only)"""
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+    channel = _normalize_channel_name(request.args.get("channel"))
+    payload = request.get_json(silent=True) or {}
+    last_id = payload.get("lastMessageId")
+    if last_id is None:
+        last_id = request.args.get("lastMessageId", type=int)
+
+    if grade is None or section is None or last_id is None:
+        return jsonify({"error": "missing parameters"}), 400
+
+    # Only students can mark read
+    session_grade, session_section, session_number = _get_student_session_info()
+    if session_grade != grade or session_section != section or session_number is None:
+        return jsonify({"error": "forbidden"}), 403
+
+    channels, _, _, memberships, _ = _ensure_channels_for_class(grade, section, persist=True)
+    if not _channel_exists(channels, channel):
+        channel = DEFAULT_CHANNEL
+    member_classes = memberships.get(channel) or [{"grade": grade, "section": section}]
+    if not any(
+        _normalize_class_value(m.get("grade")) == grade and _normalize_class_value(m.get("section")) == section
+        for m in member_classes
+    ):
+        return jsonify({"error": "forbidden"}), 403
+
+    today_start = _today_start_utc()
+
+    # Build class conditions
+    conditions = []
+    for m in member_classes:
+        g = _normalize_class_value(m.get("grade"))
+        s = _normalize_class_value(m.get("section"))
+        if g is None or s is None:
+            continue
+        conditions.append(and_(ChatMessage.grade == g, ChatMessage.section == s))
+
+    if not conditions:
+        return jsonify({"error": "forbidden"}), 403
+
+    message_ids = [
+        mid for (mid,) in db.session.query(ChatMessage.id)
+        .filter(
+            ChatMessage.channel == channel,
+            ChatMessage.id <= int(last_id),
+            ChatMessage.created_at >= today_start,
+            or_(*conditions)
+        )
+        .all()
+    ]
+
+    if not message_ids:
+        return jsonify({"ok": True, "count": 0})
+
+    inserted = 0
+    for mid in message_ids:
+        try:
+            db.session.add(ChatMessageRead(
+                message_id=mid,
+                grade=grade,
+                section=section,
+                student_number=session_number,
+            ))
+            db.session.commit()
+            inserted += 1
+        except IntegrityError:
+            db.session.rollback()
+        except Exception:
+            db.session.rollback()
+
+    return jsonify({"ok": True, "count": inserted})
+
+
+@blueprint.get("/consent")
+def get_chat_consent():
+    """Check chat-specific consent for the current student"""
+    grade, section, number = _get_student_session_info()
+    if grade is None or section is None or number is None:
+        return jsonify({"error": "학생 로그인이 필요합니다"}), 401
+
+    consent = _get_chat_consent(grade, section, number)
+    if consent and consent.version == CHAT_CONSENT_VERSION:
+        return jsonify({
+            "consented": True,
+            "version": consent.version,
+            "agreedAt": consent.agreed_at.isoformat() if consent.agreed_at else None,
+        })
+
+    return jsonify({
+        "consented": False,
+        "version": consent.version if consent else None,
+        "requiredVersion": CHAT_CONSENT_VERSION,
+    })
+
+
+@blueprint.post("/consent")
+def accept_chat_consent():
+    """Persist chat-specific consent for the current student"""
+    grade, section, number = _get_student_session_info()
+    if grade is None or section is None or number is None:
+        return jsonify({"error": "학생 로그인이 필요합니다"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    version = payload.get("version") or CHAT_CONSENT_VERSION
+
+    # Force to the latest version even if stale payload is sent
+    if version != CHAT_CONSENT_VERSION:
+        version = CHAT_CONSENT_VERSION
+
+    consent = _get_chat_consent(grade, section, number)
+    now = datetime.utcnow()
+    if consent:
+        consent.version = version
+        consent.agreed_at = now
+    else:
+        consent = ChatConsent(
+            grade=grade,
+            section=section,
+            student_number=number,
+            version=version,
+            agreed_at=now,
+        )
+        db.session.add(consent)
+
+    db.session.commit()
+
+    return jsonify({
+        "ok": True,
+        "consented": True,
+        "version": version,
+        "agreedAt": consent.agreed_at.isoformat() if consent.agreed_at else None,
+    })

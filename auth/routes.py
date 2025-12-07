@@ -27,12 +27,13 @@ from auth.sessions import (
 )
 from config import config
 from extensions import db
-from models import User, UserType
+from models import User, UserType, TermsConsent
 
 blueprint = Blueprint("auth", __name__, url_prefix="/auth")
 
 LEGACY_PUBLIC_KEY_URL = "https://auth.dimigo.net/oauth/public"
 LEGACY_AUTHORIZE_URL = "https://auth.dimigo.net/oauth"
+SERVICE_TERMS_VERSION = "v1"
 
 
 def _coerce_int(value: Any) -> int | None:
@@ -170,9 +171,28 @@ def _ensure_user_record(data: Dict[str, Any]) -> User:
     return user
 
 
+def _get_terms_consent(user_id: int | None) -> TermsConsent | None:
+    if not user_id:
+        return None
+    return TermsConsent.query.filter_by(user_id=user_id).first()
+
+
+def _requires_terms_consent(user: User | None) -> bool:
+    if not user:
+        return True
+    consent = _get_terms_consent(user.id)
+    return not consent or consent.version != SERVICE_TERMS_VERSION
+
+
 def _finalize_login(user: User, remember: bool) -> Response:
     issue_session(user)
-    redirect_target = session.pop("post_login_redirect", "/my.html")
+    redirect_target = session.pop("post_login_redirect", "/user.html")
+
+    # 기본 서비스 약관 동의 체크
+    if _requires_terms_consent(user):
+        session["post_terms_redirect"] = redirect_target
+        return make_response(redirect("/terms-consent.html"))
+
     response = make_response(redirect(redirect_target))
     clear_remembered_session(response)
     if remember:
@@ -327,6 +347,9 @@ def status():
     user = session.get("user")
     if not user:
         return jsonify({"logged_in": False}), 401
+    # Check terms consent requirement
+    db_user = User.query.get(user.get("id")) if user.get("id") else None
+    requires_terms = _requires_terms_consent(db_user)
     return jsonify(
         {
             "logged_in": True,
@@ -335,6 +358,8 @@ def status():
             "section": user.get("section"),
             "number": user.get("number"),
             "email": user.get("email"),
+            "requires_terms_consent": requires_terms,
+            "terms_version": SERVICE_TERMS_VERSION,
         }
     )
 
@@ -343,6 +368,63 @@ def status():
 def mode():
     return jsonify({"use_dimicheck_oauth": config.USE_DIMICHECK_OAUTH})
 
+
+@blueprint.get("/terms-consent")
+def get_terms_consent():
+    user_info = session.get("user")
+    if not user_info:
+        return jsonify({"error": "unauthorized"}), 401
+    db_user = User.query.get(user_info.get("id")) if user_info.get("id") else None
+    if not db_user:
+        return jsonify({"error": "unauthorized"}), 401
+    consent = _get_terms_consent(db_user.id)
+    if consent and consent.version == SERVICE_TERMS_VERSION:
+        return jsonify({
+            "consented": True,
+            "version": consent.version,
+            "agreedAt": consent.agreed_at.isoformat() if consent.agreed_at else None,
+            "redirect": session.get("post_terms_redirect"),
+        })
+    return jsonify({
+        "consented": False,
+        "version": consent.version if consent else None,
+        "requiredVersion": SERVICE_TERMS_VERSION,
+        "redirect": session.get("post_terms_redirect"),
+    })
+
+
+@blueprint.post("/terms-consent")
+def accept_terms_consent():
+    user_info = session.get("user")
+    if not user_info:
+        return jsonify({"error": "unauthorized"}), 401
+    db_user = User.query.get(user_info.get("id")) if user_info.get("id") else None
+    if not db_user:
+        return jsonify({"error": "unauthorized"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    version = payload.get("version") or SERVICE_TERMS_VERSION
+    if version != SERVICE_TERMS_VERSION:
+        version = SERVICE_TERMS_VERSION
+
+    consent = _get_terms_consent(db_user.id)
+    now = datetime.utcnow()
+    if consent:
+        consent.version = version
+        consent.agreed_at = now
+    else:
+        consent = TermsConsent(user_id=db_user.id, version=version, agreed_at=now)
+        db.session.add(consent)
+    db.session.commit()
+
+    redirect_target = session.pop("post_terms_redirect", "/user.html")
+    return jsonify({
+        "ok": True,
+        "consented": True,
+        "version": version,
+        "agreedAt": consent.agreed_at.isoformat() if consent.agreed_at else None,
+        "redirect": redirect_target,
+    })
 
 @blueprint.get("/dev-login")
 def dev_login():

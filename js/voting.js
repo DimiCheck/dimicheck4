@@ -8,6 +8,7 @@ class VotingManager {
     this.grade = null;
     this.section = null;
     this.myNumber = null;
+    this.channel = 'home';
     this.activeVote = null;
     this.pollingInterval = null;
     this.countdownInterval = null;
@@ -26,12 +27,24 @@ class VotingManager {
     this.lastResultCounts = null;
   }
 
-  init(grade, section, myNumber) {
+  init(grade, section, myNumber, channel = 'home') {
     this.grade = grade;
     this.section = section;
     this.myNumber = myNumber;
+    this.channel = channel || 'home';
     this.cacheElements();
     this.startPolling();
+  }
+
+  setChannel(channel) {
+    const normalized = (channel || 'home').trim();
+    if (this.channel === normalized) return;
+    this.channel = normalized;
+    this.activeVote = null;
+    this.currentVoteId = null;
+    this.lastResultCounts = null;
+    this.notifyTimelineEvent(null);
+    this.checkActiveVote();
   }
 
   cacheElements() {
@@ -73,10 +86,15 @@ class VotingManager {
     if (!this.grade || !this.section) return;
 
     try {
-      const res = await fetch(`/api/classes/vote/active?grade=${this.grade}&section=${this.section}`);
+      const res = await fetch(`/api/classes/vote/active?grade=${this.grade}&section=${this.section}&channel=${encodeURIComponent(this.channel || 'home')}`);
       if (!res.ok) return;
 
       const data = await res.json();
+
+      if (data.channel && data.channel.toLowerCase() !== (this.channel || 'home').toLowerCase()) {
+        this.hideVote();
+        return;
+      }
 
       if (!data.active) {
         this.activeVote = null;
@@ -107,6 +125,8 @@ class VotingManager {
 
   hasVoteChanged(newVote) {
     if (!this.activeVote) return true;
+
+    if ((this.activeVote.channel || '').toLowerCase() !== (newVote.channel || '').toLowerCase()) return true;
 
     // 투표 ID가 다르면 새로운 투표
     if (this.activeVote.voteId !== newVote.voteId) return true;
@@ -396,6 +416,7 @@ class VotingManager {
       state,
       expiresAt: data.expiresAt,
       timestamp: data.expiresAt || data.createdAt,
+      channel: data.channel || this.channel,
       payload: data
     };
   }
@@ -479,7 +500,7 @@ class VotingManager {
     }
 
     try {
-      const res = await fetch(`/api/classes/vote/respond?grade=${this.grade}&section=${this.section}`, {
+      const res = await fetch(`/api/classes/vote/respond?grade=${this.grade}&section=${this.section}&channel=${encodeURIComponent(this.channel || 'home')}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -560,7 +581,7 @@ class VotingManager {
     }
 
     try {
-      const res = await fetch(`/api/classes/vote/create?grade=${this.grade}&section=${this.section}`, {
+      const res = await fetch(`/api/classes/vote/create?grade=${this.grade}&section=${this.section}&channel=${encodeURIComponent(this.channel || 'home')}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

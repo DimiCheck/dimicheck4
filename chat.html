@@ -147,6 +147,10 @@
       box-sizing: border-box
     }
 
+    [hidden] {
+      display: none !important;
+    }
+
     html,
     body {
       height: 100%
@@ -237,7 +241,8 @@
       display: flex;
       gap: 8px;
       align-items: center;
-      justify-content: space-between
+      justify-content: space-between;
+      flex-wrap: wrap;
     }
 
     .title {
@@ -255,6 +260,256 @@
       border-radius: 999px;
       background: var(--primary);
       box-shadow: 0 0 10px color-mix(in oklab, var(--primary) 50%, transparent)
+    }
+
+    .channel-switcher {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .channel-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 12px;
+      border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      background: color-mix(in oklab, var(--bg) 90%, rgba(255, 255, 255, 0.2));
+      color: var(--text);
+      cursor: pointer;
+      font-weight: 700;
+      height: 40px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 12px 28px rgba(0, 0, 0, 0.35);
+    }
+
+    .channel-toggle:hover {
+      background: color-mix(in oklab, var(--bg) 82%, rgba(255, 255, 255, 0.24));
+    }
+
+    .channel-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .channel-hash {
+      color: var(--muted);
+      font-weight: 700;
+      letter-spacing: .5px;
+    }
+
+    .channel-caret {
+      font-size: 12px;
+      opacity: .8;
+    }
+
+    .channel-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      min-width: 220px;
+      width: min(320px, 90vw);
+      background: color-mix(in oklab, var(--bg) 88%, rgba(255, 255, 255, 0.12));
+      border: 1px solid color-mix(in oklab, var(--text) 18%, transparent);
+      border-radius: 16px;
+      padding: 12px;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(10px);
+      z-index: 30;
+    }
+
+    .channel-menu-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .channel-menu-title {
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .channel-menu-subtitle {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .channel-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+
+    .channel-modal {
+      background: color-mix(in oklab, var(--bg) 90%, rgba(255, 255, 255, 0.15));
+      border: 1px solid color-mix(in oklab, var(--text) 14%, transparent);
+      border-radius: 18px;
+      padding: 20px;
+      width: min(520px, 92vw);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(12px);
+    }
+
+    .channel-modal h3 {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+    }
+
+    .channel-modal p {
+      margin: 4px 0 16px 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .channel-modal .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .channel-modal input,
+    .channel-modal textarea {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      padding: 10px 12px;
+      background: var(--card-2);
+      color: var(--text);
+      font-family: inherit;
+      resize: vertical;
+    }
+
+    .channel-class-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .channel-class-grid label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      background: var(--card-2);
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .channel-class-grid input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+    }
+
+    .channel-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
+    }
+
+    .btn-primary {
+      background: linear-gradient(90deg,
+          color-mix(in oklab, var(--primary) 60%, transparent),
+          color-mix(in oklab, var(--primary-2) 60%, transparent));
+      border: none;
+      color: #fff;
+    }
+
+    .channel-list {
+      margin: 10px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+
+    .channel-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      height: auto;
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid color-mix(in oklab, var(--text) 10%, transparent);
+      background: var(--card-2);
+      color: var(--text);
+      cursor: pointer;
+      text-align: left;
+      font-weight: 600;
+    }
+
+    .channel-item:hover {
+      border-color: color-mix(in oklab, var(--text) 18%, transparent);
+    }
+
+    .channel-item .channel-chip {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .channel-item.active {
+      border-color: color-mix(in oklab, var(--primary) 60%, transparent);
+      background: color-mix(in oklab, var(--primary) 18%, transparent);
+    }
+
+    .channel-unread-dot {
+      width: 10px;
+      height: 10px;
+      background: #ff3b30;
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px color-mix(in oklab, #ff3b30 30%, transparent);
+      margin-left: auto;
+    }
+
+    .channel-create-btn {
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      background: linear-gradient(90deg,
+          color-mix(in oklab, var(--primary) 55%, transparent),
+          color-mix(in oklab, var(--primary-2) 55%, transparent));
+      border: none;
+      color: #fff;
+      font-weight: 700;
+      padding: 10px 12px;
+      cursor: pointer;
+    }
+
+    .channel-create-btn:hover {
+      opacity: .9;
+    }
+
+    .channel-delete-btn {
+      width: 100%;
+      margin-top: 8px;
+      height: auto;
+      border-radius: 12px;
+      background: color-mix(in oklab, #ff3b30 60%, transparent);
+      border: 1px solid color-mix(in oklab, #ff3b30 70%, transparent);
+      color: #fff;
+      font-weight: 700;
+      padding: 10px 12px;
+      cursor: pointer;
+    }
+
+    .channel-delete-btn:hover {
+      opacity: .9;
     }
 
     button {
@@ -331,19 +586,6 @@
     .chat-message {
       display: flex;
       gap: 12px;
-      animation: fadeInUp .3s ease-out;
-    }
-
-    @keyframes fadeInUp {
-      from {
-        opacity: 0;
-        transform: translateY(10px)
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0)
-      }
     }
 
     .message-avatar {
@@ -398,9 +640,10 @@
 
     .message-header {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       gap: 8px;
       margin-bottom: 4px;
+      flex-wrap: wrap;
     }
 
     .message-author {
@@ -411,6 +654,12 @@
     .message-time {
       font-size: 12px;
       color: var(--muted);
+    }
+
+    .message-read-count {
+      font-size: 12px;
+      color: var(--muted);
+      margin-left: auto;
     }
 
     .message-body {
@@ -752,6 +1001,8 @@
       background: var(--bg-2);
       border-top: 1px solid color-mix(in oklab, var(--text) 10%, transparent);
       flex-shrink: 0;
+      position: relative;
+      align-items: center;
     }
 
     .chat-input {
@@ -796,6 +1047,58 @@
     .btn-send:active {
       transform: scale(0.96);
       box-shadow: 0 0 0 6px color-mix(in oklab, var(--primary) 25%, transparent), 0 6px 16px rgba(208, 79, 255, .4);
+    }
+
+    .send-menu {
+      position: absolute;
+      right: 0;
+      bottom: calc(100% + 8px);
+      background: color-mix(in oklab, var(--bg) 88%, rgba(255, 255, 255, 0.12));
+      border: 1px solid color-mix(in oklab, var(--text) 8%, transparent);
+      border-radius: 14px;
+      padding: 6px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 190px;
+      z-index: 20;
+    }
+
+    .send-menu:before {
+      content: "";
+      position: absolute;
+      bottom: -7px;
+      right: 18px;
+      border: 8px solid transparent;
+      border-top-color: var(--card);
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .2));
+    }
+
+    .send-menu-item {
+      border: none;
+      background: transparent;
+      color: var(--text);
+      font-size: 14px;
+      text-align: left;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background .15s, transform .15s;
+    }
+
+    .send-menu-item:hover {
+      background: rgba(255, 255, 255, .06);
+      transform: translateY(-1px);
+    }
+
+    .send-menu-item .menu-icon {
+      font-size: 16px;
+      width: 20px;
+      text-align: center;
     }
 
     /* Modals */
@@ -900,6 +1203,66 @@
       display: flex;
       gap: 12px;
       margin-top: 20px;
+      justify-content: flex-end;
+    }
+
+    /* Consent modal */
+    .consent-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 3000;
+    }
+
+    .consent-modal {
+      width: min(520px, 92vw);
+      background: color-mix(in oklab, var(--bg) 92%, rgba(255, 255, 255, 0.08));
+      border: 1px solid color-mix(in oklab, var(--text) 14%, transparent);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+    }
+
+    .consent-modal h2 {
+      margin: 0 0 6px 0;
+    }
+
+    .consent-modal p {
+      margin: 4px 0 14px 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .consent-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 12px 0 16px 0;
+    }
+
+    .consent-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: var(--card-2);
+      border: 1px solid color-mix(in oklab, var(--text) 10%, transparent);
+    }
+
+    .consent-item input {
+      margin-top: 4px;
+    }
+
+    .consent-links {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 13px;
     }
 
     .avatar-upload {
@@ -1132,6 +1495,19 @@
 
     .nav-item:active svg {
       transform: scale(0.85);
+    }
+
+    .nav-badge {
+      position: absolute;
+      top: 4px;
+      right: 12px;
+      background: #ff3b30;
+      color: #fff;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-weight: 800;
+      box-shadow: 0 0 0 6px color-mix(in oklab, #ff3b30 25%, transparent);
     }
 
     .spacer {
@@ -1512,6 +1888,7 @@
       max-height: 400px;
       overflow-y: auto;
       padding: 8px;
+      grid-auto-rows: 1fr;
     }
 
     .emoji-item {
@@ -1599,6 +1976,8 @@
       }
 
       .class-emoji-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
         max-height: calc(70vh - 250px - env(safe-area-inset-bottom));
       }
     }
@@ -1664,12 +2043,99 @@
     <div class="blob b3"></div>
   </div>
 
+  <!-- Chat Consent Modal -->
+  <div id="chatConsentOverlay" class="consent-overlay" hidden>
+    <div class="consent-modal" onclick="event.stopPropagation()">
+      <h2>채팅 서비스 이용 동의</h2>
+      <p>채팅·투표·이모티콘 등 학급 커뮤니티 기능 이용을 위해 별도의 약관·개인정보 처리 동의가 필요합니다.</p>
+      <div class="consent-list">
+        <label class="consent-item">
+          <input type="checkbox" id="chatTermsCheckbox" />
+          <span>채팅 이용약관에 동의합니다.</span>
+        </label>
+        <label class="consent-item">
+          <input type="checkbox" id="chatPrivacyCheckbox" />
+          <span>채팅 개인정보 처리방침에 동의합니다.</span>
+        </label>
+      </div>
+      <div class="consent-links">
+        <a href="/chat-terms.html" target="_blank" rel="noopener noreferrer">채팅 이용약관 보기</a>
+        <a href="/chat-privacy.html" target="_blank" rel="noopener noreferrer">채팅 개인정보 처리방침 보기</a>
+        <a href="/terms.html" target="_blank" rel="noopener noreferrer">기본 이용약관</a>
+        <a href="/privacy.html" target="_blank" rel="noopener noreferrer">기본 개인정보처리방침</a>
+      </div>
+      <div class="modal-actions">
+        <button id="chatConsentConfirmBtn" class="btn-primary" disabled>동의하고 시작</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Channel Modal -->
+  <div id="channelModalOverlay" class="channel-modal-overlay" hidden>
+    <div class="channel-modal" id="channelModal" onclick="event.stopPropagation()">
+      <h3>새 채널 만들기</h3>
+      <p>채널 이름과 함께할 반을 입력하세요. (예: 1-1, 1-2)</p>
+      <div class="field">
+        <label for="channelNameInput">채널 이름</label>
+        <input id="channelNameInput" type="text" maxlength="30" placeholder="자유토크" />
+      </div>
+      <div class="field">
+        <label>함께할 반 선택</label>
+        <div class="channel-class-grid" id="channelClassGrid">
+          <label><input type="checkbox" data-class-check data-grade="1" data-section="1"> 1학년 1반</label>
+          <label><input type="checkbox" data-class-check data-grade="1" data-section="2"> 1학년 2반</label>
+          <label><input type="checkbox" data-class-check data-grade="1" data-section="3"> 1학년 3반</label>
+          <label><input type="checkbox" data-class-check data-grade="1" data-section="4"> 1학년 4반</label>
+          <label><input type="checkbox" data-class-check data-grade="1" data-section="5"> 1학년 5반</label>
+          <label><input type="checkbox" data-class-check data-grade="1" data-section="6"> 1학년 6반</label>
+          <label><input type="checkbox" data-class-check data-grade="2" data-section="1"> 2학년 1반</label>
+          <label><input type="checkbox" data-class-check data-grade="2" data-section="2"> 2학년 2반</label>
+          <label><input type="checkbox" data-class-check data-grade="2" data-section="3"> 2학년 3반</label>
+          <label><input type="checkbox" data-class-check data-grade="2" data-section="4"> 2학년 4반</label>
+          <label><input type="checkbox" data-class-check data-grade="2" data-section="5"> 2학년 5반</label>
+          <label><input type="checkbox" data-class-check data-grade="2" data-section="6"> 2학년 6반</label>
+          <label><input type="checkbox" data-class-check data-grade="3" data-section="1"> 3학년 1반</label>
+          <label><input type="checkbox" data-class-check data-grade="3" data-section="2"> 3학년 2반</label>
+          <label><input type="checkbox" data-class-check data-grade="3" data-section="3"> 3학년 3반</label>
+          <label><input type="checkbox" data-class-check data-grade="3" data-section="4"> 3학년 4반</label>
+          <label><input type="checkbox" data-class-check data-grade="3" data-section="5"> 3학년 5반</label>
+          <label><input type="checkbox" data-class-check data-grade="3" data-section="6"> 3학년 6반</label>
+        </div>
+      </div>
+      <div class="channel-modal-actions">
+        <button id="channelModalCancelBtn" class="btn-ghost" type="button">취소</button>
+        <button id="channelModalCreateBtn" class="btn-primary" type="button">만들기</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Header -->
   <header>
     <div class="toolbar">
       <div class="title">
         <span class="dot" aria-hidden="true"></span>
         채팅
+        <div class="channel-switcher">
+          <button id="channelToggle" class="channel-toggle" aria-haspopup="listbox" aria-expanded="false"
+            aria-label="채널 선택">
+            <span class="channel-label">
+              <span class="channel-hash">#</span>
+              <span id="currentChannelLabel">home</span>
+            </span>
+            <span class="channel-caret">⌄</span>
+          </button>
+          <div id="channelMenu" class="channel-menu" hidden>
+            <div class="channel-menu-header">
+              <div>
+                <div class="channel-menu-title">채널</div>
+                <div class="channel-menu-subtitle">반 안에서 채팅 공간을 골라요</div>
+              </div>
+            </div>
+            <div id="channelList" class="channel-list"></div>
+            <button id="channelCreateBtn" class="channel-create-btn" type="button">+ 새 채널 만들기</button>
+            <button id="channelDeleteBtn" class="channel-delete-btn" type="button" hidden>채널 삭제</button>
+          </div>
+        </div>
       </div>
       <div style="display:flex;gap:8px">
         <button id="voteCreateBtn" class="icon-btn" aria-label="투표 만들기" title="투표 만들기">📊</button>
@@ -1719,6 +2185,16 @@
         </div>
       </div>
       <input type="text" id="chatInput" class="chat-input" placeholder="메시지 입력..." maxlength="500" />
+      <div id="sendMenu" class="send-menu" hidden>
+        <button type="button" class="send-menu-item" data-send-action="chat-only">
+          <span class="menu-icon">💬</span>
+          <span>채팅에만 보내기</span>
+        </button>
+        <button type="button" class="send-menu-item" data-send-action="board-only">
+          <span class="menu-icon">🧲</span>
+          <span>칠판에만 보내기</span>
+        </button>
+      </div>
       <button id="sendBtn" class="btn-send" aria-label="전송">전송</button>
     </div>
   </div>
@@ -2055,6 +2531,7 @@
         <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z" />
       </svg>
       <span>채팅</span>
+      <span id="navChatBadge" class="nav-badge" hidden>N</span>
     </a>
     <a href="/my.html" class="nav-item">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">

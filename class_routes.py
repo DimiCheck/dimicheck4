@@ -19,6 +19,7 @@ except ImportError:
     socketio = None
 
 blueprint = Blueprint("classes", __name__, url_prefix="/api/classes")
+DEFAULT_CHAT_CHANNEL = "home"
 
 
 def _normalize_class_value(value: int | str | None) -> int | None:
@@ -137,12 +138,11 @@ def save_state():
     new_magnets = normalized_magnets
 
     state = ClassState.query.filter_by(grade=grade, section=section).first()
-
-    # ✅ 기존 데이터 유지
-    if state and state.data:
-        magnets = json.loads(state.data).get("magnets", {})
-    else:
-        magnets = {}
+    state_payload = _load_state_payload(state)
+    magnets = state_payload.get("magnets", {})
+    channels = _normalize_channels(state_payload.get("channels"))
+    memberships = _normalize_channel_memberships(state_payload.get("channelMemberships"), channels, grade, section)
+    owners = _normalize_channel_owners(state_payload.get("channelOwners"), channels)
 
     # ✅ 기존 + 새로운 데이터 병합
     # Preserve special fields (reaction, thought, etc.) when updating magnet position
@@ -156,15 +156,17 @@ def save_state():
                 data[field] = existing[field]
         magnets[str(num)] = data   # 같은 번호면 갱신, 없으면 추가
 
+    payload_to_save = {"magnets": magnets, "channels": channels, "channelMemberships": memberships, "channelOwners": owners}
+
     if not state:
         state = ClassState(
             grade=grade,
             section=section,
-            data=json.dumps({"magnets": magnets})
+            data=json.dumps(payload_to_save, ensure_ascii=False)
         )
         db.session.add(state)
     else:
-        state.data = json.dumps({"magnets": magnets})
+        state.data = json.dumps(payload_to_save, ensure_ascii=False)
 
     db.session.commit()
 
@@ -187,23 +189,125 @@ def save_state():
     return jsonify({"ok": True, "magnets": magnets})
 
 
+def _normalize_channels(channels_raw) -> list[str]:
+    channels = channels_raw if isinstance(channels_raw, list) else []
+    normalized: list[str] = []
+    seen = set()
+
+    for ch in channels:
+        if not isinstance(ch, str):
+            continue
+        name = ch.strip()
+        if not name:
+            continue
+        key = name.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(name[:30])
+
+    if DEFAULT_CHAT_CHANNEL.casefold() not in seen:
+        normalized.insert(0, DEFAULT_CHAT_CHANNEL)
+    return normalized
+
+
+def _normalize_channel_memberships(raw_memberships, channels: list[str], grade: int | None, section: int | None) -> dict[str, list[dict]]:
+    memberships = raw_memberships if isinstance(raw_memberships, dict) else {}
+    result: dict[str, list[dict]] = {}
+
+    for ch in channels:
+        entries = []
+        seen = set()
+        raw_entries = memberships.get(ch) if isinstance(memberships.get(ch), list) else []
+        for entry in raw_entries:
+            if not isinstance(entry, dict):
+                continue
+            g = _normalize_class_value(entry.get("grade"))
+            s = _normalize_class_value(entry.get("section"))
+            if g is None or s is None:
+                continue
+            key = f"{g}-{s}"
+            if key in seen:
+                continue
+            seen.add(key)
+            entries.append({"grade": g, "section": s})
+
+        if grade is not None and section is not None:
+            key = f"{grade}-{section}"
+            if key not in seen:
+                entries.append({"grade": grade, "section": section})
+        result[ch] = entries
+
+    return result
+
+
+def _normalize_channel_owners(raw_owners, channels: list[str]) -> dict[str, list[dict]]:
+    owners = raw_owners if isinstance(raw_owners, dict) else {}
+    result: dict[str, list[dict]] = {}
+
+    for ch in channels:
+        entries = []
+        seen = set()
+        raw_entries = owners.get(ch) if isinstance(owners.get(ch), list) else []
+        for entry in raw_entries:
+            if not isinstance(entry, dict):
+                continue
+            g = _normalize_class_value(entry.get("grade"))
+            s = _normalize_class_value(entry.get("section"))
+            n = _normalize_class_value(entry.get("studentNumber"))
+            if g is None or s is None or n is None:
+                continue
+            key = f"{g}-{s}-{n}"
+            if key in seen:
+                continue
+            seen.add(key)
+            entries.append({"grade": g, "section": s, "studentNumber": n})
+        result[ch] = entries
+
+    return result
+
+
 def _load_state_payload(state: ClassState | None) -> dict[str, dict[str, object]]:
     if not state or not state.data:
-        return {"magnets": {}}
+        return {
+            "magnets": {},
+            "channels": [DEFAULT_CHAT_CHANNEL],
+            "channelMemberships": {DEFAULT_CHAT_CHANNEL: []},
+            "channelOwners": {DEFAULT_CHAT_CHANNEL: []}
+        }
 
     try:
         raw = json.loads(state.data)
     except json.JSONDecodeError:
-        return {"magnets": {}}
+        return {
+            "magnets": {},
+            "channels": [DEFAULT_CHAT_CHANNEL],
+            "channelMemberships": {DEFAULT_CHAT_CHANNEL: []},
+            "channelOwners": {DEFAULT_CHAT_CHANNEL: []}
+        }
 
     if not isinstance(raw, dict):
-        return {"magnets": {}}
+        return {
+            "magnets": {},
+            "channels": [DEFAULT_CHAT_CHANNEL],
+            "channelMemberships": {DEFAULT_CHAT_CHANNEL: []},
+            "channelOwners": {DEFAULT_CHAT_CHANNEL: []}
+        }
 
     magnets = raw.get("magnets")
     if not isinstance(magnets, dict):
         magnets = {}
 
-    return {"magnets": magnets}
+    channels = _normalize_channels(raw.get("channels"))
+    memberships = _normalize_channel_memberships(
+        raw.get("channelMemberships"),
+        channels,
+        getattr(state, "grade", None),
+        getattr(state, "section", None)
+    )
+    owners = _normalize_channel_owners(raw.get("channelOwners"), channels)
+
+    return {"magnets": magnets, "channels": channels, "channelMemberships": memberships, "channelOwners": owners}
 
 
 @blueprint.post("/thought")
@@ -235,16 +339,35 @@ def upsert_thought():
     except (TypeError, ValueError):
         duration_seconds = 5
     duration_seconds = max(1, min(duration_seconds, 60))
+    target_raw = payload.get("target") or ""
+    target = target_raw.lower().strip() if isinstance(target_raw, str) else ""
+    skip_chat_raw = payload.get("skipChat")
+    skip_chat_log = False
+    if isinstance(skip_chat_raw, bool):
+        skip_chat_log = skip_chat_raw
+    elif isinstance(skip_chat_raw, (int, float)):
+        skip_chat_log = bool(skip_chat_raw)
+    elif isinstance(skip_chat_raw, str):
+        skip_chat_log = skip_chat_raw.lower() in ("true", "1", "yes", "y", "on")
+    elif target in ("board", "board-only", "board_only"):
+        skip_chat_log = True
 
     state = ClassState.query.filter_by(grade=grade, section=section).first()
     created_state = False
     if not state:
-        state = ClassState(grade=grade, section=section, data=json.dumps({"magnets": {}}))
+        state = ClassState(
+            grade=grade,
+            section=section,
+            data=json.dumps({"magnets": {}, "channels": [DEFAULT_CHAT_CHANNEL], "channelMemberships": {DEFAULT_CHAT_CHANNEL: [{"grade": grade, "section": section}]}, "channelOwners": {DEFAULT_CHAT_CHANNEL: []}}, ensure_ascii=False)
+        )
         db.session.add(state)
         created_state = True
 
     state_payload = _load_state_payload(state)
     magnets = state_payload["magnets"]
+    channels = _normalize_channels(state_payload.get("channels"))
+    memberships = _normalize_channel_memberships(state_payload.get("channelMemberships"), channels, grade, section)
+    owners = _normalize_channel_owners(state_payload.get("channelOwners"), channels)
     key = str(target_number)
     current = magnets.get(key)
     if not isinstance(current, dict):
@@ -276,13 +399,14 @@ def upsert_thought():
         response_payload["thought"] = None
 
     magnets[key] = current
-    state.data = json.dumps({"magnets": magnets})
+    state.data = json.dumps({"magnets": magnets, "channels": channels, "channelMemberships": memberships, "channelOwners": owners}, ensure_ascii=False)
 
     # Also save to ChatMessage table for persistent chat
-    if thought_text:
+    if thought_text and not skip_chat_log:
         chat_message = ChatMessage(
             grade=grade,
             section=section,
+            channel=DEFAULT_CHAT_CHANNEL,
             student_number=target_number,
             message=thought_text
         )
@@ -515,12 +639,19 @@ def send_reaction():
     # Get or create ClassState
     state = ClassState.query.filter_by(grade=grade, section=section).first()
     if not state:
-        state = ClassState(grade=grade, section=section, data=json.dumps({"magnets": {}}))
+        state = ClassState(
+            grade=grade,
+            section=section,
+            data=json.dumps({"magnets": {}, "channels": [DEFAULT_CHAT_CHANNEL], "channelMemberships": {DEFAULT_CHAT_CHANNEL: [{"grade": grade, "section": section}]}, "channelOwners": {DEFAULT_CHAT_CHANNEL: []}}, ensure_ascii=False)
+        )
         db.session.add(state)
 
     # Load existing state
     state_payload = _load_state_payload(state)
     magnets = state_payload["magnets"]
+    channels = _normalize_channels(state_payload.get("channels"))
+    memberships = _normalize_channel_memberships(state_payload.get("channelMemberships"), channels, grade, section)
+    owners = _normalize_channel_owners(state_payload.get("channelOwners"), channels)
     key = str(session_number)
     current = magnets.get(key)
     if not isinstance(current, dict):
@@ -538,7 +669,7 @@ def send_reaction():
     })
 
     magnets[key] = current
-    state.data = json.dumps({"magnets": magnets})
+    state.data = json.dumps({"magnets": magnets, "channels": channels, "channelMemberships": memberships, "channelOwners": owners}, ensure_ascii=False)
 
     db.session.commit()
 

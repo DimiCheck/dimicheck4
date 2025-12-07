@@ -324,6 +324,15 @@
 
   const LABELS={toilet:"화장실",hallway:"복도",club:"동아리",afterschool:"방과후",project:"프로젝트",early:"조기입실",etc:"기타",absence:"결석",section:"교실"};
 
+  const escapeHTML = (value) => {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  };
+
   function buildCardChips(magnets, grade, section, view = "away") {
     const items = []; // {num, html}
 
@@ -346,7 +355,7 @@
             `<span class="chip chip-present-soft" data-number="${num}" data-status="${cat}" data-grade="${grade}" data-section="${section}">${num}번 ${LABELS[cat]}</span>`
           });
         } else { // 결원
-          const label = cat === "etc" ? (data?.reason?.trim() || LABELS.etc) : (LABELS[cat] || "이동");
+          const label = cat === "etc" ? escapeHTML(data?.reason?.trim() || LABELS.etc) : escapeHTML(LABELS[cat] || "이동");
           items.push({ num, html:
             `<span class="chip chip-away" data-number="${num}" data-status="${cat}" data-grade="${grade}" data-section="${section}">${num}번 ${label}</span>`
           });
@@ -356,7 +365,7 @@
 
       // 결원 보기
       if (view === "away" && isAbsent) {
-        const label = cat === "etc" ? (data?.reason?.trim() || LABELS.etc) : (LABELS[cat] || "이동");
+        const label = cat === "etc" ? escapeHTML(data?.reason?.trim() || LABELS.etc) : escapeHTML(LABELS[cat] || "이동");
         items.push({ num, html:
           `<span class="chip chip-away" data-number="${num}" data-status="${cat}" data-grade="${grade}" data-section="${section}">${num}번 ${label}</span>`
         });

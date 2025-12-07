@@ -180,8 +180,24 @@
       border-radius:calc(var(--radius) + 4px);
       background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
     }
+    .now.glow{
+      box-shadow:0 0 0 10px color-mix(in oklab, #38d67a 32%, transparent);
+      border-color: color-mix(in oklab, #38d67a 45%, transparent);
+      transition: box-shadow .25s ease, border-color .25s ease;
+    }
     .now h3{margin:0 0 6px; font-size:16px; letter-spacing:.2px}
     .now .val{font-size:28px; font-weight:700; line-height:1.2}
+    .saved-badge{
+      margin-left:10px;
+      font-size:14px;
+      font-weight:700;
+      color:#38d67a;
+      opacity:0;
+      transition:opacity .2s ease;
+    }
+    @media (max-width: 768px){
+      .saved-badge{display:none;}
+    }
 
     .section-head{
       margin-top:6px; font-size:15px; color:var(--muted); letter-spacing:.5px
@@ -225,10 +241,19 @@
     }
     .status-card.selected{
       transform:translateY(-2px) scale(1.02);
-      box-shadow:var(--ring);
-      border-color: color-mix(in oklab, var(--primary) 50%, transparent);
-      background:linear-gradient(180deg, color-mix(in oklab, var(--primary) 10%, rgba(255,255,255,.1)), rgba(255,255,255,.05));
+      box-shadow:0 0 0 10px color-mix(in oklab, #38d67a 32%, transparent);
+      border-color: color-mix(in oklab, #38d67a 45%, transparent);
+      background:linear-gradient(180deg, color-mix(in oklab, #38d67a 10%, rgba(255,255,255,.1)), rgba(255,255,255,.05));
       animation:bounce-in .4s cubic-bezier(0.34, 1.2, 0.64, 1);
+    }
+    .status-card:not(.selected){
+      box-shadow:none !important;
+      transform:none !important;
+    }
+    .status-card:not(.selected):hover,
+    .status-card:not(.selected):active{
+      box-shadow:none !important;
+      transform:none !important;
     }
     @keyframes bounce-in{
       0%{transform:translateY(-2px) scale(0.95)}
@@ -237,15 +262,6 @@
     }
     .status-card.selected:active{
       box-shadow:0 0 0 10px color-mix(in oklab, var(--primary) 35%, transparent);
-    }
-    .status-card.selected.completed{
-      box-shadow:0 0 0 8px color-mix(in oklab, #38d67a 28%, transparent);
-      border-color: color-mix(in oklab, #38d67a 45%, transparent);
-      animation:success-pulse .5s ease;
-    }
-    @keyframes success-pulse{
-      0%, 100%{transform:translateY(-2px) scale(1.02)}
-      50%{transform:translateY(-2px) scale(1.05); box-shadow:0 0 0 10px color-mix(in oklab, #38d67a 32%, transparent)}
     }
     .status-label{font-weight:800; letter-spacing:.2px; margin-bottom:6px}
     .status-desc{color:var(--muted); font-size:13px}
@@ -770,6 +786,33 @@
       .status-card.selected.completed{animation:none}
       .status-card:hover{transform:none}
     }
+    .logo-toast{
+      position:fixed;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      pointer-events:none;
+      z-index:30;
+      animation:fade-pop .7s ease;
+    }
+    .logo-toast img{
+      width:120px;
+      height:auto;
+      filter:drop-shadow(0 20px 40px rgba(0,0,0,.25));
+      animation:scale-pop .7s ease;
+    }
+    @keyframes fade-pop{
+      0%{opacity:0}
+      10%{opacity:1}
+      85%{opacity:1}
+      100%{opacity:0}
+    }
+    @keyframes scale-pop{
+      0%{transform:scale(.75)}
+      50%{transform:scale(1.08)}
+      100%{transform:scale(1)}
+    }
   </style>
 </head>
 
@@ -778,6 +821,9 @@
     <div class="blob b1"></div>
     <div class="blob b2"></div>
     <div class="blob b3"></div>
+  </div>
+  <div class="logo-toast" id="logoToast" aria-hidden="true">
+    <img src="/logo.png" alt="저장 중 로고" />
   </div>
 
   <main class="shell" role="main">
@@ -804,7 +850,10 @@
 
       <!-- 현재 상태 표시 -->
       <div class="now" role="region" aria-labelledby="now-title">
-        <h3 id="now-title">현재 선택된 상태<span id="unsavedIndicator" style="font-size: 0.7em; color: #ff7a7a; margin-left: 8px; display: none;">(저장 안 됨)</span></h3>
+        <h3 id="now-title">현재 선택된 상태
+          <span id="unsavedIndicator" style="font-size: 0.7em; color: #e774fe; margin-left: 8px; display: none;">저장 중...</span>
+          <span class="saved-badge" id="savedBadge">(저장됨)</span>
+        </h3>
         <div class="val" id="currentStatus">교실</div>
       </div>
 
@@ -813,7 +862,7 @@
         <div class="section-head">내 위치/상태 선택</div>
         <div class="grid" id="statusGrid">
           <div class="status-card" data-status="화장실(물)" tabindex="0" role="button" aria-label="화장실(물)">
-            <div class="status-label">변소(물)</div>
+            <div class="status-label">화장실(물)</div>
             <div class="status-desc">화장실 환풍구로 산타 영접</div>
           </div>
           <div class="status-card" data-status="복도" tabindex="0" role="button" aria-label="복도">
@@ -857,15 +906,6 @@
         </div>
       </div>
 
-      <div class="status-card" data-status="교실" tabindex="0" role="button" aria-label="교실">
-          <div class="status-label">교실</div>
-          <div class="status-desc">굴뚝이 없네요</div>
-      </div>
-
-      <!-- 완료 -->
-      <div class="submit-wrap">
-        <button class="btn cta" id="submitBtn" type="button" aria-label="상태 저장">완료</button>
-      </div>
     </section>
 
     <!-- RIGHT: brand / highlights -->
@@ -986,10 +1026,23 @@
     let myGrade = null, mySection = null, myNumber = null;
     let selectedStatus = null;
     let lastSavedStatus = null;
+    let saveTimer = null;
+    let isSaving = false;
+    let loginReady = false;
+    let pendingSelection = null;
     const currentStatusDisplay = document.getElementById('currentStatus');
 
     // Get the unsaved indicator element
     const unsavedIndicator = document.getElementById('unsavedIndicator');
+    const logoToast = document.getElementById('logoToast');
+    const savedBadge = document.getElementById('savedBadge');
+    const statusCards = Array.from(document.querySelectorAll('.status-card'));
+    statusCards.forEach(card => {
+      const descEl = card.querySelector('.status-desc');
+      if (descEl) {
+        card.dataset.originalDesc = descEl.textContent.trim();
+      }
+    });
 
     // 기타 입력 관리
     const etcCard  = document.querySelector('.status-card[data-status="기타"]');
@@ -1117,24 +1170,52 @@
         if (me.attachedTo === "etc" && me.reason) {
           currentStatusDisplay.textContent = `기타 - ${me.reason}`;
           lastSavedStatus = `기타 - ${me.reason}`;
+          selectedStatus = "기타";
+          if (etcItems.length === 0) {
+            etcItems.push(me.reason);
+          }
+          etcBox.style.display = 'flex';
+          etcBox.setAttribute('aria-hidden','false');
         } else {
           const label = categoryLabels[me.attachedTo] || me.attachedTo;
           currentStatusDisplay.textContent = label || "교실";
           lastSavedStatus = label || "교실";
+          if (label && label !== "교실") {
+            selectedStatus = label;
+          }
+        }
+
+        // Pre-select card if not 교실
+        if (selectedStatus && selectedStatus !== "교실") {
+          const targetCard = Array.from(document.querySelectorAll('.status-card'))
+            .find(c => c.dataset.status === selectedStatus);
+          if (targetCard) {
+            targetCard.classList.add('selected');
+          }
         }
       } catch (e) {
         console.error("loadMyState error:", e);
         currentStatusDisplay.textContent = "교실";
       }
+      loginReady = true;
+      if (pendingSelection) {
+        const { statusLabel, reason } = pendingSelection;
+        pendingSelection = null;
+        queueSave(statusLabel, reason);
+      }
     }
 
     // ===== 상태 카드 선택 처리 =====
     function refreshCurrentStatus() {
-      let displayStatus = selectedStatus ?? '—';
+      let displayStatus = selectedStatus ?? '교실';
       let isUnsaved = false;
 
       if (selectedStatus === '기타' && etcItems.length > 0) {
         displayStatus = `기타 - ${etcItems[0]}`;
+      }
+
+      if (savedBadge && selectedStatus) {
+        savedBadge.style.opacity = '0';
       }
 
       // 스크롤 애니메이션으로 텍스트 변경
@@ -1177,17 +1258,33 @@
       // 해제
       if (wasSelected) {
         card.classList.remove('selected','completed');
+        card.classList.remove('saved-glow');
+        const desc = card.querySelector('.status-desc');
+        if (desc && card.dataset.originalDesc) {
+          desc.textContent = card.dataset.originalDesc;
+        }
         selectedStatus = null;
         etcBox.style.display = 'none';
         etcBox.setAttribute('aria-hidden','true');
         refreshCurrentStatus();
+        applyCurrentSelection();
         return;
       }
 
       // 새 선택
-      document.querySelectorAll('.status-card').forEach(c => c.classList.remove('selected','completed'));
+      document.querySelectorAll('.status-card').forEach(c => {
+        c.classList.remove('selected','completed');
+        const desc = c.querySelector('.status-desc');
+        if (desc && c.dataset.originalDesc) {
+          desc.textContent = c.dataset.originalDesc;
+        }
+      });
       card.classList.add('selected');
       selectedStatus = card.dataset.status;
+      const desc = card.querySelector('.status-desc');
+      if (desc) {
+        desc.textContent = "다시 탭하여 교실로 복귀";
+      }
 
       const isEtc = selectedStatus === '기타';
       etcBox.style.display = isEtc ? 'flex' : 'none';
@@ -1195,6 +1292,7 @@
       if (isEtc) etcInput?.focus();
 
       refreshCurrentStatus();
+      applyCurrentSelection();
     }
 
     // 키보드 접근성(Enter/Space)
@@ -1225,6 +1323,7 @@
       renderChips();
       etcInput.value = '';
       refreshCurrentStatus();
+      applyCurrentSelection();
     }
 
     [etcInput, etcAddBtn, etcChips].forEach(el => {
@@ -1427,8 +1526,24 @@
     */
 
     // ===== 저장 =====
+    function showLogoToast() {
+      if (!logoToast) return;
+      logoToast.style.display = 'flex';
+      setTimeout(() => {
+        logoToast.style.display = 'none';
+      }, 700);
+    }
+
+    function pulseNowGlow() {
+      const nowPanel = document.querySelector('.now');
+      if (!nowPanel) return;
+      nowPanel.classList.add('glow');
+      setTimeout(() => nowPanel.classList.remove('glow'), 800);
+    }
+
     async function saveMyState(statusLabel, reason = null) {
-      if (!myGrade || !mySection || !myNumber) { alert("로그인 정보가 없습니다."); return; }
+      if (!myGrade || !mySection || !myNumber) { return; }
+      isSaving = true;
       const key = reverseCategoryLabels[statusLabel] || statusLabel;
 
       const magnets = {};
@@ -1441,38 +1556,46 @@
           body: JSON.stringify({ magnets })
         });
         if (!res.ok) throw new Error(await res.text());
-        // 완료 비주얼
         const selected = document.querySelector('.status-card.selected');
-        selected?.classList.add('completed');
-        lastSavedStatus = selectedStatus;
+        lastSavedStatus = reason ? `${statusLabel}${statusLabel === "기타" ? ` - ${reason}` : ''}` : statusLabel;
+        if (window.matchMedia('(max-width: 768px)').matches) {
+          showLogoToast();
+        } else if (savedBadge) {
+          savedBadge.style.opacity = '1';
+          setTimeout(() => { if (savedBadge) savedBadge.style.opacity = '0'; }, 1800);
+        }
+        if (!selectedStatus) {
+          pulseNowGlow();
+        }
+        refreshCurrentStatus();
       } catch (e) {
         console.error("saveMyState failed:", e);
         alert("저장 실패: " + e.message);
+      } finally {
+        isSaving = false;
       }
     }
 
-    document.getElementById('submitBtn').addEventListener('click', async () => {
-      if (!selectedStatus) { alert("상태를 선택해주세요."); return; }
+    function queueSave(statusLabel, reason) {
+      if (!loginReady) {
+        pendingSelection = { statusLabel, reason };
+        return;
+      }
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        saveMyState(statusLabel, reason);
+      }, 150);
+    }
+
+    function applyCurrentSelection() {
+      const statusLabel = selectedStatus || "교실";
       const reason = (selectedStatus === "기타" && etcItems.length > 0) ? etcItems[0] : null;
-      const submitBtn = document.getElementById('submitBtn');
-
-      // 저장 시작
-      submitBtn.textContent = '저장 중...';
-      submitBtn.disabled = true;
-
-      await saveMyState(selectedStatus, reason);
-
-      // 성공 애니메이션
-      submitBtn.classList.add('success-animation');
-      submitBtn.textContent = '완료됨';
-      setTimeout(() => {
-        submitBtn.textContent = '완료';
-        submitBtn.disabled = false;
-        submitBtn.classList.remove('success-animation');
-      }, 2000);
-
-      refreshCurrentStatus();
-    });
+      if (selectedStatus === "기타" && !reason) {
+        etcInput?.focus();
+        return;
+      }
+      queueSave(statusLabel, reason);
+    }
 
     // ===== 로그아웃 (선택) =====
     document.getElementById('logoutBtn').addEventListener('click', () => {

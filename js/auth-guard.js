@@ -24,6 +24,12 @@
         return null;
       }
 
+      if (data.requires_terms_consent) {
+        // redirect to terms consent page for first-time agreement
+        window.location.href = "/terms-consent.html";
+        return null;
+      }
+
       return data;
     } catch (error) {
       console.warn('[AuthGuard] Failed to verify auth status.', error);
@@ -37,4 +43,3 @@
     window.authGuardPromise = ensureAuthenticated();
   }
 })();
-

@@ -7,10 +7,115 @@ from flask import Blueprint, jsonify, request, session
 from sqlalchemy import func
 
 from extensions import db
-from models import Vote, VoteResponse
+from models import Vote, VoteResponse, ClassState
 from utils import is_board_session_active, is_teacher_session_active
+import re
 
 blueprint = Blueprint("vote", __name__, url_prefix="/api/classes/vote")
+DEFAULT_CHANNEL = "home"
+MAX_CHANNEL_NAME_LENGTH = 30
+CHANNEL_NAME_PATTERN = re.compile(r"^[A-Za-z0-9가-힣 _\\-]+$")
+
+
+def _normalize_channel_name(value: str | None) -> str:
+    name = (value or "").strip()
+    if not name:
+        return DEFAULT_CHANNEL
+    name = re.sub(r"\\s+", " ", name)
+    if len(name) > MAX_CHANNEL_NAME_LENGTH:
+        name = name[:MAX_CHANNEL_NAME_LENGTH]
+    return name
+
+
+def _normalize_channel_list(raw_list) -> list[str]:
+    channels = raw_list if isinstance(raw_list, list) else []
+    normalized: list[str] = []
+    seen = set()
+    for ch in channels:
+        if not isinstance(ch, str):
+            continue
+        name = _normalize_channel_name(ch)
+        key = name.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(name)
+    if DEFAULT_CHANNEL.casefold() not in seen:
+        normalized.insert(0, DEFAULT_CHANNEL)
+    return normalized
+
+
+def _normalize_channel_memberships(raw_memberships, channels: list[str], grade: int | None, section: int | None) -> dict[str, list[dict]]:
+    memberships = raw_memberships if isinstance(raw_memberships, dict) else {}
+    result: dict[str, list[dict]] = {}
+    for ch in channels:
+        entries = []
+        seen = set()
+        raw_entries = memberships.get(ch) if isinstance(memberships.get(ch), list) else []
+        for entry in raw_entries:
+            if not isinstance(entry, dict):
+                continue
+            g = _normalize_class_value(entry.get("grade"))
+            s = _normalize_class_value(entry.get("section"))
+            if g is None or s is None:
+                continue
+            key = f"{g}-{s}"
+            if key in seen:
+                continue
+            seen.add(key)
+            entries.append({"grade": g, "section": s})
+
+        if grade is not None and section is not None:
+            key = f"{grade}-{section}"
+            if key not in seen:
+                entries.append({"grade": grade, "section": section})
+        result[ch] = entries
+    return result
+
+
+def _load_channel_state(grade: int, section: int, *, persist: bool = False) -> tuple[list[str], dict, ClassState | None, dict]:
+    state = ClassState.query.filter_by(grade=grade, section=section).first()
+    if not state:
+        payload = {
+            "magnets": {},
+            "channels": [DEFAULT_CHANNEL],
+            "channelMemberships": {DEFAULT_CHANNEL: [{"grade": grade, "section": section}]}
+        }
+        state = ClassState(grade=grade, section=section, data=json.dumps(payload, ensure_ascii=False))
+        db.session.add(state)
+        if persist:
+            db.session.commit()
+        return payload["channels"], payload, state, payload["channelMemberships"]
+
+    try:
+        payload = json.loads(state.data) if state.data else {}
+    except (TypeError, json.JSONDecodeError):
+        payload = {}
+
+    channels = _normalize_channel_list(payload.get("channels"))
+    memberships = _normalize_channel_memberships(payload.get("channelMemberships"), channels, grade, section)
+    payload["channels"] = channels
+    payload["channelMemberships"] = memberships
+
+    if persist:
+        state.data = json.dumps(payload, ensure_ascii=False)
+        db.session.add(state)
+        db.session.commit()
+
+    return channels, payload, state, memberships
+
+
+def _channel_exists(channels: list[str], name: str) -> bool:
+    target = name.casefold()
+    return any(ch.casefold() == target for ch in channels)
+
+
+def _is_member_of_channel(memberships: dict, channel: str, grade: int, section: int) -> bool:
+    return any(
+        _normalize_class_value(m.get("grade")) == grade
+        and _normalize_class_value(m.get("section")) == section
+        for m in memberships.get(channel, [])
+    )
 
 
 def _normalize_class_value(value: int | str | None) -> int | None:
@@ -143,6 +248,7 @@ def _serialize_vote_result(vote: Vote | None) -> dict | None:
         "createdAt": vote.created_at.isoformat(),
         "expiresAt": vote.expires_at.isoformat(),
         "isActive": bool(vote.is_active and vote.expires_at > datetime.utcnow()),
+        "channel": getattr(vote, "channel", DEFAULT_CHANNEL)
     }
 
 
@@ -151,6 +257,7 @@ def get_active_vote():
     """Get the currently active vote for a class"""
     grade = request.args.get("grade", type=int)
     section = request.args.get("section", type=int)
+    requested_channel = _normalize_channel_name(request.args.get("channel"))
 
     if grade is None or section is None:
         return jsonify({"error": "missing grade or section"}), 400
@@ -158,25 +265,46 @@ def get_active_vote():
     if not _is_authorized(grade, section):
         return jsonify({"error": "forbidden"}), 403
 
+    channels, payload, _, memberships = _load_channel_state(grade, section, persist=True)
+    channel = requested_channel if _channel_exists(channels, requested_channel) else DEFAULT_CHANNEL
+    if not _is_member_of_channel(memberships, channel, grade, section):
+        return jsonify({"error": "forbidden"}), 403
+
+    member_classes = memberships.get(channel) or [{"grade": grade, "section": section}]
+
     now = datetime.utcnow()
 
     # Find active vote that hasn't expired
-    vote = Vote.query.filter(
-        Vote.grade == grade,
-        Vote.section == section,
-        Vote.is_active == True,
-        Vote.expires_at > now
-    ).order_by(Vote.created_at.desc()).first()
+    from sqlalchemy import or_, and_
+    member_conditions = []
+    for m in member_classes:
+        g = _normalize_class_value(m.get("grade"))
+        s = _normalize_class_value(m.get("section"))
+        if g is None or s is None:
+            continue
+        member_conditions.append(and_(Vote.grade == g, Vote.section == s))
+
+    vote = None
+    if member_conditions:
+        vote = Vote.query.filter(
+            Vote.channel == channel,
+            Vote.is_active == True,
+            Vote.expires_at > now,
+            or_(*member_conditions)
+        ).order_by(Vote.created_at.desc()).first()
 
     if not vote:
         last_vote = (
-            Vote.query.filter_by(grade=grade, section=section)
+            Vote.query.filter(
+                Vote.channel == channel,
+                or_(*member_conditions)
+            )
             .order_by(Vote.created_at.desc())
-            .first()
+            .first() if member_conditions else None
         )
         last_result = _serialize_vote_result(last_vote)
         if last_result:
-            return jsonify({"active": False, "lastResult": last_result})
+            return jsonify({"active": False, "lastResult": last_result, "channel": channel})
         return jsonify({"active": False})
 
     options = _load_vote_options(vote)
@@ -202,6 +330,7 @@ def get_active_vote():
         "counts": counts,
         "myVote": my_vote,
         "expiresAt": vote.expires_at.isoformat(),
+        "channel": vote.channel,
         "maxChoices": 1,  # Currently only single choice is supported
         "totalVotes": total_votes
     })
@@ -212,6 +341,7 @@ def create_vote():
     """Create a new vote"""
     grade = request.args.get("grade", type=int)
     section = request.args.get("section", type=int)
+    requested_channel = _normalize_channel_name(request.args.get("channel"))
 
     if grade is None or section is None:
         return jsonify({"error": "missing grade or section"}), 400
@@ -224,6 +354,12 @@ def create_vote():
     if not is_teacher and not is_board:
         if session_grade != grade or session_section != section or session_number is None:
             return jsonify({"error": "forbidden"}), 403
+
+    channels, payload, _, memberships = _load_channel_state(grade, section, persist=True)
+    channel = requested_channel if _channel_exists(channels, requested_channel) else DEFAULT_CHANNEL
+    if not _is_member_of_channel(memberships, channel, grade, section):
+        return jsonify({"error": "forbidden"}), 403
+    member_classes = memberships.get(channel) or [{"grade": grade, "section": section}]
 
     payload = request.get_json() or {}
     question = (payload.get("question") or "").strip()
@@ -242,18 +378,28 @@ def create_vote():
     now = datetime.utcnow()
     expires_at = now + timedelta(minutes=duration_minutes)
 
-    # Deactivate any existing active votes for this class
-    Vote.query.filter_by(
-        grade=grade,
-        section=section,
-        is_active=True
-    ).update({"is_active": False})
+    # Deactivate any existing active votes for this channel and its members
+    from sqlalchemy import or_, and_
+    member_conditions = []
+    for m in member_classes:
+        g = _normalize_class_value(m.get("grade"))
+        s = _normalize_class_value(m.get("section"))
+        if g is None or s is None:
+            continue
+        member_conditions.append(and_(Vote.grade == g, Vote.section == s))
+    if member_conditions:
+        Vote.query.filter(
+            Vote.channel == channel,
+            Vote.is_active == True,
+            or_(*member_conditions)
+        ).update({"is_active": False})
 
     created_by = session_number if session_number is not None else 0
 
     new_vote = Vote(
         grade=grade,
         section=section,
+        channel=channel,
         question=question,
         options=json.dumps(options),
         created_by=created_by,
@@ -270,7 +416,8 @@ def create_vote():
             "id": new_vote.id,
             "question": new_vote.question,
             "options": options,
-            "expiresAt": new_vote.expires_at.isoformat()
+            "expiresAt": new_vote.expires_at.isoformat(),
+            "channel": new_vote.channel
         }
     })
 
@@ -290,9 +437,6 @@ def respond_to_vote():
     if not vote:
         return jsonify({"error": "vote not found"}), 404
 
-    if not _is_authorized(vote.grade, vote.section):
-        return jsonify({"error": "forbidden"}), 403
-
     # Check if vote is still active and not expired
     now = datetime.utcnow()
     if not vote.is_active or vote.expires_at <= now:
@@ -301,6 +445,17 @@ def respond_to_vote():
     session_grade, session_section, session_number = _get_student_session_info()
     if session_number is None:
         return jsonify({"error": "student session required"}), 403
+
+    is_teacher = is_teacher_session_active()
+    is_board = is_board_session_active(vote.grade, vote.section)
+    channel = getattr(vote, "channel", DEFAULT_CHANNEL)
+
+    if not is_teacher and not is_board:
+        if session_grade is None or session_section is None:
+            return jsonify({"error": "forbidden"}), 403
+        channels, _, _, memberships = _load_channel_state(session_grade, session_section, persist=True)
+        if not _channel_exists(channels, channel) or not _is_member_of_channel(memberships, channel, session_grade, session_section):
+            return jsonify({"error": "forbidden"}), 403
 
     # Frontend sends "selected" as an array of option strings
     # We need to convert to option indices

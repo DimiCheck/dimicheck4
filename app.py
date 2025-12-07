@@ -145,6 +145,7 @@ CLASS_CONFIGS = load_class_config()
 QRNG_ENDPOINT = "https://qrng.anu.edu.au/API/jsonI.php"
 QRNG_ALLOWED_TYPES = {"uint8", "uint16", "hex16"}
 QRNG_MAX_LENGTH = 1024
+DEFAULT_CHAT_CHANNEL = "home"
 
 # 단축 상태 코드 → 내부 상태 키 매핑
 STATUS_ALIASES = {
@@ -271,26 +272,82 @@ def _normalize_status_param(raw_status: str | None) -> str | None:
     return None
 
 
+def _normalize_channels(channels_raw) -> list[str]:
+    channels = channels_raw if isinstance(channels_raw, list) else []
+    normalized: list[str] = []
+    seen = set()
+
+    for ch in channels:
+        if not isinstance(ch, str):
+            continue
+        name = ch.strip()
+        if not name:
+            continue
+        key = name.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(name[:30])
+
+    if DEFAULT_CHAT_CHANNEL.casefold() not in seen:
+        normalized.insert(0, DEFAULT_CHAT_CHANNEL)
+    return normalized
+
+
+def _normalize_channel_memberships(raw_memberships, channels: list[str], grade: int | None = None, section: int | None = None) -> dict[str, list[dict]]:
+    memberships = raw_memberships if isinstance(raw_memberships, dict) else {}
+    result: dict[str, list[dict]] = {}
+    for ch in channels:
+        entries = []
+        seen = set()
+        raw_entries = memberships.get(ch) if isinstance(memberships.get(ch), list) else []
+        for entry in raw_entries:
+            if not isinstance(entry, dict):
+                continue
+            g = _coerce_int(entry.get("grade"))
+            s = _coerce_int(entry.get("section"))
+            if g is None or s is None:
+                continue
+            key = f"{g}-{s}"
+            if key in seen:
+                continue
+            seen.add(key)
+            entries.append({"grade": g, "section": s})
+        if grade is not None and section is not None:
+            key = f"{grade}-{section}"
+            if key not in seen:
+                entries.append({"grade": grade, "section": section})
+        result[ch] = entries
+    return result
+
+
 def _load_magnet_payload(state: ClassState | None) -> dict[str, dict[str, object]]:
     if not state or not state.data:
-        return {"magnets": {}}
+        return {"magnets": {}, "channels": [DEFAULT_CHAT_CHANNEL], "channelMemberships": {DEFAULT_CHAT_CHANNEL: []}}
     try:
         raw = json.loads(state.data)
     except json.JSONDecodeError:
-        return {"magnets": {}}
+        return {"magnets": {}, "channels": [DEFAULT_CHAT_CHANNEL], "channelMemberships": {DEFAULT_CHAT_CHANNEL: []}}
     if not isinstance(raw, dict):
-        return {"magnets": {}}
+        return {"magnets": {}, "channels": [DEFAULT_CHAT_CHANNEL], "channelMemberships": {DEFAULT_CHAT_CHANNEL: []}}
     magnets = raw.get("magnets")
     if not isinstance(magnets, dict):
         magnets = {}
-    return {"magnets": magnets}
+    channels = _normalize_channels(raw.get("channels"))
+    memberships = _normalize_channel_memberships(
+        raw.get("channelMemberships"),
+        channels,
+        getattr(state, "grade", None),
+        getattr(state, "section", None),
+    )
+    return {"magnets": magnets, "channels": channels, "channelMemberships": memberships}
 
 
-def _persist_magnet_state(state: ClassState | None, grade: int, section: int, magnets: dict[str, dict[str, object]]) -> ClassState:
+def _persist_magnet_state(state: ClassState | None, grade: int, section: int, payload: dict[str, object]) -> ClassState:
     if not state:
         state = ClassState(grade=grade, section=section, data="")
         db.session.add(state)
-    state.data = json.dumps({"magnets": magnets})
+    state.data = json.dumps(payload, ensure_ascii=False)
     db.session.commit()
     return state
 
@@ -537,8 +594,11 @@ def quick_apply_status():
         state = ClassState.query.filter_by(grade=grade, section=section).first()
         payload = _load_magnet_payload(state)
         magnets = payload.get("magnets", {})
+        channels = _normalize_channels(payload.get("channels"))
+        payload["channels"] = channels
         _upsert_student_status(magnets, seat, status_code, reason)
-        state = _persist_magnet_state(state, grade, section, magnets)
+        payload["magnets"] = magnets
+        state = _persist_magnet_state(state, grade, section, payload)
     except Exception as exc:
         db.session.rollback()
         app.logger.exception("Failed to apply status via /set: %s", exc)

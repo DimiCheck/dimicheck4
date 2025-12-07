@@ -191,6 +191,7 @@ class ChatMessage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     grade = db.Column(db.Integer, nullable=False)
     section = db.Column(db.Integer, nullable=False)
+    channel = db.Column(db.String(50), nullable=False, default="home")
     student_number = db.Column(db.Integer, nullable=False)
     message = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -202,10 +203,52 @@ class ChatMessage(db.Model):
     deleted_at = db.Column(db.DateTime, nullable=True)  # Soft delete
 
     __table_args__ = (
-        db.Index("idx_chat_grade_section_created", "grade", "section", "created_at"),
+        db.Index("idx_chat_grade_section_channel_created", "grade", "section", "channel", "created_at"),
         db.Index("idx_chat_reply", "reply_to_id"),
     )
 
+
+class ChatMessageRead(db.Model):
+    __tablename__ = "chat_message_reads"
+
+    id = db.Column(db.Integer, primary_key=True)
+    message_id = db.Column(db.Integer, db.ForeignKey("chat_messages.id"), nullable=False, index=True)
+    grade = db.Column(db.Integer, nullable=False)
+    section = db.Column(db.Integer, nullable=False)
+    student_number = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("message_id", "grade", "section", "student_number", name="uq_read_per_user"),
+    )
+
+
+class ChatConsent(db.Model):
+    __tablename__ = "chat_consents"
+
+    id = db.Column(db.Integer, primary_key=True)
+    grade = db.Column(db.Integer, nullable=False)
+    section = db.Column(db.Integer, nullable=False)
+    student_number = db.Column(db.Integer, nullable=False)
+    version = db.Column(db.String(20), nullable=False)
+    agreed_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("grade", "section", "student_number", name="uq_chat_consent_user"),
+    )
+
+
+class TermsConsent(db.Model):
+    __tablename__ = "terms_consents"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    version = db.Column(db.String(20), nullable=False)
+    agreed_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", name="uq_terms_consent_user"),
+    )
 
 class APIKey(db.Model):
     __tablename__ = "api_keys"
@@ -291,6 +334,7 @@ class Vote(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     grade = db.Column(db.Integer, nullable=False)
     section = db.Column(db.Integer, nullable=False)
+    channel = db.Column(db.String(50), nullable=False, default="home")
     question = db.Column(db.Text, nullable=False)
     options = db.Column(db.Text, nullable=False)  # JSON array of options
     created_by = db.Column(db.Integer, nullable=False)  # student number who created
@@ -299,7 +343,7 @@ class Vote(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     __table_args__ = (
-        db.Index("idx_vote_grade_section_active", "grade", "section", "is_active"),
+        db.Index("idx_vote_grade_section_channel_active", "grade", "section", "channel", "is_active"),
     )
 
 

@@ -41,6 +41,8 @@ class ChatPageManager {
     this.messagesContainer = null;
     this.chatInput = null;
     this.sendBtn = null;
+    this.sendMenu = null;
+    this.chatInputContainer = null;
     this.imageUrlBtn = null;
     this.gifBtn = null;
     this.voteBubble = null;
@@ -63,6 +65,23 @@ class ChatPageManager {
     // Toast
     this.toast = null;
 
+    // Channel state
+    this.channels = ['home'];
+    this.currentChannel = 'home';
+    this.channelPermissions = {};
+    this.channelLatestMap = {};
+    this.channelToggle = null;
+    this.channelMenu = null;
+    this.channelList = null;
+    this.channelCreateBtn = null;
+    this.currentChannelLabel = null;
+    this.channelModal = null;
+    this.channelNameInput = null;
+    this.channelClassesInput = null;
+    this.channelModalCreateBtn = null;
+    this.channelModalCancelBtn = null;
+    this.channelDeleteBtn = null;
+
     // Audio elements
     this.sendAudio = new Audio('/src/send.mp3');
     this.receiveAudio = new Audio('/src/recieve.mp3');
@@ -70,11 +89,18 @@ class ChatPageManager {
     // Internal state flags
     this.isLoadingMessages = false;
     this.pollingStarted = false;
+    this.sendLongPressTimer = null;
+    this.longPressTriggered = false;
+    this.skipNextSendClick = false;
+
+    // Bindings
+    this.handleDocumentClick = this.handleDocumentClick.bind(this);
   }
 
   init() {
     this.initElements();
     this.attachEventListeners();
+    this.closeChannelModal();
     this.loadAuthStatus();
   }
 
@@ -84,6 +110,8 @@ class ChatPageManager {
     this.messagesContainer = document.getElementById('chatMessagesContainer');
     this.chatInput = document.getElementById('chatInput');
     this.sendBtn = document.getElementById('sendBtn');
+    this.sendMenu = document.getElementById('sendMenu');
+    this.chatInputContainer = document.querySelector('.chat-input-container');
     this.imageUrlBtn = document.getElementById('imageUrlBtn');
     this.gifBtn = document.getElementById('gifBtn');
     this.voteBubble = document.getElementById('voteBubble');
@@ -105,11 +133,52 @@ class ChatPageManager {
 
     // Toast
     this.toast = document.getElementById('chatToast');
+
+    // Channels
+    this.channelToggle = document.getElementById('channelToggle');
+    this.channelMenu = document.getElementById('channelMenu');
+    this.channelList = document.getElementById('channelList');
+    this.channelCreateBtn = document.getElementById('channelCreateBtn');
+    this.currentChannelLabel = document.getElementById('currentChannelLabel');
+    this.channelModal = document.getElementById('channelModal');
+    this.channelModalOverlay = document.getElementById('channelModalOverlay');
+    this.channelNameInput = document.getElementById('channelNameInput');
+    this.channelClassCheckboxes = document.querySelectorAll('[data-class-check]');
+    this.channelModalCreateBtn = document.getElementById('channelModalCreateBtn');
+    this.channelModalCancelBtn = document.getElementById('channelModalCancelBtn');
+    this.channelDeleteBtn = document.getElementById('channelDeleteBtn');
+    this.channelRefreshTimer = null;
+
+    // Consent
+    this.chatConsentOverlay = document.getElementById('chatConsentOverlay');
+    this.chatConsentConfirmBtn = document.getElementById('chatConsentConfirmBtn');
+    this.chatTermsCheckbox = document.getElementById('chatTermsCheckbox');
+    this.chatPrivacyCheckbox = document.getElementById('chatPrivacyCheckbox');
+    this.consentGranted = false;
+    this.consentVersion = 'v1';
   }
 
   attachEventListeners() {
     // Send message
-    this.sendBtn?.addEventListener('click', () => this.handleSendMessage());
+    this.sendBtn?.addEventListener('click', (e) => {
+      if (this.skipNextSendClick) {
+        this.skipNextSendClick = false;
+        return;
+      }
+      if (this.longPressTriggered) {
+        this.longPressTriggered = false;
+        return;
+      }
+      this.handleSendMessage();
+    });
+    this.sendBtn?.addEventListener('pointerdown', (e) => this.startSendLongPress(e));
+    this.sendBtn?.addEventListener('pointerup', () => this.cancelSendLongPress(true));
+    this.sendBtn?.addEventListener('pointerleave', () => this.cancelSendLongPress(false));
+    this.sendBtn?.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      this.skipNextSendClick = true;
+      this.openSendMenu();
+    });
     this.chatInput?.addEventListener('keypress', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -148,6 +217,60 @@ class ChatPageManager {
     // Image view modal
     document.getElementById('closeImageViewBtn')?.addEventListener('click', () => this.closeImageView());
     document.getElementById('imageViewOverlay')?.addEventListener('click', () => this.closeImageView());
+
+    // Channel switcher
+    this.channelToggle?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleChannelMenu();
+    });
+
+    this.channelCreateBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openChannelModal();
+    });
+
+    this.channelModalCreateBtn?.addEventListener('click', () => this.submitChannelModal());
+    this.channelModalCancelBtn?.addEventListener('click', () => this.closeChannelModal());
+    document.getElementById('channelModalOverlay')?.addEventListener('click', () => this.closeChannelModal());
+
+    this.channelDeleteBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.deleteCurrentChannel();
+    });
+
+    // Consent
+    const syncConsentBtn = () => {
+      if (!this.chatConsentConfirmBtn) return;
+      const ok = this.chatTermsCheckbox?.checked && this.chatPrivacyCheckbox?.checked;
+      this.chatConsentConfirmBtn.disabled = !ok;
+    };
+    this.chatTermsCheckbox?.addEventListener('change', syncConsentBtn);
+    this.chatPrivacyCheckbox?.addEventListener('change', syncConsentBtn);
+    this.chatConsentConfirmBtn?.addEventListener('click', async () => {
+      const ok = await this.setConsentAccepted();
+      if (!ok) {
+        return;
+      }
+      this.closeConsentModal();
+      if (!this._consentResolver) {
+        this.afterConsentGranted();
+      }
+    });
+
+    document.addEventListener('click', this.handleDocumentClick);
+
+    this.sendMenu?.addEventListener('click', (event) => {
+      const actionBtn = event.target.closest('[data-send-action]');
+      if (!actionBtn) return;
+      event.stopPropagation();
+      const action = actionBtn.dataset.sendAction;
+      this.closeSendMenu();
+      if (action === 'chat-only') {
+        this.handleSendMessage({ boardPreview: false, toastMessage: '채팅에만 전송했어요' });
+      } else if (action === 'board-only') {
+        this.handleSendBoardOnly();
+      }
+    });
   }
 
   async loadAuthStatus() {
@@ -161,7 +284,7 @@ class ChatPageManager {
       const data = await res.json();
       this.resolveClassContext(data);
       if (window.votingManager && this.grade && this.section) {
-        window.votingManager.init(this.grade, this.section, this.studentNumber);
+        window.votingManager.init(this.grade, this.section, this.studentNumber, this.currentChannel);
       }
       if (window.reactionsManager && this.grade && this.section) {
         window.reactionsManager.init(this.grade, this.section, this.studentNumber);
@@ -179,7 +302,10 @@ class ChatPageManager {
       if (window.gifPickerManager && this.grade && this.section && this.studentNumber) {
         await window.gifPickerManager.init(this.grade, this.section, this.studentNumber);
       }
-      this.loadMessages();
+      const consentOk = await this.ensureChatConsent();
+      if (!consentOk) return;
+      await this.loadChannels();
+      await this.loadMessages();
       this.startPolling();
     } catch (err) {
       console.error('Failed to load auth status:', err);
@@ -234,6 +360,504 @@ class ChatPageManager {
     }
   }
 
+  normalizeChannelName(name) {
+    if (!name) return '';
+    const cleaned = String(name).trim().replace(/\s+/g, ' ');
+    return cleaned.substring(0, 30);
+  }
+
+  getConsentStorageKey() {
+    return `dimicheck:chat-consent:${this.consentVersion || 'v1'}`;
+  }
+
+  readLocalConsent() {
+    const key = this.getConsentStorageKey();
+    try {
+      return localStorage.getItem(key) === 'true';
+    } catch (err) {
+      console.warn('Failed to read consent from storage', err);
+      return false;
+    }
+  }
+
+  persistLocalConsent() {
+    const key = this.getConsentStorageKey();
+    try {
+      localStorage.setItem(key, 'true');
+    } catch (err) {
+      console.warn('Failed to persist consent', err);
+    }
+  }
+
+  async fetchConsentStatus() {
+    try {
+      const res = await fetch('/api/classes/chat/consent', { credentials: 'include' });
+      if (!res.ok) return { consented: false };
+      const data = await res.json();
+      const ok = !!data.consented && data.version === this.consentVersion;
+      return { consented: ok, version: data.version, agreedAt: data.agreedAt };
+    } catch (err) {
+      console.warn('Failed to fetch consent status', err);
+      return { consented: false };
+    }
+  }
+
+  resolveConsentPromise(result) {
+    if (this._consentResolver) {
+      this._consentResolver(result);
+      this._consentResolver = null;
+    }
+  }
+
+  async ensureChatConsent() {
+    const serverStatus = await this.fetchConsentStatus();
+    if (serverStatus.consented) {
+      this.consentGranted = true;
+      this.persistLocalConsent();
+      return true;
+    }
+
+    // If client remembered consent but server missing, attempt to sync silently
+    if (this.readLocalConsent()) {
+      const synced = await this.saveConsentToServer(true);
+      if (synced) {
+        this.resolveConsentPromise(true);
+        return true;
+      }
+    }
+
+    return new Promise((resolve) => {
+      this.consentGranted = false;
+      this.openConsentModal();
+      this._consentResolver = resolve;
+    });
+  }
+
+  async saveConsentToServer(silent = false) {
+    try {
+      const res = await fetch('/api/classes/chat/consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ version: this.consentVersion })
+      });
+      if (!res.ok) {
+        throw new Error('동의 저장 실패');
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!data || data.consented !== true) {
+        throw new Error('동의 상태를 확인할 수 없습니다');
+      }
+      this.persistLocalConsent();
+      this.consentGranted = true;
+      this.resolveConsentPromise(true);
+      return true;
+    } catch (err) {
+      console.warn('Failed to save consent', err);
+      if (!silent) {
+        this.showToast('동의 저장에 실패했습니다. 다시 시도해주세요.');
+      }
+      return false;
+    }
+  }
+
+  async setConsentAccepted() {
+    const ok = await this.saveConsentToServer(false);
+    if (!ok) return false;
+    return true;
+  }
+
+  openConsentModal() {
+    if (this.chatConsentOverlay) {
+      this.chatConsentOverlay.hidden = false;
+    }
+  }
+
+  closeConsentModal() {
+    if (this.chatConsentOverlay) {
+      this.chatConsentOverlay.hidden = true;
+    }
+  }
+
+  afterConsentGranted() {
+    // If consent was pending, start loading now
+    if (this.pollingStarted) return;
+    this.loadChannels().then(() => {
+      this.loadMessages();
+      this.startPolling();
+    });
+  }
+
+  normalizeChannels(list) {
+    const normalized = [];
+    const seen = new Set();
+    [...(Array.isArray(list) ? list : []), 'home'].forEach((item) => {
+      const name = this.normalizeChannelName(item);
+      const key = name.toLowerCase();
+      if (!name || seen.has(key)) return;
+      seen.add(key);
+      normalized.push(name);
+    });
+    return normalized;
+  }
+
+  parseChannelList(items) {
+    const names = [];
+    const perms = {};
+    const latest = {};
+    (Array.isArray(items) ? items : []).forEach((item) => {
+      if (typeof item === 'string') {
+        const name = this.normalizeChannelName(item);
+        if (name) names.push(name);
+      } else if (item && typeof item === 'object') {
+        const name = this.normalizeChannelName(item.name);
+        if (!name) return;
+        names.push(name);
+        if (item.canDelete) {
+          perms[name.toLowerCase()] = true;
+        }
+        if (item.latestMessageId != null) {
+          latest[name.toLowerCase()] = Number(item.latestMessageId) || 0;
+        }
+      }
+    });
+    return { names: this.normalizeChannels(names), perms, latest };
+  }
+
+  getChannelStorageKey() {
+    if (!this.grade || !this.section) return null;
+    return `dimicheck:chat-channel:${this.grade}-${this.section}`;
+  }
+
+  saveChannelPreference(channel) {
+    const key = this.getChannelStorageKey();
+    if (!key) return;
+    try {
+      localStorage.setItem(key, channel);
+    } catch (err) {
+      console.warn('Failed to persist channel preference', err);
+    }
+  }
+
+  getLastReadKey(channel) {
+    if (!this.grade || !this.section) return null;
+    const safeChannel = (channel || 'home').toLowerCase();
+    return `dimicheck:chat-lastread:${this.grade}-${this.section}:${safeChannel}`;
+  }
+
+  markChannelAsRead(channel, latestId) {
+    const key = this.getLastReadKey(channel);
+    if (!key) return;
+    const id = Number(latestId) || 0;
+    try {
+      localStorage.setItem(key, String(id));
+    } catch (err) {
+      console.warn('Failed to persist last read', err);
+    }
+    this.updateNavBadge();
+  }
+
+  getLastReadId(channel) {
+    const key = this.getLastReadKey(channel);
+    if (!key) return 0;
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? Number(raw) || 0 : 0;
+    } catch (err) {
+      console.warn('Failed to read last read', err);
+      return 0;
+    }
+  }
+
+  hasUnreadForChannel(channel) {
+    const normalized = (channel || 'home').toLowerCase();
+    const latest = this.channelLatestMap[normalized] || 0;
+    const lastRead = this.getLastReadId(normalized);
+    return latest > lastRead;
+  }
+
+  async sendReadReceipt(latestId) {
+    if (!this.grade || !this.section) return;
+    if (!latestId) return;
+    try {
+      await fetch(
+        `/api/classes/chat/read?grade=${this.grade}&section=${this.section}&channel=${encodeURIComponent(this.currentChannel || 'home')}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ lastMessageId: latestId })
+        }
+      );
+    } catch (err) {
+      console.warn('Failed to send read receipt', err);
+    }
+  }
+
+  updateNavBadge() {
+    const badge = document.getElementById('navChatBadge');
+    if (!badge) return;
+    const anyUnread = this.channels.some((ch) => this.hasUnreadForChannel(ch));
+    badge.hidden = !anyUnread;
+  }
+
+  restoreChannelPreference(channels) {
+    const key = this.getChannelStorageKey();
+    if (!key) return null;
+    try {
+      const stored = localStorage.getItem(key);
+      if (!stored) return null;
+      const target = stored.toLowerCase();
+      return channels.find((ch) => ch.toLowerCase() === target) || null;
+    } catch (err) {
+      console.warn('Failed to read channel preference', err);
+      return null;
+    }
+  }
+
+  updateChannelLabel() {
+    if (this.currentChannelLabel) {
+      this.currentChannelLabel.textContent = this.currentChannel || 'home';
+    }
+  }
+
+  async loadChannels() {
+    if (!this.grade || !this.section) return;
+    try {
+      const res = await fetch(
+        `/api/classes/chat/channels?grade=${this.grade}&section=${this.section}`,
+        { credentials: 'include' }
+      );
+      if (!res.ok) {
+        throw new Error('채널을 불러올 수 없습니다');
+      }
+      const data = await res.json();
+      const { names, perms, latest } = this.parseChannelList(data.channels);
+      this.channels = names;
+      this.channelPermissions = perms;
+      this.channelLatestMap = { ...this.channelLatestMap, ...latest };
+    } catch (err) {
+      console.error('Failed to load channels:', err);
+      this.channels = this.normalizeChannels(this.channels);
+    }
+
+    const preferred = this.restoreChannelPreference(this.channels);
+    this.currentChannel = preferred || (this.channels[0] || 'home');
+    this.updateChannelLabel();
+    this.renderChannelMenu();
+    if (window.votingManager) {
+      window.votingManager.setChannel(this.currentChannel);
+    }
+    this.updateNavBadge();
+  }
+
+  renderChannelMenu() {
+    if (!this.channelList) return;
+    const channels = this.normalizeChannels(this.channels);
+    this.channels = channels;
+    this.channelList.innerHTML = '';
+
+    channels.forEach((channel) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'channel-item';
+      if (channel.toLowerCase() === (this.currentChannel || 'home').toLowerCase()) {
+        btn.classList.add('active');
+      }
+      const unread = this.hasUnreadForChannel(channel);
+      btn.innerHTML = `
+        <span class="channel-chip">#</span>
+        <span class="channel-name">${channel}</span>
+        ${unread ? '<span class="channel-unread-dot" aria-hidden="true"></span>' : ''}
+      `;
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.switchChannel(channel);
+        this.closeChannelMenu();
+      });
+      this.channelList.appendChild(btn);
+    });
+
+    if (this.channelDeleteBtn) {
+      const canDelete = !!this.channelPermissions[(this.currentChannel || 'home').toLowerCase()];
+      this.channelDeleteBtn.hidden = !canDelete;
+    }
+
+    this.updateNavBadge();
+  }
+
+  toggleChannelMenu() {
+    if (!this.channelMenu) return;
+    if (this.channelMenu.hidden) {
+      this.openChannelMenu();
+    } else {
+      this.closeChannelMenu();
+    }
+  }
+
+  openChannelMenu() {
+    if (!this.channelMenu) return;
+    this.renderChannelMenu();
+    this.channelMenu.hidden = false;
+    this.channelToggle?.setAttribute('aria-expanded', 'true');
+  }
+
+  closeChannelMenu() {
+    if (!this.channelMenu) return;
+    this.channelMenu.hidden = true;
+    this.channelToggle?.setAttribute('aria-expanded', 'false');
+  }
+
+  handleDocumentClick(event) {
+    const target = event.target;
+    if (this.channelMenu && !this.channelMenu.hidden) {
+      if (!this.channelMenu.contains(target) && !this.channelToggle?.contains(target)) {
+        this.closeChannelMenu();
+      }
+    }
+
+    if (this.sendMenu && !this.sendMenu.hidden) {
+      if (!this.sendMenu.contains(target) && !this.sendBtn?.contains(target)) {
+        this.closeSendMenu();
+      }
+    }
+  }
+
+  switchChannel(channel) {
+    const normalized = this.normalizeChannelName(channel);
+    if (!normalized) return;
+    const exists = this.channels.some((ch) => ch.toLowerCase() === normalized.toLowerCase());
+    if (!exists) {
+      this.channels = this.normalizeChannels([...this.channels, normalized]);
+      this.renderChannelMenu();
+    }
+    this.currentChannel = normalized;
+    this.saveChannelPreference(normalized);
+    this.updateChannelLabel();
+    this.lastMessageId = 0;
+    this.messages = [];
+    this.setVoteTimelineEvent(null);
+    if (window.votingManager) {
+      window.votingManager.setChannel(normalized);
+    }
+    this.renderMessages();
+    this.loadMessages();
+    this.scrollToBottom();
+    this.markChannelAsRead(normalized, this.lastMessageId);
+    this.updateNavBadge();
+  }
+
+  openChannelModal() {
+    if (!this.channelModal || !this.channelModalOverlay) return;
+    this.channelModalOverlay.hidden = false;
+    this.channelModal.dataset.open = 'true';
+    if (this.channelNameInput) {
+      this.channelNameInput.value = '';
+      this.channelNameInput.focus();
+    }
+    this.channelClassCheckboxes?.forEach((cb) => {
+      const g = Number(cb.dataset.grade);
+      const s = Number(cb.dataset.section);
+      const isSelf = g === this.grade && s === this.section;
+      cb.checked = isSelf;
+      cb.disabled = isSelf;
+    });
+  }
+
+  closeChannelModal() {
+    if (!this.channelModal || !this.channelModalOverlay) return;
+    this.channelModalOverlay.hidden = true;
+    this.channelModal.dataset.open = 'false';
+  }
+
+  parseClassSelection() {
+    const classes = [];
+    this.channelClassCheckboxes?.forEach((cb) => {
+      if (cb.checked) {
+        const g = Number(cb.dataset.grade);
+        const s = Number(cb.dataset.section);
+        if (Number.isInteger(g) && Number.isInteger(s)) {
+          classes.push({ grade: g, section: s });
+        }
+      }
+    });
+    return classes;
+  }
+
+  async submitChannelModal() {
+    if (!this.grade || !this.section) return;
+    const name = this.normalizeChannelName(this.channelNameInput?.value);
+    if (!name) {
+      this.showToast('채널 이름을 입력해주세요');
+      return;
+    }
+    const classes = this.parseClassSelection();
+
+    try {
+      const res = await fetch(
+        `/api/classes/chat/channels?grade=${this.grade}&section=${this.section}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ name, classes })
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || '채널을 만들 수 없어요');
+      }
+      const { names, perms, latest } = this.parseChannelList(data.channels);
+      this.channels = names.length ? names : this.channels;
+      this.channelPermissions = { ...this.channelPermissions, ...perms };
+      this.channelLatestMap = { ...this.channelLatestMap, ...latest };
+      this.closeChannelModal();
+      this.switchChannel(name);
+      this.renderChannelMenu();
+    } catch (err) {
+      console.error('Failed to create channel:', err);
+      this.showToast(err.message || '채널 생성에 실패했어요');
+    }
+  }
+
+  async deleteCurrentChannel() {
+    if (!this.grade || !this.section) return;
+    const channel = this.currentChannel || 'home';
+    if (channel.toLowerCase() === 'home') {
+      this.showToast('홈 채널은 삭제할 수 없습니다');
+      return;
+    }
+    if (!confirm(`#${channel} 채널을 삭제할까요?`)) return;
+
+    try {
+      const res = await fetch(
+        `/api/classes/chat/channels/${encodeURIComponent(channel)}?grade=${this.grade}&section=${this.section}`,
+        {
+          method: 'DELETE',
+          credentials: 'include'
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || '채널을 삭제할 수 없어요');
+      }
+      const { names, perms, latest } = this.parseChannelList(data.channels);
+      this.channels = names;
+      this.channelPermissions = perms;
+      this.channelLatestMap = { ...latest };
+      this.currentChannel = this.channels[0] || 'home';
+      this.saveChannelPreference(this.currentChannel);
+      this.closeChannelMenu();
+      this.updateChannelLabel();
+      this.lastMessageId = 0;
+      this.messages = [];
+      this.loadMessages();
+    } catch (err) {
+      console.error('Failed to delete channel:', err);
+      this.showToast(err.message || '채널 삭제에 실패했어요');
+    }
+  }
+
   startPolling() {
     if (this.pollingStarted) return;
     this.pollingStarted = true;
@@ -241,6 +865,10 @@ class ChatPageManager {
     this.pollingInterval = setInterval(() => {
       this.loadMessages();
     }, 2000);
+    // Refresh channels every 15 seconds for unread indicators
+    this.channelRefreshTimer = setInterval(() => {
+      this.loadChannels();
+    }, 15000);
   }
 
   stopPolling() {
@@ -248,16 +876,24 @@ class ChatPageManager {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
     }
+    if (this.channelRefreshTimer) {
+      clearInterval(this.channelRefreshTimer);
+      this.channelRefreshTimer = null;
+    }
   }
 
   async loadMessages() {
     if (!this.grade || !this.section) return;
+    if (!this.consentGranted) return;
     if (this.isLoadingMessages) return;
+
+    const channel = this.currentChannel || this.channels[0] || 'home';
+    this.currentChannel = channel;
 
     this.isLoadingMessages = true;
     try {
       const res = await fetch(
-        `/api/classes/chat/today?grade=${this.grade}&section=${this.section}`,
+        `/api/classes/chat/today?grade=${this.grade}&section=${this.section}&channel=${encodeURIComponent(channel)}`,
         { credentials: 'include' }
       );
 
@@ -266,6 +902,9 @@ class ChatPageManager {
       const data = await res.json();
       const newMessages = data.messages || [];
       const previousLastId = this.lastMessageId;
+      const channelKey = (this.currentChannel || 'home').toLowerCase();
+      const latestIdInChannel = newMessages.length ? Math.max(...newMessages.map((m) => m.id || 0)) : 0;
+      this.channelLatestMap[channelKey] = Math.max(this.channelLatestMap[channelKey] || 0, latestIdInChannel);
 
       // Check for actual changes in messages
       const hasNew = newMessages.some(msg => msg.id > this.lastMessageId);
@@ -292,6 +931,7 @@ class ChatPageManager {
         }
         this.renderMessages();
       }
+      this.updateNavBadge();
     } catch (err) {
       console.error('Failed to load messages:', err);
     } finally {
@@ -374,6 +1014,11 @@ class ChatPageManager {
     if (wasAtBottom) {
       this.scrollToBottom();
     }
+
+    // Mark as read with latest message ID
+    const latestId = this.messages.length ? Math.max(...this.messages.map((m) => m.id || 0)) : 0;
+    this.markChannelAsRead(this.currentChannel, latestId);
+    this.sendReadReceipt(latestId);
   }
 
   createMessageElement(msg) {
@@ -420,6 +1065,13 @@ class ChatPageManager {
     time.className = 'message-time';
     const timestamp = msg.timestamp || msg.postedAt || msg.createdAt;
     time.textContent = this.formatTime(timestamp);
+
+    if (msg.readCount != null) {
+      const readSpan = document.createElement('span');
+      readSpan.className = 'message-read-count';
+      readSpan.textContent = `${msg.readCount} 읽음`;
+      header.appendChild(readSpan);
+    }
 
     header.appendChild(author);
     header.appendChild(time);
@@ -551,7 +1203,51 @@ class ChatPageManager {
     return msgEl;
   }
 
-  async handleSendMessage() {
+  startSendLongPress() {
+    if (this.sendLongPressTimer) {
+      clearTimeout(this.sendLongPressTimer);
+    }
+    this.longPressTriggered = false;
+    this.sendLongPressTimer = window.setTimeout(() => {
+      this.longPressTriggered = true;
+      this.skipNextSendClick = true;
+      this.openSendMenu();
+    }, 500);
+  }
+
+  cancelSendLongPress(markSkip) {
+    if (this.sendLongPressTimer) {
+      clearTimeout(this.sendLongPressTimer);
+      this.sendLongPressTimer = null;
+    }
+    if (!this.longPressTriggered) {
+      this.skipNextSendClick = false;
+      return;
+    }
+    if (markSkip) {
+      this.skipNextSendClick = true;
+    }
+  }
+
+  openSendMenu() {
+    if (!this.sendMenu) return;
+    this.sendMenu.hidden = false;
+  }
+
+  closeSendMenu() {
+    if (!this.sendMenu) return;
+    this.sendMenu.hidden = true;
+    this.longPressTriggered = false;
+    this.skipNextSendClick = false;
+  }
+
+  async handleSendMessage(options = {}) {
+    const { boardPreview = true, toastMessage } = options || {};
+    if (!this.consentGranted) {
+      this.showToast('채팅 이용 동의 후 사용할 수 있습니다');
+      this.openConsentModal();
+      return;
+    }
     const text = this.chatInput?.value?.trim();
 
     // Check for pending image from mediaManager as well
@@ -573,12 +1269,16 @@ class ChatPageManager {
     const payload = {
       message: text || '',
       imageUrl: imageUrl || undefined,
-      replyToId: this.replyToMessage?.id || undefined
+      replyToId: this.replyToMessage?.id || undefined,
+      channel: this.currentChannel
     };
+    if (boardPreview === false) {
+      payload.boardPreview = false;
+    }
 
     try {
       const res = await fetch(
-        `/api/classes/chat/send?grade=${this.grade}&section=${this.section}`,
+        `/api/classes/chat/send?grade=${this.grade}&section=${this.section}&channel=${encodeURIComponent(this.currentChannel || 'home')}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -603,9 +1303,67 @@ class ChatPageManager {
       // Reload messages immediately
       await this.loadMessages();
       this.scrollToBottom();
+      if (toastMessage) {
+        this.showToast(toastMessage);
+      }
     } catch (err) {
       console.error('Failed to send message:', err);
       this.showToast(err.message || '메시지 전송 실패');
+    }
+  }
+
+  async handleSendBoardOnly() {
+    if (!this.consentGranted) {
+      this.showToast('채팅 이용 동의 후 사용할 수 있습니다');
+      this.openConsentModal();
+      return;
+    }
+    const text = this.chatInput?.value?.trim();
+    if (!text) {
+      this.showToast('메시지를 입력해주세요');
+      return;
+    }
+    if (this.pendingImageUrl || window.mediaManager?.hasPendingImage()) {
+      this.showToast('칠판에는 텍스트만 보낼 수 있어요');
+      return;
+    }
+    if (text.length > 140) {
+      this.showToast('칠판 메시지는 140자까지 보낼 수 있어요');
+      return;
+    }
+    if (!this.grade || !this.section) {
+      this.showToast('로그인 정보가 없습니다');
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `/api/classes/thought?grade=${this.grade}&section=${this.section}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            thought: text,
+            duration: 5,
+            skipChat: true,
+            target: 'board-only'
+          })
+        }
+      );
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || '칠판으로 전송 실패');
+      }
+
+      if (this.chatInput) this.chatInput.value = '';
+      this.pendingImageUrl = null;
+      this.cancelReply();
+      this.showToast('칠판에만 전송했어요');
+    } catch (err) {
+      console.error('Failed to send to board only:', err);
+      this.showToast(err.message || '칠판 전송 실패');
     }
   }
 
@@ -803,6 +1561,15 @@ class ChatPageManager {
         this.voteBubble.hidden = true;
       }
       this.renderMessages();
+      return;
+    }
+
+    const targetChannel = (eventData.channel || eventData.payload?.channel || 'home').toLowerCase();
+    if ((this.currentChannel || 'home').toLowerCase() !== targetChannel) {
+      this.voteTimelineEvent = null;
+      if (this.voteBubble) {
+        this.voteBubble.hidden = true;
+      }
       return;
     }
 
