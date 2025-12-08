@@ -548,9 +548,13 @@ class ChatPageManager {
   markChannelAsRead(channel, latestId) {
     const key = this.getLastReadKey(channel);
     if (!key) return;
+    const channelKey = (channel || 'home').toLowerCase();
     const id = Number(latestId) || 0;
+    const lastStored = this.getLastReadId(channel);
+    const knownLatest = Math.max(id, this.channelLatestMap[channelKey] || 0);
+    const nextValue = Math.max(lastStored, knownLatest);
     try {
-      localStorage.setItem(key, String(id));
+      localStorage.setItem(key, String(nextValue));
     } catch (err) {
       console.warn('Failed to persist last read', err);
     }
@@ -918,11 +922,8 @@ class ChatPageManager {
             !msg.deletedAt
         );
         this.messages = newMessages;
-        if (this.messages.length > 0) {
-          this.lastMessageId = Math.max(...this.messages.map(m => m.id));
-        } else {
-          this.lastMessageId = 0;
-        }
+        const latestFromMessages = this.messages.length ? Math.max(...this.messages.map(m => m.id)) : 0;
+        this.lastMessageId = Math.max(previousLastId, latestIdInChannel, latestFromMessages);
 
         if (freshMessages.length) {
           window.notificationManager?.notifyChatMessages?.(freshMessages);
@@ -951,6 +952,53 @@ class ChatPageManager {
       if (!newMsg) return true; // Message removed
       if (oldMsg.deletedAt !== newMsg.deletedAt) return true; // Deletion status changed
       if (oldMsg.message !== newMsg.message) return true; // Content changed
+      if (oldMsg.imageUrl !== newMsg.imageUrl) return true; // Image changed
+      if (oldMsg.readCount !== newMsg.readCount) return true; // Read count changed
+      if (oldMsg.replyToId !== newMsg.replyToId) return true; // Reply target changed
+      if (this.reactionsChanged(oldMsg.reactions, newMsg.reactions)) return true; // Reactions changed
+    }
+
+    return false;
+  }
+
+  reactionsChanged(oldList, newList) {
+    const a = Array.isArray(oldList) ? oldList : [];
+    const b = Array.isArray(newList) ? newList : [];
+    if (a.length !== b.length) return true;
+
+    const normalize = (list) => {
+      const map = {};
+      list.forEach((item) => {
+        const emoji = item?.emoji;
+        if (!emoji) return;
+        const students = Array.isArray(item.students)
+          ? [...item.students]
+              .map((s) => {
+                const num = Number(s);
+                return Number.isFinite(num) ? num : String(s);
+              })
+              .sort((a, b) => (a > b ? 1 : a < b ? -1 : 0))
+          : [];
+        map[emoji] = {
+          count: Number(item.count) || students.length,
+          students
+        };
+      });
+      return map;
+    };
+
+    const mapA = normalize(a);
+    const mapB = normalize(b);
+    const emojis = new Set([...Object.keys(mapA), ...Object.keys(mapB)]);
+
+    for (const emoji of emojis) {
+      const left = mapA[emoji] || { count: 0, students: [] };
+      const right = mapB[emoji] || { count: 0, students: [] };
+      if (left.count !== right.count) return true;
+      if (left.students.length !== right.students.length) return true;
+      for (let i = 0; i < left.students.length; i++) {
+        if (left.students[i] !== right.students[i]) return true;
+      }
     }
 
     return false;
@@ -1016,9 +1064,15 @@ class ChatPageManager {
     }
 
     // Mark as read with latest message ID
-    const latestId = this.messages.length ? Math.max(...this.messages.map((m) => m.id || 0)) : 0;
-    this.markChannelAsRead(this.currentChannel, latestId);
-    this.sendReadReceipt(latestId);
+    const channelKey = (this.currentChannel || 'home').toLowerCase();
+    const latestFromMessages = this.messages.length ? Math.max(...this.messages.map((m) => m.id || 0)) : 0;
+    const latestKnown = Math.max(
+      latestFromMessages,
+      this.channelLatestMap[channelKey] || 0,
+      this.lastMessageId || 0
+    );
+    this.markChannelAsRead(this.currentChannel, latestKnown);
+    this.sendReadReceipt(latestKnown);
   }
 
   createMessageElement(msg) {
@@ -1463,13 +1517,12 @@ class ChatPageManager {
     }
   }
 
-  confirmImageUrl() {
+  async confirmImageUrl() {
     const url = this.imageUrlInput?.value?.trim();
     if (url) {
       this.pendingImageUrl = url;
       this.closeImageUrlModal();
-      this.showToast('이미지가 추가되었습니다. 메시지를 전송하세요.');
-      this.chatInput?.focus();
+      await this.handleSendMessage();
     }
   }
 

@@ -243,8 +243,7 @@ class MediaManager {
       // Close modal after short delay
       setTimeout(() => {
         this.closeImageUploadModal();
-        // Focus on chat input
-        document.getElementById('chatInput')?.focus();
+        this.sendPendingImageMessage();
       }, 500);
 
     } catch (err) {
@@ -262,6 +261,15 @@ class MediaManager {
 
   hasPendingImage() {
     return this.pendingImageUrl !== null;
+  }
+
+  sendPendingImageMessage() {
+    const hasImage =
+      this.hasPendingImage() ||
+      (window.chatPage && window.chatPage.pendingImageUrl);
+    if (hasImage && window.chatPage && typeof window.chatPage.handleSendMessage === 'function') {
+      window.chatPage.handleSendMessage();
+    }
   }
 
   // ============================================================================
@@ -347,8 +355,7 @@ class MediaManager {
   selectClassEmoji(emojiUrl) {
     this.pendingImageUrl = emojiUrl;
     this.closeClassEmojiModal();
-    // Focus on chat input
-    document.getElementById('chatInput')?.focus();
+    this.sendPendingImageMessage();
   }
 
   async deleteEmoji(emojiId) {
