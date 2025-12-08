@@ -26,6 +26,8 @@ def _serialize_user(user: User) -> Dict[str, Any]:
 def issue_session(user: User) -> None:
     session.permanent = True
     session["user"] = _serialize_user(user)
+    if not session.get("csrf_token"):
+        session["csrf_token"] = secrets.token_hex(16)
     session.modified = True
 
 

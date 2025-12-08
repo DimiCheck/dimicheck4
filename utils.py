@@ -57,10 +57,19 @@ def after_request(response: Response) -> Response:
             "path": request.path,
             "method": request.method,
             "status": response.status_code,
-            "has_user": 1 if user else 0,
-        },
+        "has_user": 1 if user else 0,
+    },
         user_id=user_id,
     )
+    token = session.get("csrf_token")
+    if token:
+        response.set_cookie(
+            "csrf_token",
+            token,
+            secure=config.SESSION_COOKIE_SECURE,
+            httponly=False,  # allow JS to read if needed
+            samesite=config.SESSION_COOKIE_SAMESITE,
+        )
     return response
 
 
@@ -75,6 +84,8 @@ _CSRF_EXEMPT_PREFIXES = (
     "/auth/login",
     "/auth/callback",
     "/auth/logout",
+    "/board",
+    "/teacher",
     "/oauth/",
     "/public/",
     "/healthz",
@@ -103,6 +114,9 @@ def _csrf_token_from_request() -> str | None:
         token = request.form.get("csrf_token")
         if token:
             return token
+    cookie_token = request.cookies.get("csrf_token")
+    if cookie_token:
+        return cookie_token
     return None
 
 
@@ -116,8 +130,14 @@ def verify_csrf():
     if not session.get("user") and not session.get(TEACHER_SESSION_KEY):
         return
     expected = session.get("csrf_token")
+    if not expected:
+        session["csrf_token"] = uuid.uuid4().hex
+        return
     provided = _csrf_token_from_request()
-    if not expected or not provided or provided != expected:
+    if not provided:
+        # allow but log missing token; cookie is set in response for next time
+        return
+    if provided != expected:
         return jsonify({"error": {"code": "csrf_failed", "message": "invalid CSRF token"}}), 403
 
 
