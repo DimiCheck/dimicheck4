@@ -186,6 +186,8 @@ def _requires_terms_consent(user: User | None) -> bool:
 
 def _finalize_login(user: User, remember: bool) -> Response:
     issue_session(user)
+    if not session.get("csrf_token"):
+        session["csrf_token"] = secrets.token_hex(16)
     redirect_target = session.pop("post_login_redirect", "/user.html")
 
     # 기본 서비스 약관 동의 체크

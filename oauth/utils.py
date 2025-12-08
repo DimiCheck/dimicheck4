@@ -119,13 +119,8 @@ def decode_access_token(token: str) -> dict:
             audience=aud,
         )
     except Exception:
-        # Fallback to legacy secret for existing tokens if client-based verification fails
-        return jwt.decode(
-            token,
-            current_app.config["SECRET_KEY"],
-            algorithms=["HS256"],
-            issuer=current_app.config["OAUTH_ISSUER"],
-        )
+        # Fail closed on signature/audience errors
+        raise
 
 
 def issue_refresh_token(user: User, client: OAuthClient, scopes: List[str]) -> OAuthRefreshToken:

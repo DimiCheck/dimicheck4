@@ -271,7 +271,7 @@ def delete_api_key(key_id: int):
 @blueprint.get("/oauth/clients")
 def list_oauth_clients():
     _ensure_oauth_rotation_columns()
-    _require_user()  # 누구나 조회 가능 (secret은 반환하지 않음)
+    _require_teacher_user()
     clients = OAuthClient.query.order_by(OAuthClient.created_at.desc()).all()
     return jsonify({"clients": [_serialize_oauth_client(client) for client in clients]})
 
@@ -279,7 +279,7 @@ def list_oauth_clients():
 @blueprint.post("/oauth/clients")
 def create_oauth_client():
     _ensure_oauth_rotation_columns()
-    _require_user()  # 생성은 로그인 사용자 모두 가능
+    _require_teacher_user()
     payload = request.get_json(silent=True) or {}
     name = (payload.get("name") or "").strip()
     redirect_uris = (payload.get("redirect_uris") or "").strip()

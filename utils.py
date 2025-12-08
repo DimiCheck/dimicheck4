@@ -7,7 +7,7 @@ from threading import Lock
 from typing import Any
 
 import requests
-from flask import Response, g, request, session
+from flask import Response, g, jsonify, request, session
 from prometheus_client import Counter, Histogram, generate_latest
 
 from config import config
@@ -68,6 +68,59 @@ def metrics() -> Response:
     return Response(generate_latest(), mimetype="text/plain")
 
 
+# ---------------------------------------------------------------------------
+# CSRF protection (session-backed)
+# ---------------------------------------------------------------------------
+_CSRF_EXEMPT_PREFIXES = (
+    "/auth/login",
+    "/auth/callback",
+    "/auth/logout",
+    "/oauth/",
+    "/public/",
+    "/healthz",
+    "/metrics",
+    "/api/qrng",
+    "/manifest.webmanifest",
+    "/service-worker.js",
+    "/sitemap.xml",
+    "/robots.txt",
+    "/api/version",
+)
+_CSRF_HEADER_CANDIDATES = ("X-CSRF-Token", "X-CSRFToken")
+
+
+def _csrf_token_from_request() -> str | None:
+    for header in _CSRF_HEADER_CANDIDATES:
+        value = request.headers.get(header)
+        if value:
+            return value
+    if request.is_json:
+        payload = request.get_json(silent=True) or {}
+        token = payload.get("csrf_token") or payload.get("csrfToken")
+        if token:
+            return str(token)
+    if request.form:
+        token = request.form.get("csrf_token")
+        if token:
+            return token
+    return None
+
+
+def verify_csrf():
+    """Reject state-changing requests without a valid CSRF token."""
+    if request.method in {"GET", "HEAD", "OPTIONS"}:
+        return
+    for prefix in _CSRF_EXEMPT_PREFIXES:
+        if request.path.startswith(prefix):
+            return
+    if not session.get("user") and not session.get(TEACHER_SESSION_KEY):
+        return
+    expected = session.get("csrf_token")
+    provided = _csrf_token_from_request()
+    if not expected or not provided or provided != expected:
+        return jsonify({"error": {"code": "csrf_failed", "message": "invalid CSRF token"}}), 403
+
+
 TEACHER_SESSION_KEY = "teacher_verified"
 
 
@@ -85,6 +138,8 @@ def mark_teacher_session(duration_seconds: int, remember: bool) -> None:
     expires_at = now + max(duration_seconds, 60)
     session[TEACHER_SESSION_KEY] = {"issued_at": now, "expires_at": expires_at}
     session.permanent = remember
+    if not session.get("csrf_token"):
+        session["csrf_token"] = uuid.uuid4().hex
 
 
 def is_teacher_session_active() -> bool:

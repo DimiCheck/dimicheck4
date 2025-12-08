@@ -1,4 +1,5 @@
 import os
+import secrets
 import time
 from datetime import timedelta
 
@@ -10,10 +11,11 @@ def _env_bool(key: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "t", "yes", "y", "on"}
 
 class Config:
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-secret")
+    # Must be provided via env in production; fallback is per-process random to avoid static dev secret
+    SECRET_KEY: str = os.getenv("SECRET_KEY") or secrets.token_hex(32)
     SESSION_COOKIE_HTTPONLY: bool = True
     SESSION_COOKIE_SECURE: bool = _env_bool("SESSION_COOKIE_SECURE", True)
-    SESSION_COOKIE_SAMESITE: str = os.getenv("SESSION_COOKIE_SAMESITE", "None")
+    SESSION_COOKIE_SAMESITE: str = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
     PERMANENT_SESSION_LIFETIME: timedelta = timedelta(days=30)
     SESSION_REFRESH_EACH_REQUEST: bool = True
 
@@ -41,7 +43,7 @@ class Config:
     FRONTEND_ORIGIN: str = os.getenv("FRONTEND_ORIGIN", "https://chec.kro.kr")
 
     # 개발용 로그인 허용 여부
-    ENABLE_DEV_LOGIN: bool = os.getenv("FLASK_ENV", "development") == "development"
+    ENABLE_DEV_LOGIN: bool = _env_bool("ENABLE_DEV_LOGIN", False)
 
     # 로그 레벨
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
@@ -64,7 +66,7 @@ class Config:
     TEACHER_SESSION_REMEMBER_SECONDS = int(os.getenv("TEACHER_SESSION_REMEMBER_SECONDS", str(30 * 24 * 60 * 60)))
 
     # External APIs
-    NEIS_API_KEY: str | None = os.getenv("NEIS_API_KEY", "da82433f0f3a4351bda4ca9a0f11fc7d")
+    NEIS_API_KEY: str | None = os.getenv("NEIS_API_KEY")
     KLIPY_API_KEY: str | None = os.getenv("KLIPY_API_KEY")
 
     # Image Upload Server

@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 # .env 파일 로드 (환경 변수)
 load_dotenv()
 
-from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for, make_response
+from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for, make_response, abort
 from flask_cors import CORS, cross_origin
 from flask_smorest import Api
 from flask_socketio import SocketIO
@@ -42,6 +42,7 @@ from utils import (
     pin_guard_reset,
     pin_guard_status,
     setup_logging,
+    verify_csrf,
 )
 from ws import namespaces
 
@@ -76,6 +77,27 @@ for ns in namespaces:
 
 app.before_request(before_request)
 app.after_request(after_request)
+app.before_request(verify_csrf)
+
+
+_SENSITIVE_PREFIXES = {
+    ".env",
+    "dimicheck-471412-85491c7985df.json",
+    "instance",
+    ".git",
+    ".venv",
+    "app.db",
+}
+
+
+@app.before_request
+def _block_sensitive_files():
+    path = (request.path or "").lstrip("/")
+    lowered = path.lower()
+    for prefix in _SENSITIVE_PREFIXES:
+        prefix_lower = prefix.lower().rstrip("/")
+        if lowered == prefix_lower or lowered.startswith(f"{prefix_lower}/") or f"/{prefix_lower}" in f"/{lowered}":
+            abort(404)
 
 
 @app.context_processor
