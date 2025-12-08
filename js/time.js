@@ -86,6 +86,93 @@ const CSAT_PHASES = Object.freeze([
   { label: '끝',                startMin: 22*60 + 30,    endMin: 24*60 }
 ]);
 
+const DEFAULT_PHASE_CONFIG = {
+  weekday: WEEKDAY_PHASES,
+  sunday: SUNDAY_PHASES,
+  csat: CSAT_PHASES,
+};
+
+let phaseConfig = { default: DEFAULT_PHASE_CONFIG, grades: {} };
+let phaseConfigPromise = null;
+const PHASE_CONFIG_URL = '/timetable-phases.json';
+
+function parseTimeToMinutes(value) {
+  if (typeof value === 'number') {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    const hm = /^(\d{1,2}):(\d{2})$/.exec(trimmed);
+    if (hm) {
+      const h = Number(hm[1]);
+      const m = Number(hm[2]);
+      if (!Number.isNaN(h) && !Number.isNaN(m) && m < 60) {
+        return h * 60 + m;
+      }
+    }
+  }
+  return NaN;
+}
+
+function normalizePhaseEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const start = parseTimeToMinutes(entry.startMin);
+  const end = parseTimeToMinutes(entry.endMin);
+  if (Number.isNaN(start) || Number.isNaN(end)) return null;
+  const label = typeof entry.label === 'string' ? entry.label : '';
+  return { label, startMin: start, endMin: end };
+}
+
+function normalizePhaseMap(map) {
+  if (!map || typeof map !== 'object') return null;
+  const out = {};
+  ['weekday', 'sunday', 'csat'].forEach((key) => {
+    if (Array.isArray(map[key])) {
+      const arr = map[key].map(normalizePhaseEntry).filter(Boolean);
+      if (arr.length) out[key] = arr;
+    }
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+function mergePhaseConfig(json) {
+  const cfg = { default: DEFAULT_PHASE_CONFIG, grades: {} };
+  const def = normalizePhaseMap(json && json.default);
+  if (def) {
+    cfg.default = { ...DEFAULT_PHASE_CONFIG, ...def };
+  }
+  if (json && json.grades && typeof json.grades === 'object') {
+    Object.entries(json.grades).forEach(([gradeKey, map]) => {
+      const normalized = normalizePhaseMap(map);
+      if (normalized) {
+        cfg.grades[String(gradeKey)] = { ...cfg.default, ...normalized };
+      }
+    });
+  }
+  return cfg;
+}
+
+async function loadPhaseConfig() {
+  if (phaseConfigPromise) return phaseConfigPromise;
+  phaseConfigPromise = fetch(PHASE_CONFIG_URL, { cache: 'no-cache' })
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    })
+    .then((json) => {
+      phaseConfig = mergePhaseConfig(json);
+      updateClock();
+      return phaseConfig;
+    })
+    .catch((err) => {
+      console.warn('Failed to load timetable-phases.json, using defaults.', err);
+      phaseConfig = { default: DEFAULT_PHASE_CONFIG, grades: {} };
+      return phaseConfig;
+    });
+  return phaseConfigPromise;
+}
+
+loadPhaseConfig();
 
 const countdownOverlayEl = document.getElementById('countdownOverlay');
 const countdownNumberEl = document.getElementById('countdownNumber');
@@ -127,19 +214,34 @@ function getManualSchedule() {
   return null;
 }
 
+function getGradePhaseMap() {
+  const gradeKey = typeof window.boardGrade === 'string' && window.boardGrade ? window.boardGrade : null;
+  if (gradeKey && phaseConfig.grades && phaseConfig.grades[gradeKey]) {
+    return phaseConfig.grades[gradeKey];
+  }
+  return phaseConfig.default || DEFAULT_PHASE_CONFIG;
+}
+
+function getPhaseSet(scheduleType) {
+  const map = getGradePhaseMap();
+  const fromConfig = map && map[scheduleType];
+  const fallback = DEFAULT_PHASE_CONFIG[scheduleType] || [];
+  return Array.isArray(fromConfig) && fromConfig.length ? fromConfig : fallback;
+}
+
 function getPhasesForDate(now) {
   // 수동으로 설정된 시간표가 있으면 그것을 사용
   const manual = getManualSchedule();
   if (manual === 'weekday') {
-    return WEEKDAY_PHASES;
+    return getPhaseSet('weekday');
   } else if (manual === 'sunday') {
-    return SUNDAY_PHASES;
+    return getPhaseSet('sunday');
   } else if (manual === 'csat') {
-    return CSAT_PHASES;
+    return getPhaseSet('csat');
   }
 
   // 자동 모드: 요일에 따라 선택
-  const base = now.getDay() === 0 ? SUNDAY_PHASES : WEEKDAY_PHASES;
+  const base = now.getDay() === 0 ? getPhaseSet('sunday') : getPhaseSet('weekday');
   if (!isPostSuneungPeriod(now)) {
     return base;
   }

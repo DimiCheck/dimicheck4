@@ -1,0 +1,115 @@
+{
+  "_comment": "학년별 시간표(시간 구간)를 한 곳에서 관리합니다. startMin/endMin은 하루 기준 분 단위입니다.",
+  "default": {
+    "weekday": [
+      { "label": "아침 시간",      "startMin": "00:00", "endMin": "08:15" },
+      { "label": "아침 자습",      "startMin": "08:15", "endMin": "08:50" },
+      { "label": "아침 조회",      "startMin": "08:50", "endMin": "09:00" },
+      { "label": "오전 수업 시간", "startMin": "09:00", "endMin": "12:50" },
+      { "label": "점심 시간",      "startMin": "12:50", "endMin": "13:10" },
+      { "label": "오후 수업 시간", "startMin": "13:00", "endMin": "16:40" },
+      { "label": "청소 시간",      "startMin": "16:40", "endMin": "17:00" },
+      { "label": "종례",          "startMin": "17:00", "endMin": "17:10" },
+      { "label": "방과후 1타임",   "startMin": "17:10", "endMin": "17:50" },
+      { "label": "쉬는 시간",      "startMin": "17:50", "endMin": "17:55" },
+      { "label": "방과후 2타임",   "startMin": "17:55", "endMin": "18:35" },
+      { "label": "저녁 시간",      "startMin": "18:35", "endMin": "19:50" },
+      { "label": "야자 1타임",     "startMin": "19:50", "endMin": "21:10" },
+      { "label": "쉬는 시간",      "startMin": "21:10", "endMin": "21:30" },
+      { "label": "야자 2타임",     "startMin": "21:30", "endMin": "23:00" },
+      { "label": "끝.",           "startMin": "23:00", "endMin": "24:00" }
+    ],
+    "sunday": [
+      { "label": "수감",        "startMin": "00:00", "endMin": "20:00" },
+      { "label": "야자 1타임",   "startMin": "20:00", "endMin": "21:00" },
+      { "label": "쉬는 시간",    "startMin": "21:00", "endMin": "21:20" },
+      { "label": "야자 2타임",   "startMin": "21:20", "endMin": "22:30" },
+      { "label": "끝.",         "startMin": "22:30", "endMin": "24:00" }
+    ],
+    "csat": [
+      { "label": "아침",            "startMin": "00:00", "endMin": "09:00" },
+      { "label": "오전 자율학습 1",  "startMin": "09:00", "endMin": "10:20" },
+      { "label": "휴식 시간",       "startMin": "10:20", "endMin": "10:40" },
+      { "label": "오전 자율학습 2",  "startMin": "10:40", "endMin": "12:00" },
+      { "label": "중식",            "startMin": "12:00", "endMin": "14:00" },
+      { "label": "오후 자율학습 1",  "startMin": "14:00", "endMin": "16:00" },
+      { "label": "휴식 시간",       "startMin": "16:00", "endMin": "16:20" },
+      { "label": "오후 자율학습 2",  "startMin": "16:20", "endMin": "18:00" },
+      { "label": "석식",            "startMin": "18:00", "endMin": "20:00" },
+      { "label": "야간 자율학습",    "startMin": "20:00", "endMin": "22:30" },
+      { "label": "끝",              "startMin": "22:30", "endMin": "24:00" }
+    ]
+  },
+  "grades": {
+    "1": {
+      "_comment": "1학년 전용(없으면 default 사용)",
+      "weekday": [
+        { "label": "아침 시간",      "startMin": "00:00", "endMin": "08:15" },
+        { "label": "아침 자습",      "startMin": "08:15", "endMin": "08:50" },
+        { "label": "아침 조회",      "startMin": "08:50", "endMin": "09:00" },
+        { "label": "오전 수업 시간", "startMin": "09:00", "endMin": "12:50" },
+        { "label": "점심 시간",      "startMin": "12:50", "endMin": "13:10" },
+        { "label": "오후 수업 시간", "startMin": "13:00", "endMin": "16:40" },
+        { "label": "청소 시간",      "startMin": "16:40", "endMin": "17:00" },
+        { "label": "종례",          "startMin": "17:00", "endMin": "17:10" },
+        { "label": "방과후 1타임",   "startMin": "17:10", "endMin": "17:50" },
+        { "label": "쉬는 시간",      "startMin": "17:50", "endMin": "17:55" },
+        { "label": "방과후 2타임",   "startMin": "17:55", "endMin": "18:35" },
+        { "label": "저녁 시간",      "startMin": "18:35", "endMin": "19:50" },
+        { "label": "야자 1타임",     "startMin": "19:50", "endMin": "21:10" },
+        { "label": "쉬는 시간",      "startMin": "21:10", "endMin": "21:30" },
+        { "label": "야자 2타임",     "startMin": "21:30", "endMin": "23:00" },
+        { "label": "끝.",           "startMin": "23:00", "endMin": "24:00" }
+      ],
+      "sunday": [
+        { "label": "수감",        "startMin": "00:00", "endMin": "20:00" },
+        { "label": "야자 1타임",   "startMin": "20:00", "endMin": "21:00" },
+        { "label": "쉬는 시간",    "startMin": "21:00", "endMin": "21:20" },
+        { "label": "야자 2타임",   "startMin": "21:20", "endMin": "22:30" },
+        { "label": "끝.",         "startMin": "22:30", "endMin": "24:00" }
+      ]
+  
+    },
+    "2": {
+      "_comment": "2학년 전용 예시",
+      "weekday": [
+        { "label": "아침 시간",      "startMin": "00:00", "endMin": "08:00" },
+        { "label": "아침 자습",      "startMin": "08:00", "endMin": "08:45" },
+        { "label": "아침 조회",      "startMin": "08:45", "endMin": "09:00" },
+        { "label": "오전 수업 시간", "startMin": "09:00", "endMin": "12:50" },
+        { "label": "점심 시간",      "startMin": "12:50", "endMin": "13:20" },
+        { "label": "오후 수업 시간", "startMin": "13:00", "endMin": "16:40" },
+        { "label": "청소 시간",      "startMin": "16:40", "endMin": "17:00" },
+        { "label": "종례",          "startMin": "17:00", "endMin": "17:10" },
+        { "label": "방과후 1타임",   "startMin": "17:10", "endMin": "17:50" },
+        { "label": "쉬는 시간",      "startMin": "17:50", "endMin": "17:55" },
+        { "label": "방과후 2타임",   "startMin": "17:55", "endMin": "18:35" },
+        { "label": "저녁 시간",      "startMin": "18:35", "endMin": "19:50" },
+        { "label": "야자 1타임",     "startMin": "19:50", "endMin": "21:10" },
+        { "label": "쉬는 시간",      "startMin": "21:10", "endMin": "21:30" },
+        { "label": "야자 2타임",     "startMin": "21:30", "endMin": "23:10" },
+        { "label": "끝.",           "startMin": "23:10", "endMin": "24:00" }
+      ]
+    },
+    "3": {
+      "_comment": "3학년 전용 예시",
+      "weekday": [
+        { "label": "아침 시간",      "startMin": "00:00", "endMin": "08:15" },
+        { "label": "아침 자습",      "startMin": "08:15", "endMin": "09:00" },
+        { "label": "오전 수업 시간", "startMin": "09:00", "endMin": "12:50" },
+        { "label": "점심 시간",      "startMin": "12:50", "endMin": "13:20" },
+        { "label": "오후 수업 시간", "startMin": "13:20", "endMin": "16:40" },
+        { "label": "청소 시간",      "startMin": "16:40", "endMin": "17:00" },
+        { "label": "종례",          "startMin": "17:00", "endMin": "17:10" },
+        { "label": "방과후 1타임",   "startMin": "17:10", "endMin": "17:50" },
+        { "label": "쉬는 시간",      "startMin": "17:50", "endMin": "17:55" },
+        { "label": "방과후 2타임",   "startMin": "17:55", "endMin": "18:35" },
+        { "label": "저녁 시간",      "startMin": "18:35", "endMin": "19:50" },
+        { "label": "야자 1타임",     "startMin": "19:50", "endMin": "21:10" },
+        { "label": "쉬는 시간",      "startMin": "21:10", "endMin": "21:30" },
+        { "label": "야자 2타임",     "startMin": "21:30", "endMin": "23:10" },
+        { "label": "끝.",           "startMin": "23:10", "endMin": "24:00" }
+      ]
+    }
+  }
+}
