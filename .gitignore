@@ -20,6 +20,7 @@ dist/
 .eggs/
 pip-wheel-metadata/
 wheelhouse/
+node_modules/
 
 # 테스트/커버리지/캐시
 .pytest_cache/
