@@ -279,11 +279,15 @@ def list_oauth_clients():
 @blueprint.post("/oauth/clients")
 def create_oauth_client():
     _ensure_oauth_rotation_columns()
-    _require_teacher_user()
+    _require_user()
     payload = request.get_json(silent=True) or {}
     name = (payload.get("name") or "").strip()
     redirect_uris = (payload.get("redirect_uris") or "").strip()
     scopes = (payload.get("scopes") or "").strip()
+    if not scopes:
+        scopes = "basic student_info openid"
+    elif "openid" not in scopes.split():
+        scopes = f"{scopes} openid"
     if not name or not redirect_uris:
         _json_abort(400, "name and redirect_uris are required")
     client = OAuthClient(

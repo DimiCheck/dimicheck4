@@ -87,6 +87,7 @@ _CSRF_EXEMPT_PREFIXES = (
     "/board",
     "/teacher",
     "/oauth/",
+    "/api/mcp",
     "/public/",
     "/healthz",
     "/metrics",

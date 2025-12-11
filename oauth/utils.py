@@ -10,7 +10,9 @@ from jose import jwt
 from extensions import db
 from models import OAuthAuthorizationCode, OAuthClient, OAuthRefreshToken, User
 
-ACCESS_TOKEN_LIFETIME = timedelta(hours=1)
+# ChatGPT 커넥터는 토큰 재발급 없이 장기간 재사용하므로 만료 시간을 넉넉히 준다.
+# (리스크가 크다면 나중에 줄이고 refresh_token 사용을 강제하세요)
+ACCESS_TOKEN_LIFETIME = timedelta(days=90)
 
 
 def split_scopes(scope_str: str | None) -> List[str]:

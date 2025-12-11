@@ -26,6 +26,7 @@ from public_api import public_api_bp, broadcast_public_status_update
 from developer_routes import blueprint as developer_bp
 from oauth import blueprint as oauth_bp
 from account import blueprint as account_bp
+from mcp_routes import blueprint as mcp_bp
 from config import config
 from extensions import db
 from models import ClassConfig, ClassPin, ClassState
@@ -61,6 +62,7 @@ app.register_blueprint(public_api_bp)
 app.register_blueprint(developer_bp)
 app.register_blueprint(oauth_bp)
 app.register_blueprint(account_bp)
+app.register_blueprint(mcp_bp)
 app.add_url_rule("/metrics", "metrics", metrics)
 
 db.init_app(app)

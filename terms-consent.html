@@ -4,111 +4,333 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>이용약관 동의</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/main.css">
+  <script>
+    (function(){
+      try{
+        const raw = localStorage.getItem('dimicheck:settings');
+        if(!raw) return;
+        const parsed = JSON.parse(raw);
+        if(parsed.theme === 'light' || parsed.theme === 'dark'){
+          document.documentElement.dataset.theme = parsed.theme;
+        }else{
+          delete document.documentElement.dataset.theme;
+        }
+      }catch(err){
+        console.warn('[Theme] preload failed', err);
+      }
+    })();
+  </script>
   <style>
-    body {
-      background: radial-gradient(circle at 20% 20%, rgba(104, 132, 255, 0.18), transparent 40%), radial-gradient(circle at 80% 0%, rgba(255, 161, 184, 0.2), transparent 35%), #0b1021;
-      color: #f7f8ff;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
+    :root{
+      --bg: #0b0f14;
+      --bg-2: #0e1218;
+      --card: rgba(255,255,255,.08);
+      --card-2: rgba(255,255,255,.06);
+      --text: #e9eef6;
+      --muted: #a7b0c0;
+      --primary: #d04fff;
+      --primary-2: #ff6ad0;
+      --shadow: 0 16px 50px rgba(0, 0, 0, .45);
+      --border: color-mix(in oklab, var(--text) 12%, transparent);
     }
-    .consent-card {
-      width: min(560px, 100%);
-      background: rgba(18, 23, 45, 0.9);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: 0 16px 60px rgba(0, 0, 0, 0.35);
-      border-radius: 16px;
-      padding: 28px 32px;
+    :root[data-theme="light"]{
+      --bg: #f6f8fb;
+      --bg-2: #eef2f8;
+      --card: rgba(255,255,255,.9);
+      --card-2: rgba(255,255,255,.82);
+      --text: #0f172a;
+      --muted: #5b6475;
+      --shadow: 0 16px 50px rgba(57,72,103,.18);
+      --border: color-mix(in oklab, var(--text) 14%, transparent);
     }
-    h1 {
-      font-size: 22px;
-      margin: 0 0 12px;
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) {
+        --bg: #f6f8fb;
+        --bg-2: #eef2f8;
+        --card: rgba(255,255,255,.9);
+        --card-2: rgba(255,255,255,.82);
+        --text: #0f172a;
+        --muted: #5b6475;
+        --shadow: 0 16px 50px rgba(57,72,103,.18);
+        --border: color-mix(in oklab, var(--text) 14%, transparent);
+      }
     }
-    p.desc {
-      margin: 0 0 16px;
-      color: rgba(247, 248, 255, 0.8);
-      line-height: 1.5;
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:"Pretendard", system-ui,-apple-system,Segoe UI,Roboto,Noto Sans KR,sans-serif;
+      color:var(--text);
+      background:radial-gradient(1100px 700px at 10% -10%, #5a6cff18, transparent 60%), radial-gradient(1100px 700px at 110% 15%, #ff009020, transparent 60%), radial-gradient(900px 600px at 50% 120%, #ff00b320, transparent 60%), linear-gradient(180deg, var(--bg), var(--bg-2));
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:36px 18px;
+      overflow-x:hidden;
+      overflow-y:auto;
+      position:relative;
+      width:100%;
     }
-    .consent-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin: 16px 0 8px;
+    body::before{
+      content:'';
+      display:none;
     }
-    label {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      cursor: pointer;
+
+    .bg{
+      position:fixed;
+      inset:-14% -10%;
+      z-index:-1;
+      background:
+        radial-gradient(50% 60% at 0% 20%, color-mix(in oklab, var(--primary) 25%, transparent), transparent 60%),
+        radial-gradient(40% 55% at 100% 0%, color-mix(in oklab, #2be277 24%, transparent), transparent 55%),
+        radial-gradient(60% 70% at 40% 100%, color-mix(in oklab, #ff9d4d 20%, transparent), transparent 65%);
+      filter:blur(12px);
+      opacity:.9;
     }
-    input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      accent-color: #6a8bff;
+    .grid-overlay{
+      position:fixed;
+      inset:0;
+      background-image:
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size:120px 120px;
+      mix-blend-mode:overlay;
+      opacity:.35;
+      z-index:-1;
+      pointer-events:none;
     }
-    .links {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 8px;
-      margin: 8px 0 18px;
+
+    .consent-shell{
+      width:min(640px, 100%);
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      z-index:1;
+      margin:0 auto;
     }
-    .links a {
-      color: #a7c2ff;
-      text-decoration: underline;
-      font-size: 14px;
+    .consent-card{
+      width:100%;
+      background:linear-gradient(180deg, color-mix(in oklab, var(--card) 100%, rgba(255,255,255,.08)), var(--card-2));
+      border:1px solid var(--border);
+      box-shadow:var(--shadow);
+      border-radius:22px;
+      padding:28px 30px;
+      backdrop-filter:saturate(140%) blur(12px);
     }
-    .actions {
-      display: flex;
-      gap: 10px;
-      justify-content: flex-end;
-      margin-top: 12px;
+    .eyebrow{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:6px 12px;
+      border-radius:999px;
+      background:color-mix(in oklab, var(--primary) 18%, transparent);
+      color:color-mix(in oklab, var(--primary) 80%, var(--text));
+      font-weight:700;
+      font-size:13px;
+      letter-spacing:.3px;
     }
-    button {
-      border: none;
-      border-radius: 10px;
-      padding: 12px 18px;
-      font-weight: 600;
-      cursor: pointer;
+    h1{
+      font-size:24px;
+      margin:10px 0 6px;
+      letter-spacing:-0.2px;
     }
-    .btn-primary {
-      background: linear-gradient(135deg, #5f7bff, #5ac8fa);
-      color: #fff;
+    p.desc{
+      margin:0 0 18px;
+      color:var(--muted);
+      line-height:1.6;
     }
-    .btn-primary:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    .consent-list{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      margin:12px 0 10px;
     }
-    .btn-ghost {
-      background: rgba(255, 255, 255, 0.08);
-      color: #f7f8ff;
+    label.consent-row{
+      display:flex;
+      align-items:flex-start;
+      gap:12px;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background:linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.04));
+      cursor:pointer;
+      transition:border-color .2s ease, transform .15s ease, box-shadow .2s ease;
     }
-    .error {
-      color: #ff9ea5;
-      min-height: 18px;
-      font-size: 14px;
-      margin-bottom: 6px;
+    label.consent-row:hover{
+      transform:translateY(-1px);
+      border-color:color-mix(in oklab, var(--primary) 25%, var(--border));
+      box-shadow:0 10px 26px rgba(0,0,0,.16);
+    }
+    input[type="checkbox"]{
+      appearance:none;
+      width:22px;
+      height:22px;
+      margin-top:2px;
+      border-radius:7px;
+      border:1px solid var(--border);
+      background:color-mix(in oklab, var(--text) 6%, transparent);
+      display:grid;
+      place-items:center;
+      transition:all .2s ease;
+    }
+    input[type="checkbox"]::after{
+      content:'✓';
+      color:#fff;
+      font-weight:800;
+      font-size:14px;
+      opacity:0;
+      transform:scale(.8);
+      transition:all .2s ease;
+    }
+    input[type="checkbox"]:checked{
+      background:linear-gradient(135deg, var(--primary), var(--primary-2));
+      border-color:color-mix(in oklab, var(--primary) 45%, transparent);
+      box-shadow:0 8px 16px color-mix(in oklab, var(--primary) 18%, transparent);
+    }
+    input[type="checkbox"]:checked::after{
+      opacity:1;
+      transform:scale(1);
+    }
+    .label-text .title{font-weight:700;}
+    .label-text small{
+      display:block;
+      margin-top:4px;
+      color:var(--muted);
+      line-height:1.4;
+    }
+    .links{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(230px, 1fr));
+      gap:10px;
+      margin:6px 0 14px;
+    }
+    .links a{
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:linear-gradient(180deg, var(--card), var(--card-2));
+      color:var(--text);
+      text-decoration:none;
+      font-weight:700;
+      transition:border-color .2s ease, transform .15s ease, box-shadow .2s ease;
+    }
+    .links a span{
+      color:var(--muted);
+      font-size:12px;
+      font-weight:600;
+    }
+    .links a:hover{
+      transform:translateY(-2px);
+      border-color:color-mix(in oklab, var(--primary) 30%, var(--border));
+      box-shadow:0 8px 18px rgba(0,0,0,.18);
+    }
+    .actions{
+      display:flex;
+      gap:10px;
+      justify-content:flex-end;
+      margin-top:16px;
+      flex-wrap:wrap;
+    }
+    button{
+      border:none;
+      border-radius:12px;
+      padding:12px 16px;
+      font-weight:700;
+      cursor:pointer;
+      transition:transform .15s ease, box-shadow .2s ease, opacity .2s ease;
+      font-family:inherit;
+    }
+    .btn-primary{
+      background:linear-gradient(135deg, var(--primary), var(--primary-2));
+      color:#fff;
+      box-shadow:0 10px 24px color-mix(in oklab, var(--primary) 28%, transparent);
+    }
+    .btn-primary:disabled{
+      opacity:0.55;
+      cursor:not-allowed;
+      filter:grayscale(.1);
+      box-shadow:none;
+    }
+    .btn-ghost{
+      background:transparent;
+      color:var(--text);
+      border:1px solid var(--border);
+    }
+    .btn-ghost:hover{
+      border-color:color-mix(in oklab, var(--text) 18%, var(--border));
+    }
+    button:not(:disabled):active{
+      transform:scale(0.97);
+    }
+    .error{
+      color:#ff9ea5;
+      min-height:18px;
+      font-size:14px;
+      margin-bottom:8px;
+    }
+    .footnote{
+      color:var(--muted);
+      font-size:13px;
+      margin-top:4px;
+    }
+    @media (max-width: 540px){
+      body{padding:22px 14px;}
+      .consent-card{padding:22px 20px; border-radius:18px;}
+      h1{font-size:22px;}
+      .actions{flex-direction:column;}
+      button{width:100%;}
     }
   </style>
 </head>
 <body>
-  <div class="consent-card">
-    <h1>기본 서비스 이용 동의</h1>
-    <p class="desc">디미체크 서비스를 이용하려면 기본 이용약관 및 개인정보 처리방침에 동의해야 합니다.</p>
-    <div id="errorBox" class="error"></div>
-    <div class="consent-list">
-      <label><input type="checkbox" id="termsCheck"> 기본 이용약관에 동의합니다.</label>
-      <label><input type="checkbox" id="privacyCheck"> 개인정보 처리방침에 동의합니다.</label>
-    </div>
-    <div class="links">
-      <a href="/terms.html" target="_blank" rel="noopener noreferrer">기본 이용약관 보기</a>
-      <a href="/privacy.html" target="_blank" rel="noopener noreferrer">개인정보 처리방침 보기</a>
-    </div>
-    <div class="actions">
-      <button class="btn-ghost" id="logoutBtn" type="button">다른 계정으로</button>
-      <button class="btn-primary" id="acceptBtn" type="button" disabled>동의하고 계속하기</button>
+  <div class="bg"></div>
+  <div class="grid-overlay"></div>
+
+  <div class="consent-shell">
+    <div class="consent-card">
+      <div class="eyebrow">DIMI Check · 필수 동의</div>
+      <h1>기본 서비스 이용 동의</h1>
+      <p class="desc">디미체크 서비스를 이용하려면 기본 이용약관 및 개인정보 처리방침에 동의해야 합니다.</p>
+      <div id="errorBox" class="error"></div>
+      <div class="consent-list">
+        <label class="consent-row">
+          <input type="checkbox" id="termsCheck">
+          <div class="label-text">
+            <div class="title">기본 이용약관에 동의합니다.</div>
+            <small>서비스 사용을 위해 반드시 확인해주세요.</small>
+          </div>
+        </label>
+        <label class="consent-row">
+          <input type="checkbox" id="privacyCheck">
+          <div class="label-text">
+            <div class="title">개인정보 처리방침에 동의합니다.</div>
+            <small>데이터 처리 및 보관 방식에 관한 안내입니다.</small>
+          </div>
+        </label>
+      </div>
+      <div class="links">
+        <a href="/terms.html" target="_blank" rel="noopener noreferrer">
+          기본 이용약관 보기
+          <span>필수 약관 전문을 새 창에서 확인</span>
+        </a>
+        <a href="/privacy.html" target="_blank" rel="noopener noreferrer">
+          개인정보 처리방침 보기
+          <span>데이터 사용 및 보호 정책 전문</span>
+        </a>
+      </div>
+      <div class="actions">
+        <button class="btn-ghost" id="logoutBtn" type="button">다른 계정으로</button>
+        <button class="btn-primary" id="acceptBtn" type="button" disabled>동의하고 계속하기</button>
+      </div>
+      <div class="footnote">이미 동의했다면 자동으로 다음 화면으로 이동합니다.</div>
     </div>
   </div>
 

@@ -52,8 +52,8 @@ def load_remembered_user() -> None:
     issue_session(record.user)
 
 
-def persist_remembered_session(user: User, response: Response, device_info: str | None = None) -> None:
-    cookie_name = current_app.config["REMEMBER_ME_COOKIE_NAME"]
+def issue_remember_token(user: User, device_info: str | None = None) -> tuple[str, datetime]:
+    """새 remember-me 토큰을 발급하고 DB에 저장."""
     token = secrets.token_hex(32)
     expires_at = datetime.utcnow() + timedelta(days=current_app.config["REMEMBER_ME_DURATION_DAYS"])
     record = RememberedSession(
@@ -64,6 +64,12 @@ def persist_remembered_session(user: User, response: Response, device_info: str 
     )
     db.session.add(record)
     db.session.commit()
+    return token, expires_at
+
+
+def persist_remembered_session(user: User, response: Response, device_info: str | None = None) -> None:
+    cookie_name = current_app.config["REMEMBER_ME_COOKIE_NAME"]
+    token, expires_at = issue_remember_token(user, device_info)
 
     max_age = int(current_app.config["REMEMBER_ME_DURATION_DAYS"]) * 24 * 60 * 60
     response.set_cookie(

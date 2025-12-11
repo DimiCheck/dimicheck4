@@ -278,6 +278,85 @@
       font-size: 14px;
     }
 
+    .mcp-section {
+      margin-top: 8px;
+      padding: 16px;
+      border-radius: 14px;
+      border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      background: color-mix(in oklab, var(--card) 80%, transparent);
+      display: grid;
+      gap: 12px;
+    }
+
+    .mcp-header h4 {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .mcp-header small {
+      color: var(--muted);
+    }
+
+    .mcp-field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .mcp-field label {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .mcp-field input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      background: color-mix(in oklab, var(--card) 90%, transparent);
+      color: var(--text);
+    }
+
+    .mcp-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .mcp-status {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .mcp-result {
+      border: 1px dashed color-mix(in oklab, var(--primary) 40%, transparent);
+      border-radius: 12px;
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+      background: color-mix(in oklab, var(--card) 90%, transparent);
+    }
+
+    .mcp-row {
+      display: grid;
+      grid-template-columns: 90px 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .mcp-row code {
+      background: color-mix(in oklab, var(--card) 70%, transparent);
+      padding: 6px 8px;
+      border-radius: 8px;
+      word-break: break-all;
+    }
+
+    .mcp-hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
     .profile-card {
       display: flex;
       align-items: center;
@@ -876,6 +955,44 @@
       <div class="dev-card-content" id="developerCardContent">
         <p>DIMI Check Public API를 위한 키 발급과 사용량 모니터링, 문서 확인이 가능한 개발자 콘솔로 이동합니다.</p>
         <button type="button" id="openConsoleBtn" class="btn-primary">개발자 콘솔 열기</button>
+
+        <div class="mcp-section" id="mcpSection" hidden>
+          <div class="mcp-header">
+            <div>
+              <h4>ChatGPT MCP OAuth 발급</h4>
+              <small>리디렉션은 ChatGPT 콜백으로 고정됩니다.</small>
+            </div>
+          </div>
+          <div class="mcp-field">
+            <label for="mcpNameInput">클라이언트 이름</label>
+            <input id="mcpNameInput" type="text" placeholder="예: ChatGPT MCP" value="ChatGPT MCP" />
+          </div>
+          <div class="mcp-field">
+            <label for="mcpRedirectInput">Redirect URI</label>
+            <input id="mcpRedirectInput" type="text" value="https://chatgpt.com/connector_platform_oauth_redirect, https://chat.openai.com/aip/oauth/callback" />
+          </div>
+          <div class="mcp-field">
+            <label for="mcpScopeInput">스코프</label>
+            <input id="mcpScopeInput" type="text" value="basic student_info openid" />
+          </div>
+          <div class="mcp-actions">
+            <button type="button" id="mcpCreateBtn" class="btn-primary">ID/시크릿 발급</button>
+            <small id="mcpStatus" class="mcp-status"></small>
+          </div>
+          <div class="mcp-result" id="mcpResult" hidden>
+            <div class="mcp-row">
+              <span>Client ID</span>
+              <code id="mcpClientId"></code>
+              <button type="button" class="ghost" data-copy-target="mcpClientId">복사</button>
+            </div>
+            <div class="mcp-row">
+              <span>Client Secret</span>
+              <code id="mcpClientSecret"></code>
+              <button type="button" class="ghost" data-copy-target="mcpClientSecret">복사</button>
+            </div>
+            <p class="mcp-hint">시크릿은 한 번만 표시됩니다. 안전하게 보관하세요.</p>
+          </div>
+        </div>
       </div>
     </section>
 

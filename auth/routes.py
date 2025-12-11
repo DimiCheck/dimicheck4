@@ -3,11 +3,13 @@ from __future__ import annotations
 import secrets
 from datetime import datetime
 from typing import Any, Dict, Tuple
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import requests
 from flask import (
     Blueprint,
     Response,
+    current_app,
     jsonify,
     make_response,
     redirect,
@@ -23,6 +25,7 @@ from auth.google import build_google_auth_url, exchange_code_for_tokens, verify_
 from auth.sessions import (
     clear_remembered_session,
     issue_session,
+    issue_remember_token,
     persist_remembered_session,
 )
 from config import config
@@ -123,6 +126,35 @@ def _build_legacy_login_url() -> str:
     return f"{LEGACY_AUTHORIZE_URL}?{requests.compat.urlencode(params)}"
 
 
+def _validate_app_redirect(uri: str | None) -> bool:
+    if not uri:
+        return False
+    parsed = urlparse(uri)
+    if parsed.scheme in config.APP_LOGIN_ALLOWED_SCHEMES:
+        return True
+    if parsed.scheme in {"https", "http"} and parsed.hostname:
+        return parsed.hostname.lower() in config.APP_LOGIN_ALLOWED_WEB_HOSTS
+    return False
+
+
+def _resolve_app_redirect(uri: str | None) -> str:
+    """Return a safe redirect target for app flows."""
+    if uri and _validate_app_redirect(uri):
+        return uri
+    return config.APP_LOGIN_DEFAULT_REDIRECT
+
+
+def _build_app_redirect(uri: str, params: Dict[str, Any]) -> str:
+    parsed = urlparse(uri)
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    for key, value in params.items():
+        if value is None:
+            continue
+        query[key] = str(value)
+    new_query = urlencode(query)
+    return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment))
+
+
 def _get_legacy_public_key() -> str:
     resp = requests.get(config.OAUTH_PUBLIC_KEY_URL or LEGACY_PUBLIC_KEY_URL, timeout=5)
     resp.raise_for_status()
@@ -202,6 +234,29 @@ def _finalize_login(user: User, remember: bool) -> Response:
     return response
 
 
+@blueprint.get("/app-login")
+def app_login() -> Response:
+    remember = str(request.args.get("remember", "1")).lower() not in {"0", "false", "off"}
+    redirect_uri = _resolve_app_redirect(
+        request.args.get("redirect_uri") or request.args.get("callback")
+    )
+    session["post_login_redirect"] = url_for(
+        "auth.app_login_complete",
+        redirect_uri=redirect_uri,
+        remember="1" if remember else "0",
+        _external=True,
+    )
+    session["app_login_redirect"] = redirect_uri
+    session["app_login_remember"] = remember
+    # 앱 전용 로그인에서는 완료 단계에서 remember 토큰을 발급한다.
+    session["remember_me_requested"] = False
+    if not config.USE_DIMICHECK_OAUTH:
+        return redirect(_build_legacy_login_url())
+    state = secrets.token_urlsafe(32)
+    session["google_oauth_state"] = state
+    return redirect(build_google_auth_url(state))
+
+
 @blueprint.get("/login")
 def login() -> Response:
     remember = str(request.args.get("remember", "1")).lower() not in {"0", "false", "off"}
@@ -267,6 +322,69 @@ def _handle_legacy_callback() -> Response:
     user = _ensure_user_record(user_data)
     remember = bool(session.pop("remember_me_requested", False))
     return _finalize_login(user, remember)
+
+
+@blueprint.get("/app-login/complete")
+def app_login_complete() -> Response:
+    redirect_uri = _resolve_app_redirect(
+        request.args.get("redirect_uri") or session.get("app_login_redirect")
+    )
+    remember_arg = request.args.get("remember")
+    remember_requested = session.pop("app_login_remember", True)
+    remember = str(remember_arg if remember_arg is not None else remember_requested).lower() not in {
+        "0",
+        "false",
+        "off",
+    }
+    user_info = session.get("user")
+    if not user_info:
+        return redirect(
+            url_for(
+                "auth.app_login",
+                redirect_uri=redirect_uri,
+                remember="1" if remember else "0",
+            )
+        )
+    db_user = User.query.get(user_info.get("id")) if user_info.get("id") else None
+    if not db_user:
+        session.clear()
+        return jsonify({"error": {"code": "unauthorized", "message": "user not found"}}), 401
+
+    remember_token = None
+    remember_expires = None
+    if remember:
+        remember_token, expires_at = issue_remember_token(db_user, device_info="flutter_app")
+        remember_expires = int(expires_at.timestamp())
+
+    payload = {
+        "status": "ok",
+        "user_id": db_user.id,
+        "email": db_user.email,
+        "type": db_user.type.value if db_user.type else None,
+        "grade": db_user.grade,
+        "class": db_user.class_no,
+        "section": db_user.class_no,
+        "number": db_user.number,
+        "remember_token": remember_token,
+        "remember_cookie": current_app.config["REMEMBER_ME_COOKIE_NAME"] if remember_token else None,
+        "remember_expires": remember_expires,
+        "csrf_token": session.get("csrf_token"),
+    }
+
+    session.pop("app_login_redirect", None)
+
+    response = redirect(_build_app_redirect(redirect_uri, {k: v for k, v in payload.items() if v is not None}))
+    if remember_token:
+        max_age = int(current_app.config["REMEMBER_ME_DURATION_DAYS"]) * 24 * 60 * 60
+        response.set_cookie(
+            current_app.config["REMEMBER_ME_COOKIE_NAME"],
+            remember_token,
+            max_age=max_age,
+            secure=current_app.config.get("SESSION_COOKIE_SECURE", True),
+            httponly=True,
+            samesite=current_app.config.get("SESSION_COOKIE_SAMESITE", "None"),
+        )
+    return response
 
 
 @blueprint.route("/logout", methods=["GET", "POST"])

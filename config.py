@@ -82,6 +82,19 @@ class Config:
         "GA4_MEASUREMENT_ENDPOINT", "https://www.google-analytics.com/mp/collect"
     )
 
+    # App 전용 로그인
+    APP_LOGIN_DEFAULT_REDIRECT: str = os.getenv("APP_LOGIN_DEFAULT_REDIRECT", "dimicheck://auth-callback")
+    APP_LOGIN_ALLOWED_SCHEMES: tuple[str, ...] = tuple(
+        scheme.strip()
+        for scheme in os.getenv("APP_LOGIN_ALLOWED_SCHEMES", "dimicheck").split(",")
+        if scheme.strip()
+    )
+    APP_LOGIN_ALLOWED_WEB_HOSTS: tuple[str, ...] = tuple(
+        host.strip().lower()
+        for host in os.getenv("APP_LOGIN_ALLOWED_WEB_HOSTS", "").split(",")
+        if host.strip()
+    )
+
     # Weather
 
     # Public API limits

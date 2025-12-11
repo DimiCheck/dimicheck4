@@ -4,6 +4,7 @@ class MyPageController {
     this.section = null;
     this.number = null;
     this.nickname = '';
+    this.userType = '';
     this.settings = window.preferences?.getSettings?.() || {};
     this.isStandalone = this.checkStandalone();
     this.toastTimer = null;
@@ -40,6 +41,16 @@ class MyPageController {
     this.notificationDisabled = document.getElementById('notificationUnavailable');
     this.logoutBtn = document.getElementById('logoutBtn');
     this.toast = document.getElementById('myToast');
+    this.mcpSection = document.getElementById('mcpSection');
+    this.mcpNameInput = document.getElementById('mcpNameInput');
+    this.mcpRedirectInput = document.getElementById('mcpRedirectInput');
+    this.mcpScopeInput = document.getElementById('mcpScopeInput');
+    this.mcpCreateBtn = document.getElementById('mcpCreateBtn');
+    this.mcpStatus = document.getElementById('mcpStatus');
+    this.mcpResult = document.getElementById('mcpResult');
+    this.mcpClientId = document.getElementById('mcpClientId');
+    this.mcpClientSecret = document.getElementById('mcpClientSecret');
+    this.mcpCopyButtons = document.querySelectorAll('[data-copy-target]');
   }
 
   bindEvents() {
@@ -75,6 +86,17 @@ class MyPageController {
 
     this.logoutBtn?.addEventListener('click', () => {
       window.location.href = '/auth/logout';
+    });
+
+    this.mcpCreateBtn?.addEventListener('click', () => this.createMcpClient());
+    this.mcpCopyButtons?.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.dataset.copyTarget;
+        const el = targetId ? document.getElementById(targetId) : null;
+        if (!el || !el.textContent) return;
+        navigator.clipboard?.writeText(el.textContent.trim());
+        this.showToast('복사했습니다.');
+      });
     });
   }
 
@@ -172,6 +194,9 @@ class MyPageController {
       await this.updateProfileCard();
       this.syncClassContext();
       await this.loadNickname();
+
+      this.userType = (data.type || data.user_type || '').toLowerCase();
+      this.renderMcpSection();
 
       // 아바타 매니저 초기화
       if (window.avatarModalManager && this.grade && this.section && this.number) {
@@ -408,6 +433,53 @@ class MyPageController {
     this.toastTimer = setTimeout(() => {
       this.toast.classList.remove('show');
     }, 2500);
+  }
+
+  renderMcpSection() {
+    if (!this.mcpSection) return;
+    this.mcpSection.hidden = false;
+  }
+
+  async createMcpClient() {
+    const name = (this.mcpNameInput?.value || 'ChatGPT MCP').trim();
+    const redirect_uris =
+      (this.mcpRedirectInput?.value ||
+        'https://chatgpt.com/connector_platform_oauth_redirect, https://chat.openai.com/aip/oauth/callback').trim();
+    const scopes = (this.mcpScopeInput?.value || 'basic student_info openid').trim();
+    if (!name || !redirect_uris) {
+      this.setMcpStatus('이름과 Redirect URI를 입력하세요.', true);
+      return;
+    }
+    this.setMcpStatus('발급 중...', false);
+    if (this.mcpCreateBtn) this.mcpCreateBtn.disabled = true;
+    try {
+      const res = await fetch('/api/dev/oauth/clients', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, redirect_uris, scopes })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const message = err?.error?.message || `실패(${res.status})`;
+        throw new Error(message);
+      }
+      const data = await res.json();
+      if (this.mcpClientId) this.mcpClientId.textContent = data?.client?.client_id || '';
+      if (this.mcpClientSecret) this.mcpClientSecret.textContent = data?.client_secret || '';
+      if (this.mcpResult) this.mcpResult.hidden = false;
+      this.setMcpStatus('발급 완료! 시크릿은 한 번만 표시됩니다.', false);
+    } catch (error) {
+      this.setMcpStatus(error?.message || '발급에 실패했습니다.', true);
+    } finally {
+      if (this.mcpCreateBtn) this.mcpCreateBtn.disabled = false;
+    }
+  }
+
+  setMcpStatus(message, isError = false) {
+    if (!this.mcpStatus) return;
+    this.mcpStatus.textContent = message;
+    this.mcpStatus.style.color = isError ? '#ff8a8a' : 'var(--muted)';
   }
 }
 
