@@ -143,6 +143,7 @@ def save_state():
     channels = _normalize_channels(state_payload.get("channels"))
     memberships = _normalize_channel_memberships(state_payload.get("channelMemberships"), channels, grade, section)
     owners = _normalize_channel_owners(state_payload.get("channelOwners"), channels)
+    marquee = state_payload.get("marquee")
 
     # ✅ 기존 + 새로운 데이터 병합
     # Preserve special fields (reaction, thought, etc.) when updating magnet position
@@ -156,7 +157,13 @@ def save_state():
                 data[field] = existing[field]
         magnets[str(num)] = data   # 같은 번호면 갱신, 없으면 추가
 
-    payload_to_save = {"magnets": magnets, "channels": channels, "channelMemberships": memberships, "channelOwners": owners}
+    payload_to_save = {
+        "magnets": magnets,
+        "channels": channels,
+        "channelMemberships": memberships,
+        "channelOwners": owners,
+        "marquee": marquee,
+    }
 
     if not state:
         state = ClassState(
@@ -273,7 +280,8 @@ def _load_state_payload(state: ClassState | None) -> dict[str, dict[str, object]
             "magnets": {},
             "channels": [DEFAULT_CHAT_CHANNEL],
             "channelMemberships": {DEFAULT_CHAT_CHANNEL: []},
-            "channelOwners": {DEFAULT_CHAT_CHANNEL: []}
+            "channelOwners": {DEFAULT_CHAT_CHANNEL: []},
+            "marquee": None,
         }
 
     try:
@@ -283,7 +291,8 @@ def _load_state_payload(state: ClassState | None) -> dict[str, dict[str, object]
             "magnets": {},
             "channels": [DEFAULT_CHAT_CHANNEL],
             "channelMemberships": {DEFAULT_CHAT_CHANNEL: []},
-            "channelOwners": {DEFAULT_CHAT_CHANNEL: []}
+            "channelOwners": {DEFAULT_CHAT_CHANNEL: []},
+            "marquee": None,
         }
 
     if not isinstance(raw, dict):
@@ -291,7 +300,8 @@ def _load_state_payload(state: ClassState | None) -> dict[str, dict[str, object]
             "magnets": {},
             "channels": [DEFAULT_CHAT_CHANNEL],
             "channelMemberships": {DEFAULT_CHAT_CHANNEL: []},
-            "channelOwners": {DEFAULT_CHAT_CHANNEL: []}
+            "channelOwners": {DEFAULT_CHAT_CHANNEL: []},
+            "marquee": None,
         }
 
     magnets = raw.get("magnets")
@@ -306,8 +316,30 @@ def _load_state_payload(state: ClassState | None) -> dict[str, dict[str, object]
         getattr(state, "section", None)
     )
     owners = _normalize_channel_owners(raw.get("channelOwners"), channels)
+    marquee = raw.get("marquee")
+    if isinstance(marquee, dict):
+        text = str(marquee.get("text") or "").strip()
+        if not text:
+            marquee = None
+        else:
+            color = str(marquee.get("color") or "#fdfcff").strip()
+            if not color.startswith("#") or len(color) not in {4, 5, 7, 9}:
+                color = "#fdfcff"
+            marquee = {
+                "text": text[:20],
+                "color": color,
+                "updatedAt": marquee.get("updatedAt") or marquee.get("updated_at") or marquee.get("postedAt")
+            }
+    else:
+        marquee = None
 
-    return {"magnets": magnets, "channels": channels, "channelMemberships": memberships, "channelOwners": owners}
+    return {
+        "magnets": magnets,
+        "channels": channels,
+        "channelMemberships": memberships,
+        "channelOwners": owners,
+        "marquee": marquee,
+    }
 
 
 @blueprint.post("/thought")
@@ -358,7 +390,16 @@ def upsert_thought():
         state = ClassState(
             grade=grade,
             section=section,
-            data=json.dumps({"magnets": {}, "channels": [DEFAULT_CHAT_CHANNEL], "channelMemberships": {DEFAULT_CHAT_CHANNEL: [{"grade": grade, "section": section}]}, "channelOwners": {DEFAULT_CHAT_CHANNEL: []}}, ensure_ascii=False)
+            data=json.dumps(
+                {
+                    "magnets": {},
+                    "channels": [DEFAULT_CHAT_CHANNEL],
+                    "channelMemberships": {DEFAULT_CHAT_CHANNEL: [{"grade": grade, "section": section}]},
+                    "channelOwners": {DEFAULT_CHAT_CHANNEL: []},
+                    "marquee": None,
+                },
+                ensure_ascii=False,
+            )
         )
         db.session.add(state)
         created_state = True
@@ -399,7 +440,16 @@ def upsert_thought():
         response_payload["thought"] = None
 
     magnets[key] = current
-    state.data = json.dumps({"magnets": magnets, "channels": channels, "channelMemberships": memberships, "channelOwners": owners}, ensure_ascii=False)
+    state.data = json.dumps(
+        {
+            "magnets": magnets,
+            "channels": channels,
+            "channelMemberships": memberships,
+            "channelOwners": owners,
+            "marquee": state_payload.get("marquee"),
+        },
+        ensure_ascii=False,
+    )
 
     # Also save to ChatMessage table for persistent chat
     if thought_text and not skip_chat_log:
@@ -431,7 +481,7 @@ def load_class_state():
 
     state = ClassState.query.filter_by(grade=grade, section=section).first()
     if not state:
-        return jsonify({"magnets": {}})
+        return jsonify({"magnets": {}, "marquee": None})
 
     # Load class config to filter skip_numbers
     class_config = load_class_config().get((grade, section))
@@ -439,7 +489,7 @@ def load_class_state():
 
     # Parse state data and filter out skip_numbers
     try:
-        data = json.loads(state.data)
+        data = _load_state_payload(state)
         magnets = data.get("magnets", {})
 
         # Filter out students in skip_numbers
@@ -454,10 +504,60 @@ def load_class_state():
                 # Keep non-numeric keys
                 filtered_magnets[num] = value
 
-        return jsonify({"magnets": filtered_magnets})
+        return jsonify({"magnets": filtered_magnets, "marquee": data.get("marquee")})
     except json.JSONDecodeError:
-        return jsonify({"magnets": {}})
+        return jsonify({"magnets": {}, "marquee": None})
 
+
+@blueprint.post("/marquee")
+def set_marquee():
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+    if grade is None or section is None:
+        return jsonify({"error": "missing grade or section"}), 400
+
+    if not _is_authorized(grade, section):
+        return jsonify({"error": "forbidden"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    raw_text = payload.get("text") or payload.get("message") or ""
+    text = str(raw_text).strip()
+    if len(text) > 20:
+        text = text[:20]
+
+    state = ClassState.query.filter_by(grade=grade, section=section).first()
+    if not state:
+        state = ClassState(
+            grade=grade,
+            section=section,
+            data=json.dumps(
+                {
+                    "magnets": {},
+                    "channels": [DEFAULT_CHAT_CHANNEL],
+                    "channelMemberships": {DEFAULT_CHAT_CHANNEL: [{"grade": grade, "section": section}]},
+                    "channelOwners": {DEFAULT_CHAT_CHANNEL: []},
+                    "marquee": None,
+                },
+                ensure_ascii=False,
+            ),
+        )
+        db.session.add(state)
+
+    state_payload = _load_state_payload(state)
+    marquee_payload = None
+    if text:
+        color_raw = str(payload.get("color") or payload.get("colour") or "#fdfcff").strip()
+        color = color_raw if color_raw.startswith("#") and len(color_raw) in {4, 5, 7, 9} else "#fdfcff"
+        marquee_payload = {
+            "text": text,
+            "color": color,
+            "updatedAt": datetime.now(timezone.utc).isoformat(),
+        }
+    state_payload["marquee"] = marquee_payload
+    state.data = json.dumps(state_payload, ensure_ascii=False)
+    db.session.commit()
+
+    return jsonify({"ok": True, "marquee": marquee_payload})
 
 
 @blueprint.get("/routine")
@@ -642,7 +742,16 @@ def send_reaction():
         state = ClassState(
             grade=grade,
             section=section,
-            data=json.dumps({"magnets": {}, "channels": [DEFAULT_CHAT_CHANNEL], "channelMemberships": {DEFAULT_CHAT_CHANNEL: [{"grade": grade, "section": section}]}, "channelOwners": {DEFAULT_CHAT_CHANNEL: []}}, ensure_ascii=False)
+            data=json.dumps(
+                {
+                    "magnets": {},
+                    "channels": [DEFAULT_CHAT_CHANNEL],
+                    "channelMemberships": {DEFAULT_CHAT_CHANNEL: [{"grade": grade, "section": section}]},
+                    "channelOwners": {DEFAULT_CHAT_CHANNEL: []},
+                    "marquee": None,
+                },
+                ensure_ascii=False,
+            )
         )
         db.session.add(state)
 
@@ -669,7 +778,16 @@ def send_reaction():
     })
 
     magnets[key] = current
-    state.data = json.dumps({"magnets": magnets, "channels": channels, "channelMemberships": memberships, "channelOwners": owners}, ensure_ascii=False)
+    state.data = json.dumps(
+        {
+            "magnets": magnets,
+            "channels": channels,
+            "channelMemberships": memberships,
+            "channelOwners": owners,
+            "marquee": state_payload.get("marquee"),
+        },
+        ensure_ascii=False,
+    )
 
     db.session.commit()
 

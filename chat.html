@@ -2138,6 +2138,7 @@
         </div>
       </div>
       <div style="display:flex;gap:8px">
+        <button id="marqueeBtn" class="icon-btn" aria-label="전광판 띄우기" title="전광판 띄우기">📢</button>
         <button id="voteCreateBtn" class="icon-btn" aria-label="투표 만들기" title="투표 만들기">📊</button>
         <button id="reactionBtn" class="icon-btn" aria-label="반응" title="반응 보내기">😊</button>
       </div>
@@ -2255,6 +2256,26 @@
       </div>
 
       <p style="font-size:12px;color:var(--muted);margin-top:12px;text-align:center" id="voteCreateFeedback"></p>
+    </div>
+  </div>
+
+  <!-- Marquee Modal -->
+  <div id="marqueeModal" class="modal" hidden>
+    <div class="modal-content">
+      <h2>📢 전광판 띄우기</h2>
+      <div class="setting-group">
+        <label for="marqueeInput">칠판에 보여줄 문구 (20자 이내)</label>
+        <input type="text" id="marqueeInput" maxlength="20" placeholder="예: 2교시 자습입니다" />
+      </div>
+      <div class="setting-group">
+        <label for="marqueeColorInput">글자 색상</label>
+        <input type="color" id="marqueeColorInput" value="#fdfcff" />
+      </div>
+      <p id="marqueeFeedback" style="font-size:12px;color:var(--muted);margin-top:4px"></p>
+      <div class="modal-actions">
+        <button id="marqueeCancelBtn" class="btn-secondary" type="button">취소</button>
+        <button id="marqueeSubmitBtn" class="btn-primary" type="button">띄우기</button>
+      </div>
     </div>
   </div>
 

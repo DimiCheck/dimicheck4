@@ -1874,6 +1874,41 @@ body.fullscreen .fullscreen-btn {
   color: #fff;
 }
 
+/* 전광판 메시지 */
+.marquee-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  z-index: 1800;
+  padding: 0 2vw;
+}
+
+.marquee-text {
+  display: block;
+  text-align: left;
+  width: 100%;
+  white-space: nowrap;
+  font-size: 70vh;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--marquee-color, #fdfcff);
+  text-shadow:
+    0 0 24px rgba(255, 255, 255, 0.65),
+    0 0 52px rgba(255, 255, 255, 0.35),
+    0 0 96px rgba(255, 255, 255, 0.25);
+  transform: none;
+  opacity: 0;
+  transition: opacity 180ms ease;
+  will-change: transform, opacity;
+}
+
+.marquee-overlay.visible .marquee-text {
+  opacity: 1;
+}
+
+
 @media (max-width: 900px) {
   .connection-banner {
     left: 20px;

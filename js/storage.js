@@ -110,6 +110,154 @@ const connectionMonitor = (() => {
 
 window.connectionMonitor = connectionMonitor;
 
+const marqueeState = {
+  text: null,
+  updatedAt: null,
+  hideTimer: null,
+  color: '#fdfcff',
+  lastShownAt: null,
+};
+
+function getMarqueeStorageKey() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const g = params.get('grade');
+    const s = params.get('section');
+    if (g && s) return `marquee:last:${g}-${s}`;
+  } catch (_) {
+    // ignore
+  }
+  return 'marquee:last:global';
+}
+
+function ensureMarqueeElements() {
+  const overlay = document.getElementById('marqueeOverlay');
+  const textEl = document.getElementById('marqueeText');
+  if (!overlay || !textEl) return null;
+  return { overlay, textEl };
+}
+
+function hideMarqueeOverlay() {
+  const refs = ensureMarqueeElements();
+  if (!refs) return;
+  refs.overlay.hidden = true;
+  refs.overlay.classList.remove('visible');
+  if (marqueeState.hideTimer) {
+    clearTimeout(marqueeState.hideTimer);
+    marqueeState.hideTimer = null;
+  }
+}
+
+function playMarqueeOverlay(text) {
+  const refs = ensureMarqueeElements();
+  if (!refs) return;
+  const { overlay, textEl } = refs;
+
+  textEl.textContent = text;
+  textEl.style.color = marqueeState.color || '#fdfcff';
+  textEl.style.setProperty('--marquee-color', marqueeState.color || '#fdfcff');
+
+  overlay.hidden = false;
+  overlay.classList.add('visible');
+
+  // Cancel previous animation if any
+  if (textEl._marqueeAnim && typeof textEl._marqueeAnim.cancel === 'function') {
+    textEl._marqueeAnim.cancel();
+  }
+
+  // Measure widths to compute duration and distance
+  const viewportWidth = window.innerWidth || overlay.clientWidth || 1200;
+  const textWidth = Math.max(textEl.scrollWidth, 1);
+  const startX = viewportWidth * 0.75; // start offscreen right
+  const endX = -(textWidth + viewportWidth * 0.25); // end fully offscreen left
+  const distance = Math.max(1, startX - endX);
+  const speed = 440; // px per second (faster scroll)
+  const duration = Math.max(6, Math.min(90, distance / speed));
+
+  textEl.style.transform = `translateX(${startX}px)`;
+  textEl._marqueeAnim = textEl.animate(
+    [
+      { transform: `translateX(${startX}px)` },
+      { transform: `translateX(${endX}px)` }
+    ],
+    {
+      duration: duration * 1000,
+      easing: 'linear',
+      fill: 'forwards'
+    }
+  );
+
+  if (marqueeState.hideTimer) {
+    clearTimeout(marqueeState.hideTimer);
+  }
+
+  marqueeState.lastShownAt = Date.now();
+
+  marqueeState.hideTimer = window.setTimeout(() => {
+    overlay.classList.remove('visible');
+    overlay.hidden = true;
+  }, duration * 1000 + 1500);
+}
+
+function normalizeMarqueePayload(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+  const text = String(payload.text || '').trim();
+  if (!text) return null;
+  const colorRaw = String(payload.color || '#fdfcff').trim();
+  const allowedLengths = [4, 5, 7, 9];
+  const color = (colorRaw.startsWith('#') && allowedLengths.includes(colorRaw.length)) ? colorRaw : '#fdfcff';
+  return {
+    text: text.slice(0, 20),
+    color,
+    updatedAt: payload.updatedAt || payload.updated_at || payload.postedAt || null,
+  };
+}
+
+function handleMarqueePayload(payload) {
+  const normalized = normalizeMarqueePayload(payload);
+  if (!normalized) {
+    marqueeState.text = null;
+    marqueeState.updatedAt = null;
+    hideMarqueeOverlay();
+    return;
+  }
+  if (
+    marqueeState.text === normalized.text &&
+    marqueeState.updatedAt === normalized.updatedAt &&
+    marqueeState.color === normalized.color &&
+    marqueeState.lastShownAt
+  ) {
+    return;
+  }
+
+  const signature = `${normalized.text}|${normalized.color}|${normalized.updatedAt || ''}`;
+  const storageKey = getMarqueeStorageKey();
+  let seenSignature = false;
+  try {
+    seenSignature = localStorage.getItem(storageKey) === signature;
+  } catch (_) {
+    // ignore storage errors
+  }
+  if (seenSignature) {
+    marqueeState.text = normalized.text;
+    marqueeState.color = normalized.color;
+    marqueeState.updatedAt = normalized.updatedAt || String(Date.now());
+    marqueeState.lastShownAt = marqueeState.lastShownAt || Date.now();
+    return;
+  }
+
+  marqueeState.text = normalized.text;
+  marqueeState.color = normalized.color;
+  marqueeState.updatedAt = normalized.updatedAt || String(Date.now());
+  playMarqueeOverlay(normalized.text);
+
+  try {
+    localStorage.setItem(storageKey, signature);
+  } catch (_) {
+    // ignore storage errors
+  }
+}
+
 async function saveState(grade, section) {
   const monitor = window.connectionMonitor;
   const magnets = {};
@@ -278,6 +426,8 @@ async function loadState(grade, section, options = {}) {
       window.repositionThoughtBubbles();
     }
 
+    handleMarqueePayload(parsed.marquee);
+
     if (didNormalizeSection) {
       await saveState(grade, section);
     }
@@ -292,3 +442,8 @@ async function loadState(grade, section, options = {}) {
     }
   }
 }
+
+// Expose for other scripts
+window.loadState = loadState;
+window.saveState = saveState;
+window.fetchMagnetConfig = fetchMagnetConfig;

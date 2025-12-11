@@ -1808,6 +1808,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const voteCreateSubmitBtn = document.getElementById('voteCreateSubmitBtn');
   const voteCreateCancelBtn = document.getElementById('voteCreateCancelBtn');
   const voteAddOptionBtn = document.getElementById('voteAddOptionBtn');
+  const marqueeBtn = document.getElementById('marqueeBtn');
+  const marqueeModal = document.getElementById('marqueeModal');
+  const marqueeInput = document.getElementById('marqueeInput');
+  const marqueeColorInput = document.getElementById('marqueeColorInput');
+  const marqueeSubmitBtn = document.getElementById('marqueeSubmitBtn');
+  const marqueeCancelBtn = document.getElementById('marqueeCancelBtn');
+  const marqueeFeedback = document.getElementById('marqueeFeedback');
 
   if (voteCreateBtn) {
     voteCreateBtn.addEventListener('click', () => {
@@ -1866,6 +1873,107 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (voteAddOptionBtn) {
     voteAddOptionBtn.addEventListener('click', addVoteOption);
+  }
+
+  function openMarqueeModal() {
+    if (!marqueeModal) return;
+    marqueeModal.hidden = false;
+    marqueeFeedback.textContent = '';
+    marqueeInput.value = '';
+    if (marqueeColorInput) {
+      marqueeColorInput.value = marqueeColorInput.defaultValue || '#fdfcff';
+    }
+    marqueeInput.focus();
+  }
+
+  function closeMarqueeModal() {
+    if (!marqueeModal) return;
+    marqueeModal.hidden = true;
+    marqueeFeedback.textContent = '';
+  }
+
+  if (marqueeBtn) {
+    marqueeBtn.addEventListener('click', () => {
+      openMarqueeModal();
+    });
+  }
+
+  if (marqueeCancelBtn) {
+    marqueeCancelBtn.addEventListener('click', () => {
+      closeMarqueeModal();
+    });
+  }
+
+  if (marqueeSubmitBtn) {
+    marqueeSubmitBtn.addEventListener('click', async () => {
+      const text = (marqueeInput?.value || '').trim();
+      if (!text) {
+        if (marqueeFeedback) {
+          marqueeFeedback.textContent = '띄울 문구를 입력하세요.';
+          marqueeFeedback.style.color = 'var(--muted)';
+        }
+        return;
+      }
+      const grade = window.chatPage?.grade;
+      const section = window.chatPage?.section;
+      if (!grade || !section) {
+        if (window.chatPage?.showToast) {
+          window.chatPage.showToast('학급 정보를 불러오지 못했어요');
+        }
+        return;
+      }
+      if (marqueeFeedback) {
+        marqueeFeedback.textContent = '전송 중...';
+        marqueeFeedback.style.color = 'var(--muted)';
+      }
+      marqueeSubmitBtn.disabled = true;
+      try {
+        const res = await fetch(`/api/classes/marquee?grade=${grade}&section=${section}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            color: marqueeColorInput?.value || '#fdfcff',
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          const msg = (err && err.error && err.error.message) || err?.error || '전송에 실패했어요';
+          if (marqueeFeedback) {
+            marqueeFeedback.textContent = msg;
+            marqueeFeedback.style.color = '#ff6a6a';
+          }
+          if (window.chatPage?.showToast) {
+            window.chatPage.showToast(msg);
+          }
+          return;
+        }
+        if (window.chatPage?.showToast) {
+          window.chatPage.showToast('전광판에 띄웠어요');
+        }
+        closeMarqueeModal();
+      } catch (err) {
+        console.error('marquee submit failed', err);
+        if (marqueeFeedback) {
+          marqueeFeedback.textContent = '전송에 실패했어요';
+          marqueeFeedback.style.color = '#ff6a6a';
+        }
+        if (window.chatPage?.showToast) {
+          window.chatPage.showToast('전송에 실패했어요');
+        }
+      } finally {
+        marqueeSubmitBtn.disabled = false;
+      }
+    });
+  }
+
+  if (marqueeInput) {
+    marqueeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        marqueeSubmitBtn?.click();
+      }
+    });
   }
 
   // Reaction event listeners
