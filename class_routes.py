@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, jsonify, request, session
 
+from content_filter import contains_slang
 from extensions import db
 from config import config
 from models import ClassState, ClassRoutine, ChatMessage, MealVote, CalendarEvent
@@ -136,6 +137,14 @@ def save_state():
     # Students are allowed to move any magnet within their class;
     # payload is no longer restricted to the student's own number.
     new_magnets = normalized_magnets
+
+    for magnet_data in new_magnets.values():
+        if not isinstance(magnet_data, dict):
+            continue
+        for field in ("reason", "thought"):
+            value = magnet_data.get(field)
+            if isinstance(value, str) and contains_slang(value):
+                return jsonify({"error": "text contains prohibited words"}), 400
 
     state = ClassState.query.filter_by(grade=grade, section=section).first()
     state_payload = _load_state_payload(state)
@@ -524,6 +533,9 @@ def set_marquee():
     text = str(raw_text).strip()
     if len(text) > 20:
         text = text[:20]
+
+    if text and contains_slang(text):
+        return jsonify({"error": "marquee contains prohibited words"}), 400
 
     state = ClassState.query.filter_by(grade=grade, section=section).first()
     if not state:

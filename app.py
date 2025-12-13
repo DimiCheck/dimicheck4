@@ -45,6 +45,7 @@ from utils import (
     setup_logging,
     verify_csrf,
 )
+from content_filter import contains_slang
 from ws import namespaces
 
 import gspread
@@ -577,6 +578,20 @@ def quick_apply_status():
                 allowed_codes=allowed_codes,
                 labels=STATUS_LABELS,
                 error="invalid_status",
+            ),
+            400,
+        )
+
+    if reason and contains_slang(reason):
+        return (
+            render_template(
+                "set_status.html",
+                success=False,
+                status_code=status_code,
+                status_label=STATUS_LABELS.get(status_code, status_code),
+                allowed_codes=allowed_codes,
+                labels=STATUS_LABELS,
+                error="invalid_reason",
             ),
             400,
         )

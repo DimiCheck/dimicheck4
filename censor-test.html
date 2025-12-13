@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>검열 테스트</title>
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 32px; background: #f6f7fb; color: #111; }
+    h1 { margin-bottom: 12px; }
+    .box { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 20px; max-width: 520px; box-shadow: 0 6px 20px rgba(0,0,0,0.05); }
+    textarea { width: 100%; min-height: 120px; padding: 12px; border-radius: 10px; border: 1px solid #ccc; font-size: 15px; resize: vertical; }
+    textarea:focus { outline: 2px solid #4f8bff; border-color: #4f8bff; }
+    .status { margin-top: 14px; font-weight: 700; }
+    .pass { color: #0c7b2f; }
+    .fail { color: #c62828; }
+    .meta { margin-top: 8px; color: #666; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>검열 작동 테스트</h1>
+    <p>텍스트를 입력하면 특수문자/숫자를 제거한 뒤 <code>slang.txt</code> 단어가 포함되었는지 검사합니다.</p>
+    <textarea id="input" placeholder="여기에 테스트할 문구를 입력하세요."></textarea>
+    <div id="status" class="status">대기 중…</div>
+    <div id="meta" class="meta"></div>
+  </div>
+
+  <script>
+    const inputEl = document.getElementById('input');
+    const statusEl = document.getElementById('status');
+    const metaEl = document.getElementById('meta');
+
+    const CLEAN_PATTERN = /[^A-Za-z\u3131-\uD79D]+/g;
+    let slang = [];
+
+    const normalize = (text) => (text || '').replace(CLEAN_PATTERN, '').toLowerCase();
+
+    const update = () => {
+      const raw = inputEl.value;
+      const normalized = normalize(raw);
+      const hit = normalized && slang.some(word => word && normalized.includes(word));
+      statusEl.textContent = hit ? '검열됨 (금칙어 포함)' : '통과됨 (금칙어 없음)';
+      statusEl.className = `status ${hit ? 'fail' : 'pass'}`;
+      metaEl.textContent = `정규화된 텍스트: ${normalized || '(빈 문자열)'}`;
+    };
+
+    fetch('slang.txt')
+      .then(res => res.text())
+      .then(text => {
+        slang = text.split('\n').map(line => line.trim().toLowerCase()).filter(Boolean);
+        metaEl.textContent = `불러온 금칙어 ${slang.length}개`;
+        update();
+      })
+      .catch(err => {
+        statusEl.textContent = 'slang.txt 로드 실패';
+        metaEl.textContent = err?.message || err;
+      });
+
+    inputEl.addEventListener('input', update);
+  </script>
+</body>
+</html>

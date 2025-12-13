@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify, request, session
 from extensions import db
 from models import ChatMessage, UserNickname, ClassState, ChatReaction, UserAvatar, ClassEmoji, ChatMessageRead, ChatConsent
 from utils import is_board_session_active, is_teacher_session_active
+from content_filter import contains_slang
 import re
 from sqlalchemy import or_, and_, func
 from sqlalchemy.exc import IntegrityError
@@ -384,6 +385,9 @@ def _apply_thought_preview(grade: int, section: int, number: int, text: str | No
     if not preview:
         return
 
+    if contains_slang(preview):
+        return
+
     if len(preview) > THOUGHT_PREVIEW_MAX_LENGTH:
         preview = preview[:THOUGHT_PREVIEW_MAX_LENGTH]
 
@@ -566,6 +570,9 @@ def create_channel():
     name = _normalize_channel_name(raw_name)
     if not _is_valid_channel_name(name):
         return jsonify({"error": "invalid channel name"}), 400
+
+    if contains_slang(name):
+        return jsonify({"error": "channel name contains prohibited words"}), 400
 
     channels, state, state_payload, memberships, owners = _ensure_channels_for_class(grade, section)
     raw_classes = payload.get("classes") or []
@@ -810,6 +817,9 @@ def send_message():
     if message_text and len(message_text) > max_length:
         message_text = message_text[:max_length]
 
+    if message_text and contains_slang(message_text):
+        return jsonify({"error": "message contains prohibited words"}), 400
+
     # Validate image URL
     if image_url:
         # Check URL format (https only, common image extensions)
@@ -938,6 +948,9 @@ def set_nickname():
 
     if not nickname:
         return jsonify({"error": "nickname is required"}), 400
+
+    if contains_slang(nickname):
+        return jsonify({"error": "nickname contains prohibited words"}), 400
 
     # Validate nickname length (max 20 chars)
     max_length = 20
