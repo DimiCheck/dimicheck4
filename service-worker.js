@@ -1,4 +1,5 @@
-const CACHE_VERSION = 'v4';
+const SW_URL = new URL(self.location.href);
+const CACHE_VERSION = (SW_URL.searchParams.get('v') || 'dev').replace(/[^a-zA-Z0-9._-]/g, '_');
 const STATIC_CACHE = `dimicheck-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `dimicheck-runtime-${CACHE_VERSION}`;
 const TIMETABLE_META_CACHE = 'dimicheck-timetable-meta';
@@ -8,26 +9,8 @@ const ATPT_OFCDC_SC_CODE = 'J10';
 const SD_SCHUL_CODE = '7530560';
 const NEIS_API_KEY = 'da82433f0f3a4351bda4ca9a0f11fc7d';
 const PRECACHE_URLS = [
-  '/',
-  '/login.html',
-  '/user.html',
-  '/my.html',
-  '/schoollife.html',
-  '/routine.html',
-  '/enter_pin.html',
   '/404.html',
   '/manifest.webmanifest',
-  '/main.css',
-  '/js/preferences.js',
-  '/js/notifications.js',
-  '/js/my-page.js',
-  '/js/etc.js',
-  '/js/info.js',
-  '/js/magnet.js',
-  '/js/reset.js',
-  '/js/storage.js',
-  '/js/time.js',
-  '/js/pwa.js',
   '/src/infoicn.png',
   '/src/dimicheck_templogo.png',
   '/src/dipulllogo.svg',
@@ -48,7 +31,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  const currentCaches = [STATIC_CACHE, RUNTIME_CACHE];
+  const currentCaches = [STATIC_CACHE, RUNTIME_CACHE, TIMETABLE_META_CACHE];
   event.waitUntil(
     caches
       .keys()
@@ -77,15 +60,7 @@ self.addEventListener('fetch', (event) => {
      url.pathname.startsWith('/auth/') ||
      url.pathname === '/me')
   ) {
-    event.respondWith(
-      fetch(request).catch(async () => {
-        const fallback = await caches.match(request);
-        if (fallback) {
-          return fallback;
-        }
-        throw new Error('Network request failed and no cache entry found.');
-      })
-    );
+    event.respondWith(fetchBypassingHttpCache(request));
     return;
   }
 
@@ -98,15 +73,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(handleAssetRequest(event, request, url));
+  if (isVolatileAsset(url.pathname)) {
+    event.respondWith(handleVolatileAssetRequest(request, url.pathname));
+    return;
+  }
+
+  event.respondWith(handleStableAssetRequest(event, request, url.pathname));
 });
 
 async function handleNavigationRequest(request) {
   try {
-    const networkResponse = await fetch(request);
-    const runtime = await caches.open(RUNTIME_CACHE);
-    if (networkResponse && networkResponse.ok && networkResponse.status !== 206) {
-      runtime.put(request, networkResponse.clone());
+    const networkResponse = await fetchBypassingHttpCache(request);
+    if (isCacheableResponse(networkResponse)) {
+      const runtime = await caches.open(RUNTIME_CACHE);
+      await runtime.put(request, networkResponse.clone());
     }
     return networkResponse;
   } catch (error) {
@@ -114,7 +94,7 @@ async function handleNavigationRequest(request) {
     if (cached) {
       return cached;
     }
-    const fallback = await caches.match('/index.html');
+    const fallback = await caches.match('/404.html');
     if (fallback) {
       return fallback;
     }
@@ -122,7 +102,44 @@ async function handleNavigationRequest(request) {
   }
 }
 
-function handleAssetRequest(event, request, url) {
+function isVolatileAsset(pathname) {
+  return (
+    pathname.endsWith('.html') ||
+    pathname.endsWith('.js') ||
+    pathname.endsWith('.css') ||
+    pathname.endsWith('.json') ||
+    pathname === '/service-worker.js' ||
+    pathname === '/js/pwa.js'
+  );
+}
+
+async function fetchBypassingHttpCache(request) {
+  return fetch(new Request(request, { cache: 'no-store' }));
+}
+
+function isCacheableResponse(response) {
+  return Boolean(response && response.ok && response.status !== 206);
+}
+
+async function handleVolatileAssetRequest(request, pathname) {
+  try {
+    return await fetchBypassingHttpCache(request);
+  } catch (error) {
+    const cached = await caches.match(request);
+    if (cached) {
+      return cached;
+    }
+    if (PRECACHE_SET.has(pathname)) {
+      const fallback = await caches.match(pathname);
+      if (fallback) {
+        return fallback;
+      }
+    }
+    throw error;
+  }
+}
+
+function handleStableAssetRequest(event, request, pathname) {
   return (async () => {
     const cached = await caches.match(request);
     if (cached) {
@@ -131,15 +148,15 @@ function handleAssetRequest(event, request, url) {
     }
 
     try {
-      const networkResponse = await fetch(request);
-      if (networkResponse && networkResponse.ok && networkResponse.status !== 206) {
+      const networkResponse = await fetchBypassingHttpCache(request);
+      if (isCacheableResponse(networkResponse)) {
         const runtime = await caches.open(RUNTIME_CACHE);
         await runtime.put(request, networkResponse.clone());
       }
       return networkResponse;
     } catch (error) {
-      if (PRECACHE_SET.has(url.pathname)) {
-        const fallback = await caches.match(url.pathname);
+      if (PRECACHE_SET.has(pathname)) {
+        const fallback = await caches.match(pathname);
         if (fallback) {
           return fallback;
         }
@@ -151,8 +168,8 @@ function handleAssetRequest(event, request, url) {
 
 async function updateRuntimeCache(request) {
   try {
-    const response = await fetch(request);
-    if (response && response.ok && response.status !== 206) {
+    const response = await fetchBypassingHttpCache(request);
+    if (isCacheableResponse(response)) {
       const runtime = await caches.open(RUNTIME_CACHE);
       await runtime.put(request, response.clone());
     }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, jsonify, render_template, request, session
 
@@ -10,6 +11,7 @@ from extensions import db
 from models import User
 
 blueprint = Blueprint("account", __name__, url_prefix="/account", template_folder="templates")
+KST = ZoneInfo("Asia/Seoul")
 
 
 def _require_user() -> User:
@@ -27,20 +29,33 @@ def _current_cycle(today: date) -> tuple[date, date]:
     return start, end
 
 
+def _today_kst() -> date:
+    return datetime.now(KST).date()
+
+
+def _to_kst_date(value: datetime) -> date:
+    normalized = value
+    if normalized.tzinfo is None:
+        normalized = normalized.replace(tzinfo=timezone.utc)
+    return normalized.astimezone(KST).date()
+
+
 def _can_edit_profile(user: User) -> bool:
-    today = date.today()
-    start, end = _current_cycle(today)
-    if not (start <= today <= end):
-        return False
+    today = _today_kst()
+    start, _ = _current_cycle(today)
     if not user.last_profile_update:
         return True
-    return datetime.utcnow() - user.last_profile_update >= timedelta(days=365)
+    return _to_kst_date(user.last_profile_update) < start
 
 
 def _next_edit_date(user: User) -> date:
+    today = _today_kst()
+    start, _ = _current_cycle(today)
     if not user.last_profile_update:
-        return date.today()
-    return (user.last_profile_update + timedelta(days=365)).date()
+        return today
+    if _to_kst_date(user.last_profile_update) < start:
+        return today
+    return date(start.year + 1, 2, 20)
 
 
 @blueprint.get("")
@@ -83,6 +98,7 @@ def account_update():
     user.last_profile_update = datetime.utcnow()
     db.session.commit()
     issue_session(user)
+    can_edit = _can_edit_profile(user)
     return jsonify(
         {
             "grade": user.grade,
@@ -91,5 +107,6 @@ def account_update():
             "name": user.name,
             "last_profile_update": user.last_profile_update.isoformat(),
             "next_change": _next_edit_date(user).isoformat(),
+            "can_edit": can_edit,
         }
     )

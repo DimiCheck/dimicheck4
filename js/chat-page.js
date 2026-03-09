@@ -1850,7 +1850,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (result.success) {
         if (feedback) {
-          feedback.textContent = '투표가 생성되었습니다!';
+          feedback.textContent = result.replacedExisting
+            ? '기존 설문을 종료하고 새 설문을 만들었습니다!'
+            : '설문이 생성되었습니다!';
           feedback.style.color = '#38d67a';
         }
         setTimeout(() => {
@@ -1859,7 +1861,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         if (feedback) {
           feedback.textContent = result.error || '투표를 생성하지 못했어요.';
-          feedback.style.color = '#ff5c5c';
+          feedback.style.color = result.cancelled ? 'var(--muted)' : '#ff5c5c';
         }
       }
     });
@@ -2018,6 +2020,15 @@ function initVoteCreateModal() {
   if (!optionsList) return;
 
   optionsList.innerHTML = '';
+  const questionInput = document.getElementById('voteQuestionInput');
+  if (questionInput) questionInput.value = '';
+  const maxChoicesInput = document.getElementById('voteMaxChoices');
+  if (maxChoicesInput) maxChoicesInput.value = '1';
+  const feedback = document.getElementById('voteCreateFeedback');
+  if (feedback) {
+    feedback.textContent = '';
+    feedback.style.color = 'var(--muted)';
+  }
   // Default 2 options
   addVoteOption();
   addVoteOption();

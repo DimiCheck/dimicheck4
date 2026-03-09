@@ -107,17 +107,35 @@ class AvatarModalManager {
     this.imageStatusEl = document.getElementById('avatarImageStatus');
 
     // 이모지 선택
-    document.querySelectorAll('[data-avatar-emoji]').forEach(btn => {
-      btn.addEventListener('click', () => {
+    const emojiButtons = this.modal?.querySelectorAll('[data-avatar-emoji]') || [];
+    emojiButtons.forEach(btn => {
+      if (btn.dataset.avatarEmojiBound === '1') return;
+      btn.dataset.avatarEmojiBound = '1';
+      btn.addEventListener('click', (event) => {
+        event.preventDefault();
         this.currentEmoji = btn.dataset.avatarEmoji;
+        // 이미지 아바타 상태에서는 이모지 선택이 안 먹는 것처럼 보여 자동 해제한다.
+        if (this.currentImageUrl) {
+          this.currentImageUrl = null;
+          this.setUploadStatus('이모지를 선택해 이미지 아바타를 해제했어요.');
+        }
         this.updatePreview();
       });
     });
 
     // 색상 선택
-    document.querySelectorAll('[data-avatar-color]').forEach(btn => {
-      btn.addEventListener('click', () => {
+    const colorButtons = this.modal?.querySelectorAll('[data-avatar-color]') || [];
+    colorButtons.forEach(btn => {
+      if (btn.dataset.avatarColorBound === '1') return;
+      btn.dataset.avatarColorBound = '1';
+      btn.addEventListener('click', (event) => {
+        event.preventDefault();
         this.currentColor = btn.dataset.avatarColor;
+        // 색상 선택 시에도 이미지 모드를 해제해 즉시 반영되도록 한다.
+        if (this.currentImageUrl) {
+          this.currentImageUrl = null;
+          this.setUploadStatus('배경 색상을 선택해 이미지 아바타를 해제했어요.');
+        }
         this.updatePreview();
       });
     });
@@ -204,6 +222,26 @@ class AvatarModalManager {
     if (numberEl && this.studentNumber) {
       numberEl.textContent = String(this.studentNumber).padStart(2, '0');
     }
+
+    this.updateSelectionState();
+  }
+
+  updateSelectionState() {
+    if (!this.modal) return;
+
+    this.modal.querySelectorAll('[data-avatar-emoji]').forEach((btn) => {
+      const selected = btn.dataset.avatarEmoji === this.currentEmoji;
+      btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      btn.style.outline = selected ? '2px solid var(--primary)' : 'none';
+      btn.style.boxShadow = selected ? '0 0 0 3px rgba(208,79,255,0.2)' : '';
+    });
+
+    this.modal.querySelectorAll('[data-avatar-color]').forEach((btn) => {
+      const selected = btn.dataset.avatarColor === this.currentColor;
+      btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      btn.style.outline = selected ? '2px solid #fff' : 'none';
+      btn.style.boxShadow = selected ? '0 0 0 3px rgba(255,255,255,0.25)' : '';
+    });
   }
 
   async saveAvatar() {

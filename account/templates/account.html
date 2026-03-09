@@ -7,7 +7,6 @@
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-
     gtag('config', 'G-NX4P51JHZD');
   </script>
 
@@ -16,96 +15,248 @@
   <title>DIMI Check - 계정 관리</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
+    :root {
+      --bg: #070b12;
+      --bg-soft: #0f1624;
+      --card: rgba(255, 255, 255, 0.07);
+      --line: rgba(255, 255, 255, 0.13);
+      --text: #f2f6ff;
+      --muted: #a8b3cf;
+      --accent: #58d0ff;
+      --accent-2: #5cffb1;
+      --warn: #ffcf72;
+      --danger: #ff8f8f;
+      --shadow: 0 22px 48px rgba(0, 0, 0, 0.45);
+      --radius: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       font-family: 'Pretendard', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0b0f14;
-      color: #f4f6ff;
+      color: var(--text);
       min-height: 100vh;
-      padding: 32px 16px 80px;
+      background:
+        radial-gradient(900px 560px at -10% -15%, #2d8cff30, transparent 65%),
+        radial-gradient(800px 520px at 110% 10%, #33ffbf24, transparent 60%),
+        linear-gradient(160deg, var(--bg), var(--bg-soft));
+      padding: 32px 14px 80px;
     }
+
     main {
-      width: min(780px, 100%);
+      width: min(860px, 100%);
       margin: 0 auto;
       display: grid;
-      gap: 20px;
+      gap: 16px;
     }
+
     .card {
-      background: rgba(255, 255, 255, 0.06);
-      border-radius: 18px;
-      padding: 24px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+      background: var(--card);
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+      padding: 22px;
     }
-    h1 {
-      margin-bottom: 8px;
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: clamp(26px, 4.5vw, 34px);
     }
-    label {
-      display: block;
-      margin-bottom: 6px;
-      font-weight: 600;
-    }
-    input {
-      width: 100%;
-      padding: 12px;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      background: rgba(0, 0, 0, 0.25);
-      color: inherit;
-      font-size: 15px;
-    }
-    .grid {
-      display: flex;
-      gap: 12px;
-    }
-    .grid .field {
-      flex: 1;
-    }
-    button {
-      padding: 12px 16px;
-      border-radius: 12px;
-      border: none;
-      background: linear-gradient(135deg, #d04fff, #ff6ad0);
-      color: #0b0f14;
-      font-weight: 600;
-      cursor: pointer;
-      width: 100%;
-    }
+
     .muted {
-      color: #aab4d4;
-      font-size: 14px;
+      color: var(--muted);
+      margin: 0;
     }
-    .status {
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .meta-item {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      padding: 12px;
+    }
+
+    .meta-item .label {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .meta-item .value {
+      font-weight: 600;
+      word-break: break-word;
+    }
+
+    .row {
       display: flex;
       justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
     }
-    .status span {
-      font-weight: 600;
+
+    .chip {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      border-radius: 999px;
+      padding: 6px 10px;
+      border: 1px solid transparent;
     }
-    a {
-      color: #9dd8ff;
+
+    .chip.ok {
+      color: #0b2716;
+      background: #70f6be;
+      border-color: #70f6be;
     }
+
+    .chip.locked {
+      color: #2a1704;
+      background: var(--warn);
+      border-color: var(--warn);
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
     .notice {
-      padding: 12px;
+      margin: 14px 0;
       border-radius: 12px;
-      background: rgba(255, 214, 120, 0.12);
-      color: #ffddb0;
+      padding: 12px 14px;
       font-size: 14px;
-      margin-bottom: 16px;
-      line-height: 1.4;
+      line-height: 1.45;
+    }
+
+    .notice.ok {
+      background: rgba(92, 255, 177, 0.14);
+      color: #b9ffe0;
+      border: 1px solid rgba(92, 255, 177, 0.4);
+    }
+
+    .notice.warn {
+      background: rgba(255, 207, 114, 0.14);
+      color: #ffe0ab;
+      border: 1px solid rgba(255, 207, 114, 0.35);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin: 0 0 6px;
+    }
+
+    input {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(0, 0, 0, 0.26);
+      color: var(--text);
+      padding: 12px;
+      font-size: 15px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(88, 208, 255, 0.2);
+    }
+
+    input:disabled {
+      opacity: 0.58;
+      cursor: not-allowed;
+    }
+
+    .submit-btn {
+      margin-top: 12px;
+      width: 100%;
+      border: none;
+      border-radius: 12px;
+      padding: 13px 16px;
+      color: #031725;
+      font-weight: 700;
+      font-size: 15px;
+      background: linear-gradient(135deg, #66e2ff, #5cffb1);
+      cursor: pointer;
+    }
+
+    .submit-btn:disabled {
+      background: linear-gradient(135deg, #5b6a7e, #49586b);
+      color: #d7e0ed;
+      cursor: not-allowed;
+    }
+
+    .status-text {
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    .status-text.error {
+      color: var(--danger);
+    }
+
+    .status-text.ok {
+      color: var(--accent-2);
+    }
+
+    .quick-links {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .quick-links a {
+      color: #9fe3ff;
+      text-decoration: none;
+    }
+
+    .quick-links a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 720px) {
+      body {
+        padding-top: 20px;
+      }
+      .card {
+        padding: 16px;
+      }
+      .meta-grid {
+        grid-template-columns: 1fr;
+      }
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
 <body>
   <main>
-    <header>
+    <section class="card hero">
       <h1>계정 관리</h1>
-      <p class="muted">DIMI Check OAuth 및 학번 정보를 관리하세요.</p>
-    </header>
+      <p class="muted">학번 정보는 매년 2월 20일~다음 해 2월 19일 주기에서 1회만 수정할 수 있습니다.</p>
+    </section>
 
     {% if not user %}
       <section class="card">
@@ -113,29 +264,42 @@
       </section>
     {% else %}
       <section class="card">
-        <h2>기본 정보</h2>
-        <p class="muted">이메일: {{ user.email }}</p>
-        <div class="status">
-          <div>마지막 수정: <span>{{ (last_update.strftime('%Y-%m-%d %H:%M') if last_update else '없음') }}</span></div>
-          <div>다음 변경 가능일: <span>{{ next_change.strftime('%Y-%m-%d') }}</span></div>
-          <div>로그인 유지: <span>{{ '사용 중' if remember_enabled else '사용 안 함' }}</span></div>
+        <div class="row">
+          <h2>기본 정보</h2>
+          <span id="editStateValue" class="chip {{ 'ok' if can_edit else 'locked' }}">{{ '수정 가능' if can_edit else '이번 주기 수정 완료' }}</span>
+        </div>
+        <div class="meta-grid">
+          <div class="meta-item">
+            <span class="label">이메일</span>
+            <span class="value">{{ user.email }}</span>
+          </div>
+          <div class="meta-item">
+            <span class="label">로그인 유지</span>
+            <span class="value">{{ '사용 중' if remember_enabled else '사용 안 함' }}</span>
+          </div>
+          <div class="meta-item">
+            <span class="label">마지막 수정</span>
+            <span id="lastUpdateValue" class="value">{{ (last_update.strftime('%Y-%m-%d %H:%M') if last_update else '없음') }}</span>
+          </div>
+          <div class="meta-item">
+            <span class="label">다음 변경 가능일</span>
+            <span id="nextChangeValue" class="value">{{ ('지금' if can_edit else next_change.strftime('%Y-%m-%d')) }}</span>
+          </div>
         </div>
       </section>
 
       <section class="card">
-        <h2>학번 정보</h2>
-        <div class="notice">
-          학번 정보는 매년 2월 20일~다음 해 2월 19일 사이에 한 번만 수정할 수 있습니다. 변경 가능 기간을 확인한 뒤 제출하세요.
-        </div>
-        {% if not can_edit %}
-          <p class="muted">현재는 수정할 수 없습니다. 다음 변경 가능일 이후에 다시 시도하세요.</p>
-        {% endif %}
+        <h2>학번 변경</h2>
+        <p class="muted" style="margin-top:8px;">학년/반/번호만 입력하면 됩니다. 이름은 저장하지 않습니다.</p>
+        <p id="windowNotice" class="notice {{ 'ok' if can_edit else 'warn' }}">
+          {% if can_edit %}
+            현재 주기에서 수정 가능합니다. 저장하면 다음 주기 시작일(2월 20일)까지 다시 수정할 수 없습니다.
+          {% else %}
+            이번 주기 수정 기회를 이미 사용했습니다. 다음 변경 가능일 이후에 다시 시도하세요.
+          {% endif %}
+        </p>
         <form id="accountForm">
-          <div class="field">
-            <label for="name">이름</label>
-            <input id="name" name="name" type="text" value="{{ user.name or '' }}" />
-          </div>
-          <div class="grid">
+          <div class="form-grid">
             <div class="field">
               <label for="grade">학년</label>
               <input id="grade" name="grade" type="number" min="1" max="3" value="{{ user.grade or '' }}" {% if not can_edit %}disabled{% endif %} required />
@@ -149,14 +313,14 @@
               <input id="number" name="number" type="number" min="1" max="40" value="{{ user.number or '' }}" {% if not can_edit %}disabled{% endif %} required />
             </div>
           </div>
-          <button type="submit" {% if not can_edit %}disabled{% endif %}>정보 업데이트</button>
+          <button id="submitButton" class="submit-btn" type="submit" {% if not can_edit %}disabled{% endif %}>학번 정보 업데이트</button>
         </form>
-        <p id="accountStatus" class="muted" style="margin-top:12px"></p>
+        <p id="accountStatus" class="status-text muted"></p>
       </section>
 
       <section class="card">
         <h2>빠른 작업</h2>
-        <ul>
+        <ul class="quick-links">
           <li><a href="/console.html">Public API 콘솔</a></li>
           <li><a href="/auth/logout">로그아웃</a></li>
         </ul>
@@ -168,20 +332,87 @@
   <script>
     const form = document.getElementById('accountForm');
     const statusEl = document.getElementById('accountStatus');
+    const submitBtn = document.getElementById('submitButton');
+    const editStateValue = document.getElementById('editStateValue');
+    const lastUpdateValue = document.getElementById('lastUpdateValue');
+    const nextChangeValue = document.getElementById('nextChangeValue');
+    const windowNotice = document.getElementById('windowNotice');
+
+    const formatKstDate = (value) => {
+      if (!value) return '지금';
+      const d = new Date(`${value}T00:00:00+09:00`);
+      if (Number.isNaN(d.getTime())) return value;
+      return d.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
+    };
+
+    const formatKstDateTime = (value) => {
+      if (!value) return '없음';
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return value;
+      return d.toLocaleString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+    };
+
+    const setEditable = (editable) => {
+      if (!form) return;
+      form.querySelectorAll('input').forEach((el) => {
+        el.disabled = !editable;
+      });
+      if (submitBtn) {
+        submitBtn.disabled = !editable;
+      }
+      if (editStateValue) {
+        editStateValue.textContent = editable ? '수정 가능' : '이번 주기 수정 완료';
+        editStateValue.classList.toggle('ok', editable);
+        editStateValue.classList.toggle('locked', !editable);
+      }
+      if (windowNotice) {
+        windowNotice.className = `notice ${editable ? 'ok' : 'warn'}`;
+        windowNotice.textContent = editable
+          ? '현재 주기에서 수정 가능합니다. 저장하면 다음 주기 시작일(2월 20일)까지 다시 수정할 수 없습니다.'
+          : '이번 주기 수정 기회를 이미 사용했습니다. 다음 변경 가능일 이후에 다시 시도하세요.';
+      }
+    };
+
     if (form) {
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
-        const payload = new FormData(form);
+        statusEl.className = 'status-text muted';
+        statusEl.textContent = '저장 중...';
         try {
+          const payload = new FormData(form);
           const res = await fetch('/account/update', {
             method: 'POST',
             body: payload,
           });
           const data = await res.json();
-          if (!res.ok) throw new Error(data.error || '업데이트 실패');
-          statusEl.textContent = '업데이트되었습니다.';
+          if (!res.ok) {
+            const msg = data.error === 'edit_window_closed'
+              ? '이번 주기 수정 기회를 이미 사용했습니다.'
+              : (data.error || '업데이트 실패');
+            throw new Error(msg);
+          }
+          if (lastUpdateValue) {
+            lastUpdateValue.textContent = formatKstDateTime(data.last_profile_update);
+          }
+          if (nextChangeValue) {
+            nextChangeValue.textContent = data.can_edit ? '지금' : formatKstDate(data.next_change);
+          }
+          setEditable(Boolean(data.can_edit));
+          statusEl.className = 'status-text ok';
+          statusEl.textContent = data.can_edit
+            ? '업데이트되었습니다.'
+            : `업데이트되었습니다. 다음 변경 가능일: ${formatKstDate(data.next_change)}`;
         } catch (err) {
-          statusEl.textContent = err.message;
+          statusEl.className = 'status-text error';
+          statusEl.textContent = err.message || '오류가 발생했습니다.';
         }
       });
     }

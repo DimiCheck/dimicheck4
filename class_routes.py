@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
+import os
+import requests
 
 from flask import Blueprint, jsonify, request, session
 
@@ -832,14 +834,15 @@ def class_config():
         "end": config["end"],
         "skipNumbers": config["skip_numbers"]
     })
-import requests
-
 # ----------------- Global caching for schoollife data -----------------
 _SCHOOLLIFE_CACHE = {
     "weather": {"data": None, "timestamp": None},
     "meal": {"data": None, "timestamp": None},
     "timetable": {},  # keyed by (grade, section)
 }
+
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+_MEAL_DISK_CACHE_PATH = os.path.join(_BASE_DIR, "instance", "schoollife_meal_cache.json")
 
 def _get_kst():
     """Get KST timezone (UTC+9)"""
@@ -885,50 +888,83 @@ def _fetch_weather_from_api():
     return weather
 
 def _fetch_meal_from_api():
-    # Placeholder NEIS API call
-    params = {
-        "Type": "json",
-        "ATPT_OFCDC_SC_CODE": "J10",
-        "SD_SCHUL_CODE": "7530560",
-    }
-    if config.NEIS_API_KEY:
-        params["KEY"] = config.NEIS_API_KEY
-    # Use KST for Korea
-    print(f"[MEAL] Creating KST timezone...")
-    kst = _get_kst()
-    print(f"[MEAL] KST timezone created: {kst}")
-    now_kst = datetime.now(kst)
-    print(f"[MEAL] Current KST time: {now_kst}")
-    today = now_kst.strftime('%Y%m%d')
-    print(f"[MEAL] Today string: {today}")
-    params["MLSV_YMD"] = today
-    print(f"[MEAL] Making request to NEIS API with params: {params}")
-    res = requests.get("https://open.neis.go.kr/hub/mealServiceDietInfo", params=params, timeout=15)
+    now_kst = datetime.now(_get_kst())
+    today = now_kst.strftime('%Y-%m-%d')
+    base_url = str(config.MEAL_API_BASE_URL or "https://api.xn--rh3b.net").rstrip("/")
+    url = f"{base_url}/{today}"
+
+    res = requests.get(
+        url,
+        timeout=12,
+        headers={"Accept": "application/json"},
+    )
     res.raise_for_status()
-    data = res.json()
-    cards = {
-        "breakfast": None,
-        "lunch": None,
-        "dinner": None,
-        "date": today,
-    }
-    try:
-        rows = data['mealServiceDietInfo'][1]['row']
-        for row in rows:
-            meal = row.get('MMEAL_SC_NM')
-            items = row.get('DDISH_NM')
-            if not meal or not items:
+    payload = res.json()
+
+    def normalize_meal_items(value):
+        if not isinstance(value, dict):
+            return []
+        merged = []
+        for key in ("regular", "simple"):
+            raw_items = value.get(key)
+            if not isinstance(raw_items, list):
                 continue
-            clean = items.replace('<br/>', '\n').replace('&amp;', '&')
-            if '조식' in meal:
-                cards['breakfast'] = clean
-            elif '중식' in meal:
-                cards['lunch'] = clean
-            elif '석식' in meal:
-                cards['dinner'] = clean
-    except Exception:
+            for item in raw_items:
+                text = str(item).strip()
+                if text:
+                    merged.append(text)
+        # keep order while removing duplicates
+        return list(dict.fromkeys(merged))
+
+    data = payload.get("data") if isinstance(payload, dict) else {}
+    breakfast_items = normalize_meal_items(data.get("breakfast") if isinstance(data, dict) else None)
+    lunch_items = normalize_meal_items(data.get("lunch") if isinstance(data, dict) else None)
+    dinner_items = normalize_meal_items(data.get("dinner") if isinstance(data, dict) else None)
+
+    date_value = payload.get("date") if isinstance(payload, dict) else None
+    date_text = str(date_value).strip() if date_value else today
+
+    return {
+        "breakfast": "\n".join(breakfast_items) if breakfast_items else None,
+        "lunch": "\n".join(lunch_items) if lunch_items else None,
+        "dinner": "\n".join(dinner_items) if dinner_items else None,
+        "date": date_text,
+    }
+
+
+def _read_meal_disk_cache():
+    try:
+        with open(_MEAL_DISK_CACHE_PATH, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        if not isinstance(payload, dict):
+            return None
+        if not isinstance(payload.get("date"), str):
+            return None
+        if not isinstance(payload.get("data"), dict):
+            return None
+        return payload
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def _write_meal_disk_cache(date_text: str, data: dict):
+    try:
+        os.makedirs(os.path.dirname(_MEAL_DISK_CACHE_PATH), exist_ok=True)
+        temp_path = f"{_MEAL_DISK_CACHE_PATH}.tmp"
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "date": date_text,
+                    "savedAt": datetime.now(_get_kst()).isoformat(),
+                    "data": data,
+                },
+                f,
+                ensure_ascii=False,
+            )
+        os.replace(temp_path, _MEAL_DISK_CACHE_PATH)
+    except OSError:
+        # Non-fatal: memory cache still works.
         pass
-    return cards
 
 def _fetch_timetable_from_api(grade: int, section: int):
     # Use KST for Korea
@@ -991,30 +1027,31 @@ def get_schoollife_weather():
 
 @blueprint.get('/schoollife/meal')
 def get_schoollife_meal():
-    import traceback
+    now = datetime.now(_get_kst())
+    today = now.strftime("%Y-%m-%d")
+    cache_entry = _SCHOOLLIFE_CACHE["meal"]
+    if cache_entry["data"] and _is_same_day(cache_entry["timestamp"], now):
+        return jsonify(cache_entry["data"])
+
+    disk_cache = _read_meal_disk_cache()
+    if disk_cache and disk_cache.get("date") == today:
+        data = disk_cache.get("data")
+        cache_entry["data"] = data
+        cache_entry["timestamp"] = now
+        return jsonify(data)
+
     try:
-        now = datetime.now(_get_kst())
-        print(f"[MEAL] KST now: {now}")
-        cache_entry = _SCHOOLLIFE_CACHE["meal"]
-        if cache_entry["data"] and _is_same_day(cache_entry["timestamp"], now):
-            return jsonify(cache_entry["data"])
-
-        try:
-            data = _fetch_meal_from_api()
-            cache_entry["data"] = data
-            cache_entry["timestamp"] = now
-        except Exception as e:
-            print(f"[MEAL] API fetch error: {e}")
-            print(f"[MEAL] Traceback: {traceback.format_exc()}")
-            if cache_entry["data"]:
-                return jsonify(cache_entry["data"])
-            return jsonify({"error": str(e)}), 500
-
+        data = _fetch_meal_from_api()
+        cache_entry["data"] = data
+        cache_entry["timestamp"] = now
+        _write_meal_disk_cache(today, data)
         return jsonify(data)
     except Exception as e:
-        print(f"[MEAL] Endpoint error: {e}")
-        print(f"[MEAL] Full traceback: {traceback.format_exc()}")
-        return jsonify({"error": str(e)}), 500
+        if cache_entry["data"]:
+            return jsonify(cache_entry["data"])
+        if disk_cache and isinstance(disk_cache.get("data"), dict):
+            return jsonify(disk_cache.get("data"))
+        return jsonify({"error": "meal_fetch_failed", "message": str(e)}), 502
 
 
 @blueprint.get('/schoollife/timetable')
@@ -1039,6 +1076,8 @@ def get_schoollife_timetable():
                 "lessons": lessons,
                 "date": datetime.now(_get_kst()).strftime('%Y-%m-%d')
             }
+            if not lessons:
+                payload["message"] = "오늘 등록된 시간표가 없습니다."
             _SCHOOLLIFE_CACHE["timetable"][key] = {
                 "data": payload,
                 "timestamp": now

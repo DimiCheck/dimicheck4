@@ -4,8 +4,6 @@ import json
 from datetime import datetime, timezone, timedelta
 
 from flask import Blueprint, jsonify, request, session
-from sqlalchemy import func
-
 from extensions import db
 from models import Vote, VoteResponse, ClassState
 from utils import is_board_session_active, is_teacher_session_active
@@ -14,6 +12,7 @@ import re
 blueprint = Blueprint("vote", __name__, url_prefix="/api/classes/vote")
 DEFAULT_CHANNEL = "home"
 MAX_CHANNEL_NAME_LENGTH = 30
+MAX_VOTE_OPTIONS = 10
 CHANNEL_NAME_PATTERN = re.compile(r"^[A-Za-z0-9가-힣 _\\-]+$")
 
 
@@ -213,38 +212,211 @@ def _is_authorized(grade: int | None, section: int | None) -> bool:
 
 
 def _load_vote_options(vote: Vote) -> list[str]:
+    options, _ = _load_vote_config(vote)
+    return options
+
+
+def _load_vote_config(vote: Vote) -> tuple[list[str], int]:
     try:
-        return json.loads(vote.options)
+        payload = json.loads(vote.options)
     except (TypeError, json.JSONDecodeError):
+        return [], 1
+
+    max_choices = 1
+    raw_options = payload
+    if isinstance(payload, dict):
+        raw_options = payload.get("options")
+        parsed_max_choices = _normalize_class_value(payload.get("maxChoices") or payload.get("max_choices"))
+        if parsed_max_choices is not None:
+            max_choices = parsed_max_choices
+
+    if not isinstance(raw_options, list):
+        return [], 1
+
+    options: list[str] = []
+    for option in raw_options:
+        text = str(option).strip()
+        if text:
+            options.append(text)
+
+    if not options:
+        return [], 1
+
+    max_choices = max(1, min(max_choices, len(options)))
+    return options, max_choices
+
+
+def _normalize_vote_option_text(value: object) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip()
+
+
+def _normalize_vote_creation_options(raw_options: object) -> tuple[list[str], str | None]:
+    if not isinstance(raw_options, list):
+        return [], "options must be a list"
+
+    normalized: list[str] = []
+    seen = set()
+    for raw_option in raw_options:
+        text = _normalize_vote_option_text(raw_option)
+        if not text:
+            return [], "empty options are not allowed"
+        key = text.casefold()
+        if key in seen:
+            return [], "options must be unique"
+        seen.add(key)
+        normalized.append(text)
+
+    if len(normalized) < 2:
+        return [], "at least 2 options are required"
+    if len(normalized) > MAX_VOTE_OPTIONS:
+        return [], f"options cannot exceed {MAX_VOTE_OPTIONS}"
+    return normalized, None
+
+
+def _serialize_vote_config(options: list[str], max_choices: int) -> str:
+    normalized_max_choices = max(1, min(int(max_choices), len(options) if options else 1))
+    return json.dumps(
+        {
+            "options": options,
+            "maxChoices": normalized_max_choices,
+        },
+        ensure_ascii=False,
+    )
+
+
+def _build_vote_response_key(grade: int | None, section: int | None, student_number: int | None) -> int | None:
+    if grade is None or section is None or student_number is None:
+        return None
+    return (int(grade) * 10000) + (int(section) * 100) + int(student_number)
+
+
+def _decode_vote_response_indices(stored_value: int | None, option_count: int, max_choices: int) -> list[int]:
+    if stored_value is None or option_count <= 0:
         return []
 
+    try:
+        encoded = int(stored_value)
+    except (TypeError, ValueError):
+        return []
 
-def _build_vote_counts(vote: Vote, options: list[str]) -> tuple[dict[str, int], int]:
+    if max_choices <= 1:
+        return [encoded] if 0 <= encoded < option_count else []
+
+    selected_indices: list[int] = []
+    for idx in range(option_count):
+        if encoded & (1 << idx):
+            selected_indices.append(idx)
+    return selected_indices
+
+
+def _encode_vote_response_indices(selected_indices: list[int], max_choices: int) -> int:
+    if max_choices <= 1:
+        return selected_indices[0]
+
+    bitmask = 0
+    for idx in selected_indices:
+        bitmask |= 1 << idx
+    return bitmask
+
+
+def _find_existing_vote_response(
+    vote_id: int,
+    session_grade: int | None,
+    session_section: int | None,
+    session_number: int | None,
+    vote: Vote,
+) -> VoteResponse | None:
+    voter_key = _build_vote_response_key(session_grade, session_section, session_number)
+    if voter_key is not None:
+        response = VoteResponse.query.filter_by(vote_id=vote_id, student_number=voter_key).first()
+        if response is not None:
+            return response
+
+    # Backward compatibility for legacy same-class responses stored as plain seat numbers.
+    if (
+        session_number is not None
+        and session_grade == vote.grade
+        and session_section == vote.section
+    ):
+        return VoteResponse.query.filter_by(vote_id=vote_id, student_number=session_number).first()
+
+    return None
+
+
+def _parse_selected_indices(payload: dict, options: list[str], max_choices: int) -> tuple[list[int], str | None]:
+    raw_selected_indices = payload.get("selectedOptionIndexes")
+    if raw_selected_indices is None:
+        raw_selected_indices = payload.get("selectedIndices")
+
+    selected_indices: list[int] = []
+    if raw_selected_indices is not None:
+        if not isinstance(raw_selected_indices, list):
+            return [], "selected options must be a list"
+        seen = set()
+        for raw_index in raw_selected_indices:
+            try:
+                index = int(raw_index)
+            except (TypeError, ValueError):
+                return [], "invalid option selected"
+            if not 0 <= index < len(options):
+                return [], "invalid option selected"
+            if index in seen:
+                continue
+            seen.add(index)
+            selected_indices.append(index)
+    else:
+        selected_labels = payload.get("selected", [])
+        if not isinstance(selected_labels, list):
+            return [], "selected options must be a list"
+        seen = set()
+        for raw_label in selected_labels:
+            label = _normalize_vote_option_text(raw_label)
+            if not label:
+                continue
+            try:
+                index = options.index(label)
+            except ValueError:
+                return [], "invalid option selected"
+            if index in seen:
+                continue
+            seen.add(index)
+            selected_indices.append(index)
+
+    if not selected_indices:
+        return [], "no option selected"
+
+    if len(selected_indices) > max_choices:
+        return [], f"you can select up to {max_choices} options"
+
+    return selected_indices, None
+
+
+def _build_vote_counts(vote: Vote, options: list[str], max_choices: int) -> tuple[dict[str, int], int]:
     counts = {option: 0 for option in options}
     rows = (
-        db.session.query(VoteResponse.option_index, func.count(VoteResponse.id))
+        db.session.query(VoteResponse.option_index)
         .filter(VoteResponse.vote_id == vote.id)
-        .group_by(VoteResponse.option_index)
         .all()
     )
-    for option_index, count in rows:
-        if 0 <= option_index < len(options):
-            counts[options[option_index]] = count
-    total = sum(counts.values())
-    return counts, total
+    total_responders = len(rows)
+    for (stored_value,) in rows:
+        for option_index in _decode_vote_response_indices(stored_value, len(options), max_choices):
+            counts[options[option_index]] += 1
+    return counts, total_responders
 
 
 def _serialize_vote_result(vote: Vote | None) -> dict | None:
     if not vote:
         return None
-    options = _load_vote_options(vote)
-    counts, total = _build_vote_counts(vote, options)
+    options, max_choices = _load_vote_config(vote)
+    counts, total = _build_vote_counts(vote, options, max_choices)
     return {
         "voteId": vote.id,
         "question": vote.question,
         "options": options,
         "counts": counts,
         "totalVotes": total,
+        "maxChoices": max_choices,
         "createdAt": vote.created_at.isoformat(),
         "expiresAt": vote.expires_at.isoformat(),
         "isActive": bool(vote.is_active and vote.expires_at > datetime.utcnow()),
@@ -307,19 +479,18 @@ def get_active_vote():
             return jsonify({"active": False, "lastResult": last_result, "channel": channel})
         return jsonify({"active": False})
 
-    options = _load_vote_options(vote)
-    counts, total_votes = _build_vote_counts(vote, options)
+    options, max_choices = _load_vote_config(vote)
+    counts, total_votes = _build_vote_counts(vote, options, max_choices)
 
     # Check if current student has voted
     session_grade, session_section, session_number = _get_student_session_info()
     my_vote = []
-    if session_number is not None:
-        my_response = VoteResponse.query.filter_by(
-            vote_id=vote.id,
-            student_number=session_number
-        ).first()
-        if my_response is not None and 0 <= my_response.option_index < len(options):
-            my_vote = [options[my_response.option_index]]
+    my_vote_indices: list[int] = []
+    if session_grade is not None and session_section is not None and session_number is not None:
+        my_response = _find_existing_vote_response(vote.id, session_grade, session_section, session_number, vote)
+        if my_response is not None:
+            my_vote_indices = _decode_vote_response_indices(my_response.option_index, len(options), max_choices)
+            my_vote = [options[idx] for idx in my_vote_indices if 0 <= idx < len(options)]
 
     return jsonify({
         "active": True,
@@ -329,9 +500,11 @@ def get_active_vote():
         "options": options,
         "counts": counts,
         "myVote": my_vote,
+        "myVoteIndices": my_vote_indices,
+        "createdAt": vote.created_at.isoformat(),
         "expiresAt": vote.expires_at.isoformat(),
         "channel": vote.channel,
-        "maxChoices": 1,  # Currently only single choice is supported
+        "maxChoices": max_choices,
         "totalVotes": total_votes
     })
 
@@ -363,14 +536,19 @@ def create_vote():
 
     payload = request.get_json() or {}
     question = (payload.get("question") or "").strip()
-    options = payload.get("options") or []
+    raw_options = payload.get("options") or []
     duration_minutes = payload.get("duration", 5)
+    max_choices = _normalize_class_value(payload.get("maxChoices") or payload.get("max_choices")) or 1
 
     if not question:
         return jsonify({"error": "question is required"}), 400
 
-    if not isinstance(options, list) or len(options) < 2:
-        return jsonify({"error": "at least 2 options are required"}), 400
+    options, options_error = _normalize_vote_creation_options(raw_options)
+    if options_error:
+        return jsonify({"error": options_error}), 400
+
+    if max_choices < 1 or max_choices > len(options):
+        return jsonify({"error": "invalid maxChoices"}), 400
 
     # Limit duration
     duration_minutes = max(1, min(duration_minutes, 60))
@@ -387,12 +565,13 @@ def create_vote():
         if g is None or s is None:
             continue
         member_conditions.append(and_(Vote.grade == g, Vote.section == s))
+    replaced_count = 0
     if member_conditions:
-        Vote.query.filter(
+        replaced_count = Vote.query.filter(
             Vote.channel == channel,
             Vote.is_active == True,
             or_(*member_conditions)
-        ).update({"is_active": False})
+        ).update({"is_active": False}, synchronize_session=False)
 
     created_by = session_number if session_number is not None else 0
 
@@ -401,7 +580,7 @@ def create_vote():
         section=section,
         channel=channel,
         question=question,
-        options=json.dumps(options),
+        options=_serialize_vote_config(options, max_choices),
         created_by=created_by,
         expires_at=expires_at,
         is_active=True
@@ -416,9 +595,12 @@ def create_vote():
             "id": new_vote.id,
             "question": new_vote.question,
             "options": options,
+            "maxChoices": max_choices,
+            "createdAt": new_vote.created_at.isoformat(),
             "expiresAt": new_vote.expires_at.isoformat(),
             "channel": new_vote.channel
-        }
+        },
+        "replacedExisting": bool(replaced_count),
     })
 
 
@@ -457,41 +639,29 @@ def respond_to_vote():
         if not _channel_exists(channels, channel) or not _is_member_of_channel(memberships, channel, session_grade, session_section):
             return jsonify({"error": "forbidden"}), 403
 
-    # Frontend sends "selected" as an array of option strings
-    # We need to convert to option indices
-    selected = payload.get("selected", [])
-
-    if not selected or len(selected) == 0:
-        return jsonify({"error": "no option selected"}), 400
-
-    # Parse vote options
-    try:
-        options = json.loads(vote.options)
-    except json.JSONDecodeError:
+    options, max_choices = _load_vote_config(vote)
+    if not options:
         return jsonify({"error": "invalid vote data"}), 500
 
-    # Get the first selected option and find its index
-    selected_option = selected[0]
-    try:
-        option_index = options.index(selected_option)
-    except ValueError:
-        return jsonify({"error": "invalid option selected"}), 400
+    selected_indices, selected_error = _parse_selected_indices(payload, options, max_choices)
+    if selected_error:
+        return jsonify({"error": selected_error}), 400
+    encoded_response = _encode_vote_response_indices(selected_indices, max_choices)
+    voter_key = _build_vote_response_key(session_grade, session_section, session_number) or session_number
 
     # Check if student already voted
-    existing_response = VoteResponse.query.filter_by(
-        vote_id=vote_id,
-        student_number=session_number
-    ).first()
+    existing_response = _find_existing_vote_response(vote_id, session_grade, session_section, session_number, vote)
 
     if existing_response:
         # Update existing response
-        existing_response.option_index = option_index
+        existing_response.student_number = voter_key
+        existing_response.option_index = encoded_response
     else:
         # Create new response
         new_response = VoteResponse(
             vote_id=vote_id,
-            student_number=session_number,
-            option_index=option_index
+            student_number=voter_key,
+            option_index=encoded_response
         )
         db.session.add(new_response)
 

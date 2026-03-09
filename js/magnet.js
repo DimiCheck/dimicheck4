@@ -1113,29 +1113,8 @@ function updateEtcReasonPanel() {
       groups.delete(reason);
     }
 
-    // !snow command: change background to snow image
-    else if (reason === '!snow') {
-      document.body.style.backgroundImage = 'url(https://cdn.pixabay.com/photo/2024/11/27/05/42/ai-generated-9227230_1280.jpg)';
-      document.body.style.backgroundSize = 'cover';
-      document.body.style.backgroundPosition = 'center';
-      document.body.dataset.bgOverride = 'snow';
-      nums.forEach(n => {
-        const mag = document.querySelector(`.magnet[data-number="${n}"][data-reason="${reason}"]`);
-        if (mag) {
-          delete mag.dataset.reason;
-          mag.classList.remove('has-reason');
-          shouldSaveState = true;
-        }
-      });
-      groups.delete(reason);
-    }
-
-    // !christmas command: restore default background
-    else if (reason === '!christmas') {
-      document.body.style.backgroundImage = '';
-      document.body.style.backgroundSize = '';
-      document.body.style.backgroundPosition = '';
-      delete document.body.dataset.bgOverride;
+    // Deprecated seasonal commands: remove reason tag only (no visual effect).
+    else if (reason === '!snow' || reason === '!christmas') {
       nums.forEach(n => {
         const mag = document.querySelector(`.magnet[data-number="${n}"][data-reason="${reason}"]`);
         if (mag) {

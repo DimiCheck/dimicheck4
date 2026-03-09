@@ -91,13 +91,12 @@ $(".analog-clock")
   }
 
   async function fetchAndShowMeal() {
-    const date = todayStrDash();
-    const url = `https://api.xn--299a1v27nvthhjj.com/meal/${date}`;
+    const url = '/api/classes/schoollife/meal';
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      createMealModal(data, date);
+      createMealModal(data);
     } catch (err) {
       console.error('Fetch error:', err);
       alert('급식 정보를 불러오는 데 실패했습니다.');

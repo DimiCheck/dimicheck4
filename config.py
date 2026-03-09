@@ -1,6 +1,5 @@
 import os
 import secrets
-import time
 from datetime import timedelta
 
 
@@ -9,6 +8,41 @@ def _env_bool(key: str, default: bool) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "t", "yes", "y", "on"}
+
+
+def _default_asset_version() -> str:
+    """
+    Generate a deterministic version shared across gunicorn workers.
+    Falls back to key file mtimes so all workers return the same value.
+    """
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    tracked_files = (
+        "app.py",
+        "config.py",
+        "service-worker.js",
+        "js/pwa.js",
+        "js/storage.js",
+        "js/time.js",
+        "js/magnet.js",
+        "js/etc.js",
+        "js/info.js",
+        "js/reset.js",
+        "main.css",
+        "templates/index.html",
+    )
+    latest_mtime = 0
+    for rel_path in tracked_files:
+        abs_path = os.path.join(base_dir, rel_path)
+        try:
+            mtime = int(os.path.getmtime(abs_path))
+        except OSError:
+            continue
+        if mtime > latest_mtime:
+            latest_mtime = mtime
+
+    if latest_mtime == 0:
+        latest_mtime = int(os.path.getmtime(__file__))
+    return str(latest_mtime)
 
 class Config:
     # Must be provided via env in production; fallback is per-process random to avoid static dev secret
@@ -25,13 +59,13 @@ class Config:
 
     # OAuth (디풀 SSO or DIMICheck OAuth feature flag)
     OAUTH_CLIENT: str = os.getenv("OAUTH_CLIENT", "68a508a281af8e9319919275")
-    OAUTH_REDIRECT_URI: str = os.getenv("OAUTH_REDIRECT_URI", "https://chec.kro.kr/auth/callback")
+    OAUTH_REDIRECT_URI: str = os.getenv("OAUTH_REDIRECT_URI", "https://dimicheck.com/auth/callback")
     OAUTH_PUBLIC_KEY_URL: str | None = os.getenv("OAUTH_PUBLIC_KEY_URL")
     USE_DIMICHECK_OAUTH: bool = _env_bool("USE_DIMICHECK_OAUTH", False)
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
     GOOGLE_REDIRECT_URI: str = os.getenv("GOOGLE_REDIRECT_URI", OAUTH_REDIRECT_URI)
-    OAUTH_ISSUER: str = os.getenv("OAUTH_ISSUER", "https://chec.kro.kr")
+    OAUTH_ISSUER: str = os.getenv("OAUTH_ISSUER", "https://dimicheck.com")
     REMEMBER_ME_COOKIE_NAME: str = os.getenv("REMEMBER_ME_COOKIE_NAME", "dimicheck_remember")
     REMEMBER_ME_DURATION_DAYS: int = int(os.getenv("REMEMBER_ME_DURATION_DAYS", "30"))
     OAUTH_AUTH_CODE_LIFETIME_SECONDS: int = int(os.getenv("OAUTH_AUTH_CODE_LIFETIME_SECONDS", "300"))
@@ -40,7 +74,7 @@ class Config:
     OAUTH_JWT_SECRET_ROTATE_DAYS: int = int(os.getenv("OAUTH_JWT_SECRET_ROTATE_DAYS", "180"))
 
     # 프론트엔드 도메인 (CORS)
-    FRONTEND_ORIGIN: str = os.getenv("FRONTEND_ORIGIN", "https://chec.kro.kr")
+    FRONTEND_ORIGIN: str = os.getenv("FRONTEND_ORIGIN", "https://dimicheck.com")
 
     # 개발용 로그인 허용 여부
     ENABLE_DEV_LOGIN: bool = _env_bool("ENABLE_DEV_LOGIN", False)
@@ -72,8 +106,11 @@ class Config:
     # Image Upload Server
     IMAGE_UPLOAD_URL: str = os.getenv("IMAGE_UPLOAD_URL", "https://img.codz.me/upload")
 
+    # Schoollife meal upstream API
+    MEAL_API_BASE_URL: str = os.getenv("MEAL_API_BASE_URL", "https://api.xn--rh3b.net")
+
     # Cache busting - use timestamp or version from env
-    ASSET_VERSION: str = os.getenv("ASSET_VERSION", str(int(time.time())))
+    ASSET_VERSION: str = os.getenv("ASSET_VERSION", _default_asset_version())
 
     # Google Analytics (Measurement Protocol)
     GA4_MEASUREMENT_ID: str | None = os.getenv("GA4_MEASUREMENT_ID")

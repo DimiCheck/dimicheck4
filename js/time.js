@@ -189,29 +189,9 @@ function isPostSuneungSpecialDay(now) {
   );
 }
 
-// 수동으로 선택된 시간표 저장
-let manualScheduleOverride = null;
-
-function setManualSchedule(scheduleType) {
-  if (scheduleType === null || scheduleType === 'auto') {
-    manualScheduleOverride = null;
-    localStorage.removeItem('manualSchedule');
-  } else {
-    manualScheduleOverride = scheduleType;
-    localStorage.setItem('manualSchedule', scheduleType);
-  }
-}
-
-function getManualSchedule() {
-  if (manualScheduleOverride !== null) {
-    return manualScheduleOverride;
-  }
-  const stored = localStorage.getItem('manualSchedule');
-  if (stored) {
-    manualScheduleOverride = stored;
-    return stored;
-  }
-  return null;
+function setManualSchedule() {
+  // legacy no-op: 시간표는 항상 요일 기준 자동 적용
+  localStorage.removeItem('manualSchedule');
 }
 
 function getGradePhaseMap() {
@@ -230,15 +210,8 @@ function getPhaseSet(scheduleType) {
 }
 
 function getPhasesForDate(now) {
-  // 수동으로 설정된 시간표가 있으면 그것을 사용
-  const manual = getManualSchedule();
-  if (manual === 'weekday') {
-    return getPhaseSet('weekday');
-  } else if (manual === 'sunday') {
-    return getPhaseSet('sunday');
-  } else if (manual === 'csat') {
-    return getPhaseSet('csat');
-  }
+  // 기존 수동 오버라이드 값이 남아 있으면 정리
+  localStorage.removeItem('manualSchedule');
 
   // 자동 모드: 요일에 따라 선택
   const base = now.getDay() === 0 ? getPhaseSet('sunday') : getPhaseSet('weekday');
@@ -937,7 +910,7 @@ window.forceResyncState = async function forceResyncState() {
   }
   try {
     await saveState(grade, section);
-    await loadState(grade, section, { ignoreOffline: true });
+    await loadState(grade, section, { ignoreOffline: true, forceSync: true });
     await loadRoutineData(true);
   } catch (err) {
     console.warn('forceResyncState failed:', err);

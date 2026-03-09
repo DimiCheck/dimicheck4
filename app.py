@@ -14,6 +14,7 @@ from flask import Flask, jsonify, redirect, render_template, request, send_from_
 from flask_cors import CORS, cross_origin
 from flask_smorest import Api
 from flask_socketio import SocketIO
+from werkzeug.middleware.proxy_fix import ProxyFix
 import requests
 
 from auth import blueprint as auth_bp
@@ -52,6 +53,8 @@ import gspread
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 app.config.from_object(config)
+# Reverse proxy(TLS terminator) headers trust: X-Forwarded-Proto/Host
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 setup_logging(config.LOG_LEVEL)
 
 app.register_blueprint(auth_bp)
@@ -83,6 +86,66 @@ app.after_request(after_request)
 app.before_request(verify_csrf)
 
 
+def _set_no_store(response):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+
+
+def _set_short_revalidate_cache(response):
+    response.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
+    response.headers.pop("Pragma", None)
+    response.headers.pop("Expires", None)
+
+
+@app.after_request
+def _apply_cache_policy(response):
+    path = (request.path or "").lower()
+    mimetype = (response.mimetype or "").lower()
+    host = (request.host or "").split(":", 1)[0].lower()
+
+    def _maybe_set_hsts():
+        if request.is_secure and host in _HTTPS_ENFORCED_HOSTS:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+    is_api_or_auth = path.startswith("/api/") or path.startswith("/auth/") or path == "/me"
+    is_html = path == "/" or path.endswith(".html") or mimetype == "text/html"
+    is_service_worker = path == "/service-worker.js"
+    is_pwa_script = path == "/js/pwa.js"
+    is_manifest = path == "/manifest.webmanifest"
+
+    if is_api_or_auth or is_html or is_service_worker or is_pwa_script or is_manifest:
+        _set_no_store(response)
+        _maybe_set_hsts()
+        return response
+
+    if path.endswith((
+        ".js",
+        ".css",
+        ".json",
+        ".map",
+        ".txt",
+        ".xml",
+        ".webmanifest",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".svg",
+        ".webp",
+        ".ico",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".otf",
+    )):
+        _set_short_revalidate_cache(response)
+
+    _maybe_set_hsts()
+
+    return response
+
+
 _SENSITIVE_PREFIXES = {
     ".env",
     "dimicheck-471412-85491c7985df.json",
@@ -90,6 +153,13 @@ _SENSITIVE_PREFIXES = {
     ".git",
     ".venv",
     "app.db",
+}
+
+_HTTPS_ENFORCED_HOSTS = {
+    "dimicheck.com",
+    "www.dimicheck.com",
+    "chec.kro.kr",
+    "www.chec.kro.kr",
 }
 
 
@@ -101,6 +171,17 @@ def _block_sensitive_files():
         prefix_lower = prefix.lower().rstrip("/")
         if lowered == prefix_lower or lowered.startswith(f"{prefix_lower}/") or f"/{prefix_lower}" in f"/{lowered}":
             abort(404)
+
+
+@app.before_request
+def _force_https_for_public_hosts():
+    host = (request.host or "").split(":", 1)[0].lower()
+    if host not in _HTTPS_ENFORCED_HOSTS:
+        return None
+    if request.is_secure:
+        return None
+    https_url = request.url.replace("http://", "https://", 1)
+    return redirect(https_url, code=301)
 
 
 @app.context_processor

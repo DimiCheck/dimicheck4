@@ -1,8 +1,28 @@
 {
   "wallpapers": [
     {
+      "id": "new-year-2026",
+      "name": "불꽃축제",
+      "url": "https://cdn.pixabay.com/photo/2015/08/07/15/47/fireworks-879461_1280.jpg"
+    },
+    {
+      "id": "dimigo-2026",
+      "name": "디미고 야경",
+      "url": "https://chatgpt.com/backend-api/estuary/public_content/enc/eyJpZCI6Im1fNjk0ZGYyM2JlZmRjODE5MTg1ZTk0OWQxMmM3OTI5YWY6ZmlsZV8wMDAwMDAwMDk1OGM3MjA5OGZlOWM0OTU1MTA3YWZkNyIsInRzIjoiMjA0NDgiLCJwIjoicHlpIiwiY2lkIjoiMSIsInNpZyI6ImVkNGUxOTdiMzJlYmU1YTc3YWM3MTdmNTVkYTFkOTkyMzJkZDhkYjhlZWJmNTY2YTgyODVlZWRkZGUyMzY4ZWMiLCJ2IjoiMCIsImdpem1vX2lkIjpudWxsLCJjcyI6bnVsbCwiY3AiOm51bGwsIm1hIjpudWxsfQ=="
+    },
+    {
+        "id": "new-year-letter-2026",
+        "name": "좋은 글귀 레트로",
+        "url": "https://i.imgur.com/75kdvNN.jpeg"
+    },
+    {
+      "id": "new-year-sunrise-2026",
+      "name": "일출 풍경",
+      "url": "https://d2k5miyk6y5zf0.cloudfront.net/article/MYH/20221231/MYH20221231011100641.jpg"
+    },
+    {
       "id": "city-night-2024",
-      "name": "크리스마스 풍경",
+      "name": "도시 야경",
       "url": "https://cdn.pixabay.com/photo/2024/09/30/16/36/background-9086186_1280.jpg"
     },
     {

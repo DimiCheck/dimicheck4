@@ -103,6 +103,7 @@
       --ring: 0 0 0 8px color-mix(in oklab, var(--primary) 30%, transparent);
       --shadow: 0 10px 30px rgba(0, 0, 0, .45);
       --radius: 20px;
+      --safe-bottom: 0px;
     }
 
     :root[data-theme="light"] {
@@ -140,6 +141,12 @@
         --primary: #d04fff;
         --primary-2: #ff6ad0;
         --shadow: 0 10px 30px rgba(57, 72, 103, .15);
+      }
+    }
+
+    @media (max-width: 1024px), (hover: none) and (pointer: coarse) {
+      :root {
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
       }
     }
 
@@ -564,7 +571,7 @@
       flex-direction: column;
       overflow: hidden;
       position: relative;
-      margin-bottom: calc(100px + env(safe-area-inset-bottom));
+      margin-bottom: calc(100px + var(--safe-bottom));
     }
 
     .chat-messages-container {
@@ -997,7 +1004,7 @@
       display: flex;
       gap: 12px;
       padding: 16px clamp(12px, 3vw, 24px);
-      padding-bottom: calc(env(safe-area-inset-bottom) + 16px);
+      padding-bottom: calc(var(--safe-bottom) + 16px);
       background: var(--bg-2);
       border-top: 1px solid color-mix(in oklab, var(--text) 10%, transparent);
       flex-shrink: 0;
@@ -1450,7 +1457,7 @@
       transform: translateX(-50%);
       width: min(480px, calc(100% - 32px));
       height: 68px;
-      padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+      padding: 8px 12px calc(8px + var(--safe-bottom));
       display: flex;
       background: linear-gradient(180deg, var(--card), var(--card-2));
       backdrop-filter: saturate(180%) blur(20px);
@@ -1511,7 +1518,7 @@
     }
 
     .spacer {
-      height: calc(68px + 32px + env(safe-area-inset-bottom))
+      height: calc(68px + 32px + var(--safe-bottom))
     }
 
     @media (max-width:768px) {
@@ -1581,7 +1588,7 @@
       .bottom-nav {
         width: min(440px, calc(100% - 16px));
         height: 60px;
-        padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+        padding: 6px 8px calc(6px + var(--safe-bottom));
       }
 
       .nav-item {
@@ -1871,7 +1878,7 @@
         border-radius: 20px 20px 0 0;
         min-width: unset;
         padding: 20px;
-        padding-bottom: calc(80px + env(safe-area-inset-bottom));
+        padding-bottom: calc(80px + var(--safe-bottom));
       }
 
       .media-menu-item {
@@ -1964,21 +1971,21 @@
     @media (max-width: 768px) {
       .class-emoji-modal .modal-content {
         position: fixed;
-        bottom: calc(72px + env(safe-area-inset-bottom));
+        bottom: calc(72px + var(--safe-bottom));
         left: 0;
         right: 0;
         max-width: unset;
         border-radius: 20px 20px 0 0;
         max-height: 70vh;
         margin: 0;
-        padding-bottom: calc(32px + env(safe-area-inset-bottom));
+        padding-bottom: calc(32px + var(--safe-bottom));
         z-index: 1500;
       }
 
       .class-emoji-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
-        max-height: calc(70vh - 250px - env(safe-area-inset-bottom));
+        max-height: calc(70vh - 250px - var(--safe-bottom));
       }
     }
 

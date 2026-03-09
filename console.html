@@ -296,7 +296,7 @@
             <li>Public API: <code>Dimicheck-API-Key</code> 헤더 필수</li>
             <li>OAuth API: Bearer 액세스 토큰 (HS256, aud = client_id)</li>
           </ul>
-          <pre><code>curl https://chec.kro.kr/public/api/version \\
+          <pre><code>curl https://dimicheck.com/public/api/version \\
   -H "Dimicheck-API-Key: YOUR_KEY"</code></pre>
         </article>
         <article class="doc-card">
@@ -316,7 +316,7 @@
             <li>인트로스펙션/리보크: <code>/oauth/introspect</code>, <code>/oauth/revoke</code></li>
             <li>동의 UI는 자동 렌더, 클라이언트는 콘솔 OAuth 탭에서 발급/수정</li>
           </ul>
-          <pre><code>curl -X POST https://chec.kro.kr/oauth/token \\
+          <pre><code>curl -X POST https://dimicheck.com/oauth/token \\
   -u CLIENT_ID:CLIENT_SECRET \\
   -d \"grant_type=authorization_code&code=...&redirect_uri=...\"</code></pre>
         </article>
@@ -379,7 +379,7 @@
             <li>형식: 카운터 값은 64비트 정수, 기본 0에서 시작</li>
           </ul>
           <pre><code>헤더: Dimicheck-API-Key: YOUR_KEY
-베이스: https://chec.kro.kr/public/api/counters</code></pre>
+베이스: https://dimicheck.com/public/api/counters</code></pre>
         </article>
         <article class="doc-card">
           <h3>엔드포인트</h3>
@@ -397,25 +397,25 @@
         <article class="doc-card">
           <h3>요청/응답 예시</h3>
           <pre><code># 생성
-curl -X POST https://chec.kro.kr/public/api/counters \
+curl -X POST https://dimicheck.com/public/api/counters \
   -H "Content-Type: application/json" \
   -H "Dimicheck-API-Key: YOUR_KEY" \
   -d '{"name":"like-counter","initial":0}'
 
 # +10
-curl -X POST https://chec.kro.kr/public/api/counters/{id}/add \
+curl -X POST https://dimicheck.com/public/api/counters/{id}/add \
   -H "Content-Type: application/json" \
   -H "Dimicheck-API-Key: YOUR_KEY" \
   -d '{"value":10}'
 
 # 42로 세팅
-curl -X POST https://chec.kro.kr/public/api/counters/{id}/set \
+curl -X POST https://dimicheck.com/public/api/counters/{id}/set \
   -H "Content-Type: application/json" \
   -H "Dimicheck-API-Key: YOUR_KEY" \
   -d '{"value":42}'
 
 # 조회
-curl https://chec.kro.kr/public/api/counters/{id} \
+curl https://dimicheck.com/public/api/counters/{id} \
   -H "Dimicheck-API-Key: YOUR_KEY"</code></pre>
           <ul>
             <li>응답 형태: <code>{ "id": "...", "name": "like-counter", "value": 10, "updated_at": "...Z" }</code></li>
@@ -472,7 +472,7 @@ curl https://chec.kro.kr/public/api/counters/{id} \
     const formatKSTDate = (value) => { const d = parseTimestamp(value); return d ? d.toLocaleDateString('ko-KR', { timeZone: TIME_ZONE }) : '-'; };
     const formatKSTTime = (value) => { const d = parseTimestamp(value); return d ? d.toLocaleTimeString('ko-KR', { timeZone: TIME_ZONE }) : '-'; };
     const formatUnits = (value) => Number(value ?? 0).toFixed(1);
-    const API_BASE = 'https://chec.kro.kr';
+    const API_BASE = 'https://dimicheck.com';
     const API_KEY_PLACEHOLDER = 'YOUR_KEY';
     const CODE_LANGS = ['curl', 'javascript', 'python', 'node'];
 

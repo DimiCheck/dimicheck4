@@ -2,10 +2,14 @@ const connectionMonitor = (() => {
   const banner = document.getElementById('connectionStatusBanner');
   const OFFLINE_HTML = '현재 디미체크가 정상적으로 작동하지 않아 오프라인 모드로 전환합니다. 디미체크 상태는 <a href="https://checstat.netlify.app" target="_blank" rel="noopener noreferrer">checstat.netlify.app</a>에서 확인하실 수 있습니다. 상태를 계속 확인하는 중...';
   const ONLINE_HTML = '디미체크에 다시 연결되었습니다. 최신 상태를 동기화했습니다.';
+  const FAILURE_THRESHOLD = 3;
+  const RECOVERY_SUCCESS_THRESHOLD = 2;
   let state = 'online';
   let healthTimer = null;
   let hideTimer = null;
   let resyncInFlight = false;
+  let failureStreak = 0;
+  let successStreak = 0;
 
   function showBanner(variant, html, autoHideMs) {
     if (!banner) return;
@@ -43,7 +47,7 @@ const connectionMonitor = (() => {
     try {
       const res = await fetch(`/healthz?ts=${Date.now()}`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`health ${res.status}`);
-      handleRecovery();
+      markSuccess();
     } catch {
       // keep waiting
     }
@@ -78,6 +82,8 @@ const connectionMonitor = (() => {
 
   function handleRecovery() {
     if (state !== 'offline') return;
+    failureStreak = 0;
+    successStreak = 0;
     state = 'online';
     showBanner('online', ONLINE_HTML, 4000);
     stopHealthMonitoring();
@@ -86,13 +92,21 @@ const connectionMonitor = (() => {
 
   function markFailure() {
     if (state === 'offline') return;
+    successStreak = 0;
+    failureStreak += 1;
+    if (failureStreak < FAILURE_THRESHOLD) return;
+    failureStreak = 0;
     state = 'offline';
     showBanner('offline', OFFLINE_HTML);
     startHealthMonitoring();
   }
 
   function markSuccess() {
+    failureStreak = 0;
     if (state === 'offline') {
+      successStreak += 1;
+      if (successStreak < RECOVERY_SUCCESS_THRESHOLD) return;
+      successStreak = 0;
       handleRecovery();
     }
   }
@@ -117,6 +131,17 @@ const marqueeState = {
   color: '#fdfcff',
   lastShownAt: null,
 };
+
+// Prevent stale poll responses from snapping magnets back right after local save.
+let stateSyncPauseUntil = 0;
+let loadStateInFlight = false;
+
+function pauseStateSync(ms = 0) {
+  const until = Date.now() + Math.max(0, Number(ms) || 0);
+  if (until > stateSyncPauseUntil) {
+    stateSyncPauseUntil = until;
+  }
+}
 
 function getMarqueeStorageKey() {
   try {
@@ -277,6 +302,8 @@ async function saveState(grade, section) {
   });
 
   try {
+    // Pause polling immediately so pre-commit stale data does not overwrite local drag result.
+    pauseStateSync(1500);
     const res = await fetch(`/api/classes/state/save?grade=${grade}&section=${section}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -288,6 +315,8 @@ async function saveState(grade, section) {
     if (monitor && typeof monitor.markSuccess === 'function') {
       monitor.markSuccess();
     }
+    // Keep a short grace window after successful save to avoid visual bounce.
+    pauseStateSync(1500);
     return true;
   } catch (e) {
     console.warn("saveState failed:", e);
@@ -339,10 +368,18 @@ function restoreToFreePosition(el, data) {
 async function loadState(grade, section, options = {}) {
   const monitor = window.connectionMonitor;
   const ignoreOffline = Boolean(options && options.ignoreOffline);
+  const forceSync = Boolean(options && options.forceSync);
   if (!ignoreOffline && monitor && typeof monitor.isOffline === 'function' && monitor.isOffline()) {
     return;
   }
+  if (!forceSync && Date.now() < stateSyncPauseUntil) {
+    return;
+  }
+  if (loadStateInFlight) {
+    return;
+  }
 
+  loadStateInFlight = true;
   try {
     const res = await fetch(`/api/classes/state/load?grade=${grade}&section=${section}`, { cache: 'no-store' });
     if (!res.ok) throw new Error("로드 실패");
@@ -440,6 +477,8 @@ async function loadState(grade, section, options = {}) {
     if (monitor && typeof monitor.markFailure === 'function') {
       monitor.markFailure();
     }
+  } finally {
+    loadStateInFlight = false;
   }
 }
 

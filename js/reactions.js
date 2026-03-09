@@ -10,7 +10,7 @@ class ReactionsManager {
     this.myNumber = null;
     this.cooldownEnd = 0;
     this.cooldownInterval = null;
-    this.allowedEmojis = ["❤️", "😂", "😮", "😢", "🔥", "👍", "👏", "🎉", "🤩", "🥳", "😎", "💯", "❄️", "🎄", "🎅", "🧦"];
+    this.allowedEmojis = ["❤️", "😂", "😮", "😢", "🔥", "👍", "👏", "🎉", "🤩", "🥳", "😎", "💯"];
   }
 
   init(grade, section, myNumber) {

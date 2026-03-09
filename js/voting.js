@@ -137,8 +137,10 @@ class VotingManager {
     // 옵션이 변경되었는지 확인
     if (JSON.stringify(this.activeVote.options) !== JSON.stringify(newVote.options)) return true;
 
+    if ((this.activeVote.maxChoices || 1) !== (newVote.maxChoices || 1)) return true;
+
     // 내 투표가 변경되었는지 확인
-    if (JSON.stringify(this.activeVote.myVote) !== JSON.stringify(newVote.myVote)) return true;
+    if (JSON.stringify(this.activeVote.myVoteIndices || []) !== JSON.stringify(newVote.myVoteIndices || [])) return true;
 
     return false;
   }
@@ -187,7 +189,7 @@ class VotingManager {
     if (this.optionsEl) {
       const isSameVote = this.currentVoteId === voteData.voteId;
       if (!isSameVote) {
-        this.pendingSelection = new Set(voteData.myVote || []);
+        this.pendingSelection = new Set((voteData.myVoteIndices || []).map((value) => String(value)));
         this.currentVoteId = voteData.voteId;
       }
 
@@ -200,32 +202,32 @@ class VotingManager {
       }
 
       this.optionsEl.innerHTML = '';
-      voteData.options.forEach(option => {
+      voteData.options.forEach((option, index) => {
         const optionEl = document.createElement('label');
         optionEl.className = 'vote-option';
 
         const input = document.createElement('input');
         input.type = voteData.maxChoices > 1 ? 'checkbox' : 'radio';
         input.name = 'vote-option';
-        input.value = option;
+        input.value = String(index);
 
-        if (this.pendingSelection.has(option)) {
+        if (this.pendingSelection.has(String(index))) {
           input.checked = true;
-        } else if (voteData.myVote && voteData.myVote.includes(option)) {
+        } else if ((voteData.myVoteIndices || []).includes(index)) {
           input.checked = true;
         }
 
         input.addEventListener('change', () => {
           if (voteData.maxChoices > 1) {
             if (input.checked) {
-              this.pendingSelection.add(option);
+              this.pendingSelection.add(String(index));
             } else {
-              this.pendingSelection.delete(option);
+              this.pendingSelection.delete(String(index));
             }
           } else {
-    this.pendingSelection?.clear();
+            this.pendingSelection?.clear();
             if (input.checked) {
-              this.pendingSelection.add(option);
+              this.pendingSelection.add(String(index));
             }
             // For radio, ensure others cleared visually
             this.optionsEl.querySelectorAll('input[type="radio"]').forEach(r => {
@@ -284,6 +286,7 @@ class VotingManager {
     }
 
     this.currentVoteId = resultData.voteId ?? null;
+    this.lastResultCounts = resultData.counts || {};
     this.renderResultList(resultData);
 
     const overlay = document.getElementById('indexVoteOverlay');
@@ -376,10 +379,10 @@ class VotingManager {
 
     if (results) {
       results.innerHTML = '';
+      const total = voteData.totalVotes ?? 0;
 
       voteData.options.forEach(option => {
         const count = voteData.counts[option] || 0;
-        const total = Object.values(voteData.counts).reduce((a, b) => a + b, 0);
         const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
 
         const resultEl = document.createElement('div');
@@ -415,7 +418,8 @@ class VotingManager {
     return {
       state,
       expiresAt: data.expiresAt,
-      timestamp: data.expiresAt || data.createdAt,
+      createdAt: data.createdAt,
+      timestamp: data.createdAt || data.expiresAt,
       channel: data.channel || this.channel,
       payload: data
     };
@@ -481,7 +485,9 @@ class VotingManager {
     const options = document.getElementById('voteOptions');
     if (!options) return { success: false, error: '투표 UI를 찾을 수 없습니다.' };
 
-    const checked = Array.from(options.querySelectorAll('input:checked')).map(input => input.value);
+    const checked = Array.from(options.querySelectorAll('input:checked'))
+      .map((input) => Number.parseInt(input.value, 10))
+      .filter((value) => Number.isInteger(value));
 
     if (checked.length === 0) {
       return { success: false, error: '투표할 항목을 선택해주세요.' };
@@ -505,7 +511,7 @@ class VotingManager {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           voteId: this.activeVote.voteId,
-          selected: checked
+          selectedOptionIndexes: checked
         })
       });
 
@@ -572,12 +578,32 @@ class VotingManager {
       return { success: false, error: '질문을 입력해주세요.' };
     }
 
-    if (!options || options.length < 2 || options.length > 10) {
+    const normalizedOptions = [];
+    const seen = new Set();
+    for (const option of options || []) {
+      const text = String(option || '').replace(/\s+/g, ' ').trim();
+      if (!text) continue;
+      const key = text.toLowerCase();
+      if (seen.has(key)) {
+        return { success: false, error: '옵션은 서로 다르게 입력해주세요.' };
+      }
+      seen.add(key);
+      normalizedOptions.push(text);
+    }
+
+    if (normalizedOptions.length < 2 || normalizedOptions.length > 10) {
       return { success: false, error: '옵션은 2~10개여야 합니다.' };
     }
 
-    if (maxChoices < 1 || maxChoices > options.length) {
+    if (maxChoices < 1 || maxChoices > normalizedOptions.length) {
       return { success: false, error: '최대 선택 개수가 올바르지 않습니다.' };
+    }
+
+    if (this.activeVote && (this.activeVote.channel || 'home').toLowerCase() === (this.channel || 'home').toLowerCase()) {
+      const replaceConfirmed = window.confirm('이미 진행 중인 설문이 있습니다. 새 설문을 만들면 기존 설문이 종료됩니다. 계속할까요?');
+      if (!replaceConfirmed) {
+        return { success: false, cancelled: true, error: '설문 생성을 취소했습니다.' };
+      }
     }
 
     try {
@@ -586,22 +612,21 @@ class VotingManager {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question: question.trim(),
-          options: options,
+          options: normalizedOptions,
           maxChoices: maxChoices
         })
       });
 
       if (!res.ok) {
         const data = await res.json();
-        if (data.error === 'active vote already exists') {
-          throw new Error('이미 진행 중인 투표가 있습니다.');
-        }
         throw new Error(data.error || 'Failed to create vote');
       }
 
+      const data = await res.json();
+
       // 즉시 투표 확인
       await this.checkActiveVote();
-      return { success: true };
+      return { success: true, replacedExisting: Boolean(data.replacedExisting) };
     } catch (err) {
       console.error('createVote error:', err);
       return { success: false, error: err.message || '투표를 생성하지 못했어요.' };

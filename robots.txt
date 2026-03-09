@@ -9,4 +9,4 @@ Disallow: /auth/
 Disallow: /metrics
 Disallow: /reload-configs
 
-Sitemap: https://chec.kro.kr/sitemap.xml
+Sitemap: https://dimicheck.com/sitemap.xml

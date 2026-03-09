@@ -63,6 +63,7 @@
       --ok: #38d67a;
       --warn: #ffb020;
       --err: #ff5c5c;
+      --safe-bottom: 0px;
     }
     :root[data-theme="light"]{
       --bg: #f6f8fb;
@@ -97,6 +98,12 @@
         --primary: #d04fff;
         --primary-2: #ff6ad0;
         --shadow: 0 10px 30px rgba(57,72,103,.15);
+      }
+    }
+
+    @media (max-width: 1024px), (hover: none) and (pointer: coarse) {
+      :root {
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
       }
     }
 
@@ -215,7 +222,7 @@
     @keyframes rise{to{opacity:1; transform:none}}
 
     .spacer {
-      height: calc(68px + 80px + env(safe-area-inset-bottom));
+      height: calc(68px + 80px + var(--safe-bottom));
     }
 
     /* Bottom Navigation - Floating Rounded Style */
@@ -226,7 +233,7 @@
       transform: translateX(-50%);
       width: min(480px, calc(100% - 32px));
       height: 68px;
-      padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+      padding: 8px 12px calc(8px + var(--safe-bottom));
       display: flex;
       background: linear-gradient(180deg, var(--card), var(--card-2));
       backdrop-filter: saturate(180%) blur(20px);
@@ -460,32 +467,6 @@
         flex: 1 1 calc(50% - 4px);
       }
     }
-    .holiday-card{
-      margin-top:16px;
-      padding:14px;
-      border-radius:14px;
-      border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
-      background:linear-gradient(135deg, color-mix(in oklab, #e5467c 55%, var(--card)), color-mix(in oklab, #2ec5d3 45%, var(--card-2)));
-      box-shadow:0 8px 22px rgba(0,0,0,.25);
-    }
-    .holiday-card .holiday-head{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      font-weight:700;
-      font-size:15px;
-    }
-    .holiday-card .holiday-count{
-      margin-top:8px;
-      font-size:clamp(22px,6vw,34px);
-      font-weight:800;
-    }
-    .holiday-card .holiday-note{
-      margin-top:6px;
-      font-size:13px;
-      color:color-mix(in oklab, var(--text) 88%, #fff);
-    }
   </style>
 </head>
 <body>
@@ -573,14 +554,6 @@
       귀가 시간을 설정해주세요
     </div>
     <div id="countdownMessage" style="margin-top:12px; text-align:center; font-size:clamp(13px, 3.5vw, 16px); color:var(--muted);"></div>
-    <div class="holiday-card" aria-live="polite">
-      <div class="holiday-head">
-        <span>🎄 크리스마스까지</span>
-        <span id="christmasTargetLabel" style="font-size:12px; font-weight:600; color:color-mix(in oklab, var(--text) 88%, #fff);"></span>
-      </div>
-      <div class="holiday-count" id="christmasCountdown">계산 중…</div>
-      <div class="holiday-note" id="christmasNote">다가오는 휴일을 기다리는 중입니다.</div>
-    </div>
   </section>
 
   <!-- 반별 공동 캘린더 -->
@@ -647,29 +620,161 @@
     }
   }
 
+  const SCHOOLLIFE_STORAGE_KEYS = {
+    grade: 'schoollife:last_grade',
+    section: 'schoollife:last_class',
+  };
+
+  const authState = {
+    loggedIn: false,
+    role: null,
+    grade: null,
+    section: null,
+    number: null,
+  };
+
+  function toPositiveInt(value){
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  function getUrlClassSelection(){
+    const params = new URLSearchParams(window.location.search);
+    return {
+      grade: toPositiveInt(params.get('grade')),
+      section: toPositiveInt(params.get('section') || params.get('class')),
+    };
+  }
+
+  function loadSavedSelection(keyName, legacyKey){
+    const current = loadData(keyName);
+    if (current !== null && current !== undefined && current !== '') return String(current);
+    const legacy = loadData(legacyKey);
+    if (legacy !== null && legacy !== undefined && legacy !== '') return String(legacy);
+    return null;
+  }
+
+  function saveCurrentClassSelection(){
+    saveData(SCHOOLLIFE_STORAGE_KEYS.grade, gradeSel.value);
+    saveData(SCHOOLLIFE_STORAGE_KEYS.section, classSel.value);
+  }
+
+  async function loadAuthStatus(){
+    try{
+      const response = await fetch('/auth/status', {
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    }catch(error){
+      console.warn('[Schoollife] auth status load failed', error);
+      return null;
+    }
+  }
+
+  async function hydrateClassSelection(){
+    const auth = await loadAuthStatus();
+    const urlSelection = getUrlClassSelection();
+    const savedGrade = loadSavedSelection(SCHOOLLIFE_STORAGE_KEYS.grade, 'last_grade');
+    const savedSection = loadSavedSelection(SCHOOLLIFE_STORAGE_KEYS.section, 'last_class');
+
+    authState.loggedIn = Boolean(auth?.logged_in);
+    authState.role = auth?.role || null;
+    authState.grade = toPositiveInt(auth?.grade);
+    authState.section = toPositiveInt(auth?.section || auth?.class);
+    authState.number = toPositiveInt(auth?.number);
+
+    let nextGrade = savedGrade || '1';
+    let nextSection = savedSection || '1';
+
+    if (authState.loggedIn && authState.grade && authState.section) {
+      if (authState.role === 'teacher') {
+        nextGrade = savedGrade || String(authState.grade);
+        nextSection = savedSection || String(authState.section);
+      } else {
+        nextGrade = String(authState.grade);
+        nextSection = String(authState.section);
+      }
+    }
+
+    if (urlSelection.grade) nextGrade = String(urlSelection.grade);
+    if (urlSelection.section) nextSection = String(urlSelection.section);
+
+    gradeSel.value = nextGrade;
+    classSel.value = nextSection;
+    saveCurrentClassSelection();
+  }
+
   // -------- select init --------
   const gradeSel = document.getElementById('gradeSel');
   const classSel = document.getElementById('classSel');
   (function initSelectors(){
     for(let g=1; g<=3; g++){ const o=document.createElement('option'); o.value=String(g); o.textContent=`${g}학년`; gradeSel.appendChild(o); }
     for(let c=1; c<=6; c++){ const o=document.createElement('option'); o.value=String(c); o.textContent=`${c}반`; classSel.appendChild(o); }
-    gradeSel.value = loadData('last_grade') || '1';
-    classSel.value  = loadData('last_class') || '3';
+    gradeSel.value = '1';
+    classSel.value  = '1';
     gradeSel.addEventListener('change', onSelChange);
     classSel.addEventListener('change', onSelChange);
   })();
 
   function onSelChange(){
-    saveData('last_grade', gradeSel.value);
-    saveData('last_class', classSel.value);
+    saveCurrentClassSelection();
     loadAllSchoollifeData();
   }
 
   // -------- API helpers --------
-  async function fetchJson(url) {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return await response.json();
+  async function fetchJson(url, options = {}) {
+    const response = await fetch(url, {
+      credentials: 'include',
+      cache: 'no-store',
+      ...options,
+    });
+    const text = await response.text();
+    let payload = null;
+    if (text) {
+      try {
+        payload = JSON.parse(text);
+      } catch (error) {
+        payload = text;
+      }
+    }
+    if (!response.ok) {
+      const message =
+        payload?.error?.message ||
+        payload?.error ||
+        `HTTP error! status: ${response.status}`;
+      const fetchError = new Error(message);
+      fetchError.status = response.status;
+      fetchError.payload = payload;
+      throw fetchError;
+    }
+    return payload;
+  }
+
+  function getSelectedGradeSection(){
+    return {
+      grade: toPositiveInt(gradeSel.value),
+      section: toPositiveInt(classSel.value),
+    };
+  }
+
+  function describeProtectedClassFeature(featureName){
+    const { grade, section } = getSelectedGradeSection();
+    if (!authState.loggedIn) {
+      return `${featureName} 로그인 후 이용할 수 있습니다.`;
+    }
+    if (
+      authState.role === 'student' &&
+      authState.grade &&
+      authState.section &&
+      grade &&
+      section &&
+      (authState.grade !== grade || authState.section !== section)
+    ) {
+      return `${featureName} 내 반에서만 볼 수 있습니다.`;
+    }
+    return `${featureName} 불러올 수 없습니다.`;
   }
 
   function applyWeatherGradient(desc){
@@ -833,7 +938,7 @@
     sub.textContent = fmtDateKR(payload?.date) || '오늘 시간표';
 
     if (!lessons.length) {
-      list.innerHTML = `<div class="empty">시간표를 불러오지 못했습니다.</div>`;
+      list.innerHTML = `<div class="empty">${payload?.message || '오늘 등록된 시간표가 없습니다.'}</div>`;
       return;
     }
 
@@ -990,7 +1095,7 @@
       if (res.totalCount === 0) {
         statsEl.textContent = '아직 투표한 학생이 없습니다';
       } else {
-        statsEl.textContent = `우리 학교 학생의 ${res.percentage}%가 오늘 급식이 산타의 선물이라 생각해요 (${res.positiveCount}/${res.totalCount}명)`;
+        statsEl.textContent = `우리 학교 학생의 ${res.percentage}%가 오늘 급식이 맛있다고 생각해요 (${res.positiveCount}/${res.totalCount}명)`;
       }
 
       // Highlight user's vote
@@ -1001,14 +1106,17 @@
       }
     } catch(e) {
       console.error('Failed to load meal vote stats:', e);
-      document.getElementById('mealVoteStats').textContent = '투표 정보를 불러올 수 없습니다';
+      const message = e?.status === 403
+        ? describeProtectedClassFeature('투표 정보는')
+        : '투표 정보를 불러올 수 없습니다';
+      document.getElementById('mealVoteStats').textContent = message;
     }
   }
 
   async function voteMeal(isPositive){
     const g = gradeSel.value, c = classSel.value;
     try {
-      await fetch(`/api/classes/schoollife/meal/vote?grade=${g}&section=${c}`, {
+      await fetchJson(`/api/classes/schoollife/meal/vote?grade=${g}&section=${c}`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({isPositive})
@@ -1016,7 +1124,7 @@
       await loadMealVoteStats();
     } catch(e) {
       console.error('Failed to vote:', e);
-      alert('투표에 실패했습니다');
+      alert(e?.status === 403 ? '급식 투표는 내 반에서만 할 수 있습니다.' : '투표에 실패했습니다');
     }
   }
 
@@ -1034,7 +1142,10 @@
       renderCalendar();
     } catch(e) {
       console.error('Failed to load calendar events:', e);
-      document.getElementById('calendarView').innerHTML = '<div class="empty">캘린더를 불러올 수 없습니다</div>';
+      const message = e?.status === 403
+        ? describeProtectedClassFeature('캘린더는')
+        : '캘린더를 불러올 수 없습니다';
+      document.getElementById('calendarView').innerHTML = `<div class="empty">${message}</div>`;
     }
   }
 
@@ -1122,7 +1233,7 @@
     if (!dateStr) return;
 
     try {
-      await fetch(`/api/classes/calendar/events/${eventId}`, {
+      await fetchJson(`/api/classes/calendar/events/${eventId}`, {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
@@ -1134,7 +1245,7 @@
       await loadCalendarEvents();
     } catch(e) {
       console.error('Failed to update event:', e);
-      alert('일정 수정에 실패했습니다');
+      alert(e?.status === 403 ? '이 일정을 수정할 권한이 없습니다.' : '일정 수정에 실패했습니다');
     }
   };
 
@@ -1142,13 +1253,13 @@
     if (!confirm('이 일정을 삭제하시겠습니까?')) return;
 
     try {
-      await fetch(`/api/classes/calendar/events/${eventId}`, {
+      await fetchJson(`/api/classes/calendar/events/${eventId}`, {
         method: 'DELETE'
       });
       await loadCalendarEvents();
     } catch(e) {
       console.error('Failed to delete event:', e);
-      alert('일정 삭제에 실패했습니다');
+      alert(e?.status === 403 ? '이 일정을 삭제할 권한이 없습니다.' : '일정 삭제에 실패했습니다');
     }
   };
 
@@ -1162,7 +1273,7 @@
 
     const g = gradeSel.value, c = classSel.value;
     try {
-      await fetch(`/api/classes/calendar/events?grade=${g}&section=${c}`, {
+      await fetchJson(`/api/classes/calendar/events?grade=${g}&section=${c}`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
@@ -1174,13 +1285,12 @@
       await loadCalendarEvents();
     } catch(e) {
       console.error('Failed to create event:', e);
-      alert('일정 추가에 실패했습니다');
+      alert(e?.status === 403 ? '이 반에는 일정을 추가할 수 없습니다.' : '일정 추가에 실패했습니다');
     }
   });
 
   // -------- Countdown Timer --------
   let countdownInterval = null;
-  let christmasInterval = null;
 
   function parseSavedHomeTime(raw){
     if (!raw && raw !== 0){
@@ -1264,48 +1374,6 @@
     countdownInterval = setInterval(updateCountdown, 1000);
   }
 
-  function getNextChristmas(){
-    const now = new Date();
-    let target = new Date(`${now.getFullYear()}-12-25T00:00:00`);
-    if (target <= now) {
-      target = new Date(`${now.getFullYear() + 1}-12-25T00:00:00`);
-    }
-    return target;
-  }
-
-  function updateChristmasCountdown(){
-    const countdownEl = document.getElementById('christmasCountdown');
-    const noteEl = document.getElementById('christmasNote');
-    const targetLabel = document.getElementById('christmasTargetLabel');
-    if (!countdownEl || !noteEl) return;
-
-    const now = new Date();
-    const target = getNextChristmas();
-    const diff = target - now;
-
-    if (targetLabel) {
-      targetLabel.textContent = `${target.getFullYear()}년 12월 25일`;
-    }
-
-    if (diff <= 0) {
-      countdownEl.textContent = '🎅 메리 크리스마스!';
-      noteEl.textContent = '따뜻한 휴일 보내세요.';
-      return;
-    }
-
-    countdownEl.textContent = formatRemaining(diff);
-    const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    noteEl.textContent = `${daysLeft}일 남았습니다. 따뜻한 준비를 시작해볼까요?`;
-  }
-
-  function startChristmasCountdown(){
-    if (christmasInterval) {
-      clearInterval(christmasInterval);
-    }
-    updateChristmasCountdown();
-    christmasInterval = setInterval(updateChristmasCountdown, 1000);
-  }
-
   document.getElementById('setHomeTimeBtn').addEventListener('click', () => {
     const dateInput = document.getElementById('homeDateInput');
     const timeInput = document.getElementById('homeTimeOnlyInput');
@@ -1363,10 +1431,13 @@
     ]);
   }
 
-  // initial kick
-  loadAllSchoollifeData();
-  initCountdown();
-  startChristmasCountdown();
+  async function bootstrapSchoollifePage() {
+    await hydrateClassSelection();
+    await loadAllSchoollifeData();
+    initCountdown();
+  }
+
+  bootstrapSchoollifePage();
 </script>
 
 <nav class="bottom-nav" aria-label="하단 내비게이션">

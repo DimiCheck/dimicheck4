@@ -15,7 +15,7 @@ from mcp.server.fastmcp import Context, FastMCP
 
 from mcp_auth import DimicheckTokenVerifier
 
-BASE_URL = os.getenv("DIMICHECK_BASE_URL", "https://chec.kro.kr")
+BASE_URL = os.getenv("DIMICHECK_BASE_URL", "https://dimicheck.com")
 DEFAULT_TIMEOUT = float(os.getenv("DIMICHECK_HTTP_TIMEOUT", "30"))
 SERVER_PORT = int(os.getenv("DIMICHECK_MCP_PORT", "8787"))
 LOG = logging.getLogger("uvicorn.error")
@@ -86,13 +86,13 @@ token_verifier = DimicheckTokenVerifier()
 server = FastMCP(
     name="dimicheck-mcp",
     instructions="Use ChatGPT-issued OAuth token (Dimicheck) to call MCP endpoints.",
-    website_url="https://chec.kro.kr",
+    website_url="https://dimicheck.com",
     host="0.0.0.0",
     port=SERVER_PORT,
     streamable_http_path="/mcp",
     auth=AuthSettings(
-        issuer_url="https://chec.kro.kr",
-        resource_server_url="https://chec.kro.kr/mcp",
+        issuer_url="https://dimicheck.com",
+        resource_server_url="https://dimicheck.com/mcp",
         required_scopes=["basic", "student_info"],
     ),
     token_verifier=token_verifier,
@@ -135,12 +135,12 @@ def _oidc_payload() -> dict:
     Shared OIDC discovery payload.
     Issuer matches Flask oauth tokens (OAUTH_ISSUER) and keeps endpoints stable.
     """
-    issuer = "https://chec.kro.kr"
+    issuer = "https://dimicheck.com"
     return {
         "issuer": issuer,
-        "authorization_endpoint": "https://chec.kro.kr/oauth/authorize",
-        "token_endpoint": "https://chec.kro.kr/oauth/token",
-        "registration_endpoint": "https://chec.kro.kr/mcp/oauth2/register",
+        "authorization_endpoint": "https://dimicheck.com/oauth/authorize",
+        "token_endpoint": "https://dimicheck.com/oauth/token",
+        "registration_endpoint": "https://dimicheck.com/mcp/oauth2/register",
         "response_types_supported": ["code"],
         "grant_types_supported": ["authorization_code"],
         "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic", "none"],

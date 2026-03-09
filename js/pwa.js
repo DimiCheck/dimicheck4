@@ -4,10 +4,30 @@
   }
 
   let refreshing = false;
+  const SW_RELOAD_GUARD_KEY = 'dimicheck_sw_last_reload_at';
+  const SW_RELOAD_GUARD_MS = 15000;
 
-  function registerServiceWorker() {
+  async function resolveServiceWorkerUrl() {
+    try {
+      const res = await fetch('/api/version', { cache: 'no-store', credentials: 'same-origin' });
+      if (!res.ok) {
+        return '/service-worker.js';
+      }
+      const data = await res.json();
+      const version = data && data.version ? String(data.version) : '';
+      if (!version) {
+        return '/service-worker.js';
+      }
+      return `/service-worker.js?v=${encodeURIComponent(version)}`;
+    } catch (error) {
+      return '/service-worker.js';
+    }
+  }
+
+  async function registerServiceWorker() {
+    const swUrl = await resolveServiceWorkerUrl();
     navigator.serviceWorker
-      .register('/service-worker.js')
+      .register(swUrl, { updateViaCache: 'none' })
       .then((registration) => {
         onRegistration(registration);
       })
@@ -47,6 +67,22 @@
     window.dispatchEvent(changeEvent);
     if (refreshing) {
       return;
+    }
+    const now = Date.now();
+    let lastReloadAt = 0;
+    try {
+      lastReloadAt = Number(sessionStorage.getItem(SW_RELOAD_GUARD_KEY) || 0);
+    } catch (error) {
+      lastReloadAt = 0;
+    }
+    if (now - lastReloadAt < SW_RELOAD_GUARD_MS) {
+      console.warn('[PWA] Skip reload to prevent service worker reload loop');
+      return;
+    }
+    try {
+      sessionStorage.setItem(SW_RELOAD_GUARD_KEY, String(now));
+    } catch (error) {
+      // Ignore storage failures
     }
     refreshing = true;
     window.location.reload();
