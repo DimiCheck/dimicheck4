@@ -137,6 +137,19 @@ _NOTICE_DOT_SECONDS = 10 * 60
 _NOTICE_BURST_WINDOW = timedelta(minutes=10)
 
 
+def _ensure_notice_tables() -> bool:
+    try:
+        TeacherNotice.__table__.create(bind=db.engine, checkfirst=True)
+        TeacherNoticeRead.__table__.create(bind=db.engine, checkfirst=True)
+        return True
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return False
+
+
 def _valid_grade_section(grade: int | None, section: int | None) -> bool:
     return bool(grade in {1, 2, 3} and section in {1, 2, 3, 4, 5, 6})
 
@@ -280,6 +293,8 @@ def _select_board_notices(notices: list[TeacherNotice]) -> list[TeacherNotice]:
 def create_teacher_notice():
     if not _teacher_only():
         return jsonify({"error": "forbidden"}), 403
+    if not _ensure_notice_tables():
+        return jsonify({"error": "notice storage unavailable"}), 503
 
     payload = request.get_json(silent=True) or {}
     teacher_name = str(payload.get("teacherName") or "").strip()
@@ -318,6 +333,18 @@ def get_teacher_notices():
         return jsonify({"error": "missing grade/section"}), 400
     if not _is_authorized(grade, section):
         return jsonify({"error": "forbidden"}), 403
+    if not _ensure_notice_tables():
+        return jsonify(
+            {
+                "grade": grade,
+                "section": section,
+                "mode": mode,
+                "notices": [],
+                "hasUnread": False,
+                "unreadCount": 0,
+                "latestUnread": None,
+            }
+        )
 
     fetch_limit = 500 if mode == "all" else 120
     notices = _load_targeted_notices(grade, section, limit=fetch_limit)
@@ -382,6 +409,8 @@ def mark_teacher_notices_read():
         or session_section != section
     ):
         return jsonify({"error": "forbidden"}), 403
+    if not _ensure_notice_tables():
+        return jsonify({"error": "notice storage unavailable"}), 503
 
     payload = request.get_json(silent=True) or {}
     mark_all = bool(payload.get("all"))

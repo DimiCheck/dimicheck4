@@ -176,6 +176,22 @@ def _purge_expired_teacher_tickets() -> None:
         pass
 
 
+def _ensure_teacher_ticket_table() -> bool:
+    try:
+        from extensions import db
+        from models import TeacherSessionTicket
+
+        TeacherSessionTicket.__table__.create(bind=db.engine, checkfirst=True)
+        return True
+    except Exception:
+        try:
+            from extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        return False
+
+
 def clear_teacher_session() -> None:
     data = _get_teacher_session()
     session.pop(TEACHER_SESSION_KEY, None)
@@ -215,6 +231,12 @@ def mark_teacher_session(duration_seconds: int, remember: bool) -> None:
         from extensions import db
         from models import TeacherSessionTicket
 
+        if not _ensure_teacher_ticket_table():
+            # 안전한 폴백: 서버 티켓 테이블 생성 실패 시 일단 세션은 유지
+            # (로그인 불가 루프 방지)
+            session[TEACHER_SESSION_KEY] = {"issued_at": now, "expires_at": expires_at}
+            return
+
         ticket = TeacherSessionTicket(
             session_id=ticket_id,
             user_agent_hash=_teacher_session_user_agent_hash(),
@@ -248,6 +270,10 @@ def is_teacher_session_active() -> bool:
         return False
 
     _purge_expired_teacher_tickets()
+    if not _ensure_teacher_ticket_table():
+        # 서버 티켓 저장소 점검 불가 시, 만료시간 기반으로만 허용 (서비스 가용성 우선)
+        return True
+
     try:
         from models import TeacherSessionTicket
 
