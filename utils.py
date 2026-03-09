@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import logging
+import hashlib
+import secrets
 import time
 import uuid
+from datetime import datetime, timezone
 from threading import Lock
 from typing import Any
 
@@ -150,17 +153,82 @@ def _get_teacher_session() -> dict | None:
     return data if isinstance(data, dict) else None
 
 
+def _teacher_session_user_agent_hash() -> str:
+    user_agent = request.headers.get("User-Agent", "")
+    return hashlib.sha256(user_agent.encode("utf-8")).hexdigest()
+
+
+def _purge_expired_teacher_tickets() -> None:
+    try:
+        from extensions import db
+        from models import TeacherSessionTicket
+
+        now = datetime.now(timezone.utc)
+        TeacherSessionTicket.query.filter(TeacherSessionTicket.expires_at < now).delete(synchronize_session=False)
+        db.session.commit()
+    except Exception:
+        try:
+            from extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        # Ticket cleanup should never break request flow.
+        pass
+
+
 def clear_teacher_session() -> None:
+    data = _get_teacher_session()
     session.pop(TEACHER_SESSION_KEY, None)
+    ticket_id = data.get("session_id") if isinstance(data, dict) else None
+    if not isinstance(ticket_id, str) or not ticket_id:
+        return
+    try:
+        from extensions import db
+        from models import TeacherSessionTicket
+
+        ticket = TeacherSessionTicket.query.filter_by(session_id=ticket_id).first()
+        if ticket:
+            db.session.delete(ticket)
+            db.session.commit()
+    except Exception:
+        try:
+            from extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        # Session cleanup should be best-effort only.
+        pass
 
 
 def mark_teacher_session(duration_seconds: int, remember: bool) -> None:
+    _purge_expired_teacher_tickets()
     now = int(time.time())
     expires_at = now + max(duration_seconds, 60)
-    session[TEACHER_SESSION_KEY] = {"issued_at": now, "expires_at": expires_at}
+    ticket_id = secrets.token_urlsafe(48)
+    session_payload = {"issued_at": now, "expires_at": expires_at, "session_id": ticket_id}
+    session[TEACHER_SESSION_KEY] = session_payload
     session.permanent = remember
     if not session.get("csrf_token"):
         session["csrf_token"] = uuid.uuid4().hex
+
+    try:
+        from extensions import db
+        from models import TeacherSessionTicket
+
+        ticket = TeacherSessionTicket(
+            session_id=ticket_id,
+            user_agent_hash=_teacher_session_user_agent_hash(),
+            expires_at=datetime.fromtimestamp(expires_at, tz=timezone.utc),
+        )
+        db.session.add(ticket)
+        db.session.commit()
+    except Exception:
+        try:
+            from extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        clear_teacher_session()
 
 
 def is_teacher_session_active() -> bool:
@@ -172,6 +240,40 @@ def is_teacher_session_active() -> bool:
         clear_teacher_session()
         return False
     if expires_at < time.time():
+        clear_teacher_session()
+        return False
+    ticket_id = data.get("session_id")
+    if not isinstance(ticket_id, str) or not ticket_id:
+        clear_teacher_session()
+        return False
+
+    _purge_expired_teacher_tickets()
+    try:
+        from models import TeacherSessionTicket
+
+        ticket = TeacherSessionTicket.query.filter_by(session_id=ticket_id).first()
+    except Exception:
+        try:
+            from extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+        clear_teacher_session()
+        return False
+    if not ticket:
+        clear_teacher_session()
+        return False
+    ticket_expires_at = ticket.expires_at
+    if not isinstance(ticket_expires_at, datetime):
+        clear_teacher_session()
+        return False
+    if ticket_expires_at.tzinfo is None:
+        ticket_expires_at = ticket_expires_at.replace(tzinfo=timezone.utc)
+    if ticket_expires_at < datetime.now(timezone.utc):
+        clear_teacher_session()
+        return False
+    expected_hash = _teacher_session_user_agent_hash()
+    if ticket.user_agent_hash and ticket.user_agent_hash != expected_hash:
         clear_teacher_session()
         return False
     return True

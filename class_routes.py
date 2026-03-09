@@ -6,11 +6,20 @@ import os
 import requests
 
 from flask import Blueprint, jsonify, request, session
+from sqlalchemy import or_
 
 from content_filter import contains_slang
 from extensions import db
 from config import config
-from models import ClassState, ClassRoutine, ChatMessage, MealVote, CalendarEvent
+from models import (
+    ClassState,
+    ClassRoutine,
+    ChatMessage,
+    MealVote,
+    CalendarEvent,
+    TeacherNotice,
+    TeacherNoticeRead,
+)
 from config_loader import load_class_config
 from utils import is_board_session_active, is_teacher_session_active
 from public_api import broadcast_public_status_update
@@ -121,6 +130,305 @@ def _is_authorized(grade: int | None, section: int | None) -> bool:
 
 def _teacher_only() -> bool:
     return is_teacher_session_active()
+
+
+_NOTICE_FRESH_SECONDS = 10
+_NOTICE_DOT_SECONDS = 10 * 60
+_NOTICE_BURST_WINDOW = timedelta(minutes=10)
+
+
+def _valid_grade_section(grade: int | None, section: int | None) -> bool:
+    return bool(grade in {1, 2, 3} and section in {1, 2, 3, 4, 5, 6})
+
+
+def _to_notice_target_key(grade: int, section: int) -> str:
+    return f"{grade}-{section}"
+
+
+def _parse_notice_target_classes(raw_targets: str | None) -> list[str]:
+    try:
+        parsed = json.loads(raw_targets or "[]")
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(parsed, list):
+        return []
+    normalized: list[str] = []
+    seen = set()
+    for item in parsed:
+        if isinstance(item, dict):
+            g = _normalize_class_value(item.get("grade"))
+            s = _normalize_class_value(item.get("section"))
+            if not _valid_grade_section(g, s):
+                continue
+            key = _to_notice_target_key(g, s)
+        elif isinstance(item, str):
+            parts = item.split("-")
+            if len(parts) != 2:
+                continue
+            g = _normalize_class_value(parts[0])
+            s = _normalize_class_value(parts[1])
+            if not _valid_grade_section(g, s):
+                continue
+            key = _to_notice_target_key(g, s)
+        else:
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(key)
+    return normalized
+
+
+def _normalize_notice_targets(payload: dict) -> tuple[bool, list[str]]:
+    raw = payload.get("targetClasses")
+    if raw is None:
+        raw = payload.get("targets")
+
+    if raw is None:
+        return True, []
+
+    targets: list[str] = []
+    seen = set()
+    if isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, dict):
+                g = _normalize_class_value(item.get("grade"))
+                s = _normalize_class_value(item.get("section"))
+            elif isinstance(item, str):
+                parts = item.split("-")
+                g = _normalize_class_value(parts[0]) if len(parts) > 0 else None
+                s = _normalize_class_value(parts[1]) if len(parts) > 1 else None
+            else:
+                g = None
+                s = None
+            if not _valid_grade_section(g, s):
+                continue
+            key = _to_notice_target_key(g, s)
+            if key in seen:
+                continue
+            seen.add(key)
+            targets.append(key)
+
+    if not targets:
+        return True, []
+    return False, targets
+
+
+def _notice_matches_class(notice: TeacherNotice, grade: int, section: int) -> bool:
+    if notice.target_all:
+        return True
+    target_key = _to_notice_target_key(grade, section)
+    return target_key in _parse_notice_target_classes(notice.target_classes)
+
+
+def _notice_created_at_utc(notice: TeacherNotice) -> datetime:
+    created_at = notice.created_at or datetime.utcnow()
+    if created_at.tzinfo is None:
+        return created_at.replace(tzinfo=timezone.utc)
+    return created_at.astimezone(timezone.utc)
+
+
+def _serialize_notice(notice: TeacherNotice, *, now_utc: datetime | None = None) -> dict:
+    now = now_utc or datetime.now(timezone.utc)
+    created_at = _notice_created_at_utc(notice)
+    age_seconds = max(0, int((now - created_at).total_seconds()))
+    targets = _parse_notice_target_classes(notice.target_classes)
+    target_labels = "전체(모든 반)" if notice.target_all or not targets else ", ".join(targets)
+    return {
+        "id": notice.id,
+        "teacherName": notice.teacher_name,
+        "text": notice.text,
+        "createdAt": created_at.isoformat(),
+        "createdAtMs": int(created_at.timestamp() * 1000),
+        "ageSeconds": age_seconds,
+        "showGlow": age_seconds <= _NOTICE_FRESH_SECONDS,
+        "showDot": _NOTICE_FRESH_SECONDS < age_seconds <= _NOTICE_DOT_SECONDS,
+        "targetAll": bool(notice.target_all),
+        "targetClasses": targets,
+        "targetLabel": target_labels,
+    }
+
+
+def _load_targeted_notices(grade: int, section: int, *, limit: int = 100) -> list[TeacherNotice]:
+    key = _to_notice_target_key(grade, section)
+    candidates = (
+        TeacherNotice.query
+        .filter(
+            or_(
+                TeacherNotice.target_all.is_(True),
+                TeacherNotice.target_classes.like(f'%"{key}"%'),
+            )
+        )
+        .order_by(TeacherNotice.created_at.desc(), TeacherNotice.id.desc())
+        .limit(max(1, limit))
+        .all()
+    )
+    return [notice for notice in candidates if _notice_matches_class(notice, grade, section)]
+
+
+def _select_board_notices(notices: list[TeacherNotice]) -> list[TeacherNotice]:
+    if not notices:
+        return []
+    now = datetime.now(timezone.utc)
+    recent = [notice for notice in notices if now - _notice_created_at_utc(notice) <= _NOTICE_BURST_WINDOW]
+    if len(recent) >= 2:
+        return recent
+    return [notices[0]]
+
+
+@blueprint.post("/notices")
+def create_teacher_notice():
+    if not _teacher_only():
+        return jsonify({"error": "forbidden"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    teacher_name = str(payload.get("teacherName") or "").strip()
+    text = str(payload.get("text") or "").strip()
+
+    if not teacher_name:
+        return jsonify({"error": "teacher name is required"}), 400
+    if not text:
+        return jsonify({"error": "notice text is required"}), 400
+    if len(teacher_name) > 80:
+        teacher_name = teacher_name[:80]
+    if len(text) > 500:
+        text = text[:500]
+
+    target_all, target_classes = _normalize_notice_targets(payload)
+
+    notice = TeacherNotice(
+        teacher_name=teacher_name,
+        text=text,
+        target_all=target_all,
+        target_classes=json.dumps(target_classes, ensure_ascii=False),
+    )
+    db.session.add(notice)
+    db.session.commit()
+
+    return jsonify({"ok": True, "notice": _serialize_notice(notice)}), 201
+
+
+@blueprint.get("/notices")
+def get_teacher_notices():
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+    mode = (request.args.get("mode") or "latest").strip().lower()
+
+    if grade is None or section is None:
+        return jsonify({"error": "missing grade/section"}), 400
+    if not _is_authorized(grade, section):
+        return jsonify({"error": "forbidden"}), 403
+
+    fetch_limit = 500 if mode == "all" else 120
+    notices = _load_targeted_notices(grade, section, limit=fetch_limit)
+    if mode == "board":
+        selected = _select_board_notices(notices)
+    elif mode == "all":
+        selected = notices
+    else:
+        selected = notices[:1]
+
+    now = datetime.now(timezone.utc)
+    serialized = [_serialize_notice(notice, now_utc=now) for notice in selected]
+
+    session_grade, session_section, session_number = _get_student_session_info()
+    unread_count = 0
+    latest_unread = None
+    if (
+        session_number is not None
+        and session_grade == grade
+        and session_section == section
+    ):
+        notice_ids = [notice.id for notice in notices]
+        if notice_ids:
+            read_ids = {
+                row.notice_id
+                for row in TeacherNoticeRead.query.filter(
+                    TeacherNoticeRead.notice_id.in_(notice_ids),
+                    TeacherNoticeRead.grade == grade,
+                    TeacherNoticeRead.section == section,
+                    TeacherNoticeRead.student_number == session_number,
+                ).all()
+            }
+            unread_ids = [notice_id for notice_id in notice_ids if notice_id not in read_ids]
+            unread_count = len(unread_ids)
+            if unread_ids:
+                latest_unread = next((n for n in notices if n.id == unread_ids[0]), None)
+
+    return jsonify(
+        {
+            "grade": grade,
+            "section": section,
+            "mode": mode,
+            "notices": serialized,
+            "hasUnread": unread_count > 0,
+            "unreadCount": unread_count,
+            "latestUnread": _serialize_notice(latest_unread, now_utc=now) if latest_unread else None,
+        }
+    )
+
+
+@blueprint.post("/notices/read")
+def mark_teacher_notices_read():
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+    if grade is None or section is None:
+        return jsonify({"error": "missing grade/section"}), 400
+
+    session_grade, session_section, session_number = _get_student_session_info()
+    if (
+        session_number is None
+        or session_grade != grade
+        or session_section != section
+    ):
+        return jsonify({"error": "forbidden"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    mark_all = bool(payload.get("all"))
+    requested_ids = payload.get("noticeIds")
+    targeted_notices = _load_targeted_notices(grade, section, limit=500)
+    targeted_ids = [notice.id for notice in targeted_notices]
+
+    if mark_all:
+        notice_ids = targeted_ids
+    elif isinstance(requested_ids, list):
+        wanted = {int(nid) for nid in requested_ids if _normalize_class_value(nid) is not None}
+        notice_ids = [nid for nid in targeted_ids if nid in wanted]
+    else:
+        notice_ids = []
+
+    if not notice_ids:
+        return jsonify({"ok": True, "marked": 0})
+
+    existing = {
+        row.notice_id
+        for row in TeacherNoticeRead.query.filter(
+            TeacherNoticeRead.notice_id.in_(notice_ids),
+            TeacherNoticeRead.grade == grade,
+            TeacherNoticeRead.section == section,
+            TeacherNoticeRead.student_number == session_number,
+        ).all()
+    }
+
+    created = 0
+    for notice_id in notice_ids:
+        if notice_id in existing:
+            continue
+        db.session.add(
+            TeacherNoticeRead(
+                notice_id=notice_id,
+                grade=grade,
+                section=section,
+                student_number=session_number,
+            )
+        )
+        created += 1
+
+    if created:
+        db.session.commit()
+
+    return jsonify({"ok": True, "marked": created})
+
 
 @blueprint.post("/state/save")
 def save_state():

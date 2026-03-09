@@ -82,6 +82,63 @@
 
     .main-title{text-align:center;font-size:30px;font-weight:700;letter-spacing:4px;margin-bottom:28px;}
 
+    .notice-panel{
+      background:rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:16px;
+      padding:16px;
+      margin-bottom:10px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .notice-panel h3{font-size:18px;font-weight:700;margin:0;}
+    .notice-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+    .notice-input,.notice-textarea{
+      width:100%;
+      background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:10px;
+      color:#fff;
+      padding:10px 12px;
+      font-size:14px;
+    }
+    .notice-textarea{min-height:86px;resize:vertical;}
+    .notice-toggle{
+      display:flex;align-items:center;gap:8px;font-size:14px;color:#d8deeb;
+    }
+    .notice-targets{
+      display:none;
+      grid-template-columns:repeat(6,minmax(0,1fr));
+      gap:8px;
+    }
+    .notice-targets.visible{display:grid;}
+    .target-chip{
+      border:1px solid rgba(255,255,255,.16);
+      border-radius:10px;
+      padding:8px 6px;
+      text-align:center;
+      font-size:13px;
+      cursor:pointer;
+      user-select:none;
+    }
+    .target-chip input{display:none;}
+    .target-chip.active{
+      border-color:#ff6a93;
+      background:rgba(255,106,147,.2);
+      color:#ffe2eb;
+    }
+    .notice-send{
+      border:none;
+      border-radius:10px;
+      padding:10px 14px;
+      font-weight:700;
+      background:linear-gradient(135deg,#ff5f78,#ff7a7a);
+      color:#fff;
+      cursor:pointer;
+    }
+    .notice-feedback{font-size:13px;color:#a7b0c0;min-height:18px;}
+
     /* Cards */
     .class-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;}
     .class-card{
@@ -228,6 +285,21 @@
       </div>
     </div>
 
+    <div class="notice-panel">
+      <h3>교사 공지 등록</h3>
+      <input id="noticeTeacherName" class="notice-input" type="text" placeholder="선생님 이름" maxlength="80" />
+      <textarea id="noticeText" class="notice-textarea" placeholder="공지 내용을 입력하세요 (최대 500자)" maxlength="500"></textarea>
+      <label class="notice-toggle">
+        <input id="noticeAllTargets" type="checkbox" checked />
+        전체(모든 반)에 공지하기
+      </label>
+      <div id="noticeTargets" class="notice-targets"></div>
+      <div class="notice-row">
+        <button id="noticeSendBtn" class="notice-send" type="button">공지 보내기</button>
+        <span id="noticeFeedback" class="notice-feedback"></span>
+      </div>
+    </div>
+
     <div class="update-time" id="updateTime">마지막 업데이트: --:--</div>
     <h2 class="main-title"><span id="gradeLabel">1</span>학년 반 현황</h2>
 
@@ -311,6 +383,99 @@
   <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
   <script>
   let currentGrade = 1;
+  const noticeTargetContainer = document.getElementById('noticeTargets');
+  const noticeAllTargets = document.getElementById('noticeAllTargets');
+  const noticeSendBtn = document.getElementById('noticeSendBtn');
+  const noticeFeedback = document.getElementById('noticeFeedback');
+
+  function initNoticeTargetSelector() {
+    const targets = [];
+    for (let g = 1; g <= 3; g++) {
+      for (let s = 1; s <= 6; s++) {
+        targets.push({ grade: g, section: s });
+      }
+    }
+    noticeTargetContainer.innerHTML = targets.map(({ grade, section }) => (
+      `<label class="target-chip active" data-grade="${grade}" data-section="${section}">
+        <input type="checkbox" checked />
+        ${grade}-${section}
+      </label>`
+    )).join("");
+    noticeTargetContainer.querySelectorAll('.target-chip').forEach(chip => {
+      chip.addEventListener('click', (event) => {
+        event.preventDefault();
+        const checkbox = chip.querySelector('input');
+        checkbox.checked = !checkbox.checked;
+        chip.classList.toggle('active', checkbox.checked);
+      });
+    });
+  }
+
+  noticeAllTargets.addEventListener('change', () => {
+    const enabled = !noticeAllTargets.checked;
+    noticeTargetContainer.classList.toggle('visible', enabled);
+    if (!enabled) {
+      noticeTargetContainer.querySelectorAll('input').forEach(input => { input.checked = true; });
+      noticeTargetContainer.querySelectorAll('.target-chip').forEach(chip => chip.classList.add('active'));
+    }
+  });
+
+  async function sendTeacherNotice() {
+    const teacherName = (document.getElementById('noticeTeacherName').value || '').trim();
+    const text = (document.getElementById('noticeText').value || '').trim();
+    if (!teacherName) {
+      noticeFeedback.textContent = '선생님 이름을 입력해주세요.';
+      return;
+    }
+    if (!text) {
+      noticeFeedback.textContent = '공지 내용을 입력해주세요.';
+      return;
+    }
+
+    const targets = [];
+    if (!noticeAllTargets.checked) {
+      noticeTargetContainer.querySelectorAll('.target-chip').forEach(chip => {
+        const checked = chip.querySelector('input')?.checked;
+        if (checked) {
+          targets.push({
+            grade: Number(chip.dataset.grade),
+            section: Number(chip.dataset.section),
+          });
+        }
+      });
+      if (!targets.length) {
+        noticeFeedback.textContent = '대상 반을 하나 이상 선택해주세요.';
+        return;
+      }
+    }
+
+    noticeSendBtn.disabled = true;
+    noticeFeedback.textContent = '공지 전송 중...';
+    try {
+      const res = await fetch('/api/classes/notices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          teacherName,
+          text,
+          targetClasses: targets,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || '공지 전송에 실패했습니다.');
+      }
+      document.getElementById('noticeText').value = '';
+      noticeFeedback.textContent = '공지 등록 완료!';
+    } catch (error) {
+      noticeFeedback.textContent = error?.message || '공지 전송에 실패했습니다.';
+    } finally {
+      noticeSendBtn.disabled = false;
+    }
+  }
+
+  noticeSendBtn.addEventListener('click', sendTeacherNotice);
+  initNoticeTargetSelector();
   const gradeButtons=document.querySelectorAll('.grade-btn');
   gradeButtons.forEach(btn=>{
     btn.addEventListener('click',()=>{

@@ -194,6 +194,23 @@
     }
     .now h3{margin:0 0 6px; font-size:16px; letter-spacing:.2px}
     .now .val{font-size:28px; font-weight:700; line-height:1.2}
+    .notice-alert{
+      margin-top:10px;
+      width:100%;
+      text-align:left;
+      border:1px solid rgba(255, 92, 92, 0.35);
+      background:rgba(255, 92, 92, 0.14);
+      color:#ffdfe4;
+      border-radius:12px;
+      padding:10px 12px;
+      font-weight:600;
+      font-size:13px;
+      cursor:pointer;
+      display:none;
+    }
+    .notice-alert:hover{
+      background:rgba(255, 92, 92, 0.2);
+    }
     .saved-badge{
       margin-left:10px;
       font-size:14px;
@@ -862,6 +879,7 @@
           <span class="saved-badge" id="savedBadge">(저장됨)</span>
         </h3>
         <div class="val" id="currentStatus">교실</div>
+        <button id="noticeAlertBox" class="notice-alert" type="button"></button>
       </div>
 
       <!-- 상태 선택 -->
@@ -1038,6 +1056,8 @@
     let loginReady = false;
     let pendingSelection = null;
     const currentStatusDisplay = document.getElementById('currentStatus');
+    const noticeAlertBox = document.getElementById('noticeAlertBox');
+    let noticeInitialized = false;
 
     // Get the unsaved indicator element
     const unsavedIndicator = document.getElementById('unsavedIndicator');
@@ -1063,6 +1083,77 @@
     const thoughtOverlay = document.getElementById('thoughtOverlay');
     const thoughtOpenBtn = document.getElementById('thoughtOpenBtn');
     const thoughtCloseBtn = document.getElementById('thoughtCloseBtn');
+
+    function buildSchoollifeNoticeLink() {
+      return `/schoollife.html?grade=${myGrade}&section=${mySection}&view=notices`;
+    }
+
+    function trimNoticeText(text, max = 30) {
+      const value = String(text || '').trim();
+      if (value.length <= max) return value;
+      return `${value.slice(0, max)}...`;
+    }
+
+    function noticeStorageKey() {
+      return `dimicheck:lastNoticeNotification:${myGrade}-${mySection}`;
+    }
+
+    async function maybeNotifyUserNotice(notice) {
+      if (!notice?.id) return;
+      const key = noticeStorageKey();
+      let saved = 0;
+      try {
+        saved = Number(localStorage.getItem(key) || 0);
+      } catch (_) {
+        saved = 0;
+      }
+      if (!noticeInitialized) {
+        try {
+          localStorage.setItem(key, String(notice.id));
+        } catch (_) {}
+        return;
+      }
+      if (saved >= notice.id) return;
+      try {
+        localStorage.setItem(key, String(notice.id));
+      } catch (_) {}
+      window.notificationManager?.notifyTeacherNotice?.(notice, {
+        grade: myGrade,
+        section: mySection,
+      });
+    }
+
+    function renderNoticeAlert(payload) {
+      if (!noticeAlertBox) return;
+      const hasUnread = Boolean(payload?.hasUnread);
+      const notice = payload?.latestUnread || payload?.notices?.[0] || null;
+      if (!hasUnread || !notice) {
+        noticeAlertBox.style.display = 'none';
+        noticeAlertBox.textContent = '';
+        return;
+      }
+      noticeAlertBox.style.display = 'block';
+      noticeAlertBox.textContent = `새 공지 ${trimNoticeText(notice.text)} 가 등록되었습니다 ->`;
+    }
+
+    async function loadUserNotices() {
+      if (!myGrade || !mySection) return;
+      try {
+        const res = await fetch(`/api/classes/notices?grade=${myGrade}&section=${mySection}&mode=latest`, {
+          credentials: 'include',
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+        const payload = await res.json();
+        renderNoticeAlert(payload);
+        const notice = payload?.notices?.[0] || null;
+        await maybeNotifyUserNotice(notice);
+      } catch (error) {
+        console.warn('[User] notice load failed', error);
+      } finally {
+        noticeInitialized = true;
+      }
+    }
 
     // 라벨 변환
     const categoryLabels = {
@@ -1154,6 +1245,7 @@
         }
 
         await loadMyState();
+        await loadUserNotices();
       } catch (e) {
         console.warn("checkLogin failed:", e);
         location.href = "/auth/login";
@@ -1605,6 +1697,11 @@
     }
 
     // ===== 로그아웃 (선택) =====
+    noticeAlertBox?.addEventListener('click', () => {
+      if (!myGrade || !mySection) return;
+      location.href = buildSchoollifeNoticeLink();
+    });
+
     document.getElementById('logoutBtn').addEventListener('click', () => {
       location.href = '/auth/logout';
     });
@@ -1621,6 +1718,7 @@
 
     // 진입 시 로그인 확인
     checkLogin();
+    setInterval(() => loadUserNotices(), 10000);
     startHeartbeat();
   </script>
   <nav class="bottom-nav" aria-label="하단 내비게이션">

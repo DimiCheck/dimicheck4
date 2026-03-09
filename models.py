@@ -408,6 +408,50 @@ class CalendarEvent(db.Model):
     )
 
 
+class TeacherSessionTicket(db.Model):
+    __tablename__ = "teacher_session_tickets"
+
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(96), unique=True, nullable=False)
+    user_agent_hash = db.Column(db.String(64), nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index("idx_teacher_session_expires_at", "expires_at"),
+    )
+
+
+class TeacherNotice(db.Model):
+    __tablename__ = "teacher_notices"
+
+    id = db.Column(db.Integer, primary_key=True)
+    teacher_name = db.Column(db.String(80), nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    target_all = db.Column(db.Boolean, default=True, nullable=False)
+    target_classes = db.Column(db.Text, nullable=False, default="[]")  # JSON array: ["1-1","2-3"]
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index("idx_teacher_notice_created_at", "created_at"),
+    )
+
+
+class TeacherNoticeRead(db.Model):
+    __tablename__ = "teacher_notice_reads"
+
+    id = db.Column(db.Integer, primary_key=True)
+    notice_id = db.Column(db.Integer, db.ForeignKey("teacher_notices.id"), nullable=False, index=True)
+    grade = db.Column(db.Integer, nullable=False)
+    section = db.Column(db.Integer, nullable=False)
+    student_number = db.Column(db.Integer, nullable=False)
+    read_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("notice_id", "grade", "section", "student_number", name="uq_teacher_notice_read"),
+    )
+
+
 class OAuthClient(db.Model):
     __tablename__ = "oauth_clients"
 

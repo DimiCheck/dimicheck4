@@ -97,7 +97,8 @@
 
       const latest = messages[messages.length - 1];
 
-      if (this.settings.chatNotifications && this.registration) {
+      const appNoticeEnabled = Boolean(this.settings.chatNotifications || this.settings.timetableNotifications);
+      if (appNoticeEnabled && this.registration) {
         const granted = await this.ensurePermission();
         if (granted) {
           const options = this.buildNotificationOptions(latest);
@@ -118,6 +119,49 @@
           new Notification('새 채팅 메시지', options);
         } catch (error) {
           console.warn('[Notifications] Browser notification failed.', error);
+        }
+      }
+    }
+
+    async notifyTeacherNotice(notice, context = {}) {
+      if (!notice?.id) return;
+      if (document.visibilityState === 'visible' && document.hasFocus()) return;
+
+      const grade = Number(context.grade) || this.classContext?.grade;
+      const section = Number(context.section) || this.classContext?.section;
+      const targetUrl = grade && section
+        ? `/schoollife.html?grade=${grade}&section=${section}&view=notices`
+        : '/schoollife.html?view=notices';
+
+      const options = {
+        body: String(notice.text || '').slice(0, 120),
+        tag: `teacher-notice-${notice.id}`,
+        renotify: false,
+        data: { url: targetUrl },
+        icon: ICON,
+        badge: BADGE,
+        timestamp: Date.now()
+      };
+
+      if (this.settings.chatNotifications && this.registration) {
+        const granted = await this.ensurePermission();
+        if (granted) {
+          try {
+            await this.registration.showNotification('새 공지 알림', options);
+          } catch (error) {
+            console.warn('[Notifications] Failed to show notice notification.', error);
+          }
+        }
+        return;
+      }
+
+      if (this.shouldUseBrowserNotifications()) {
+        const granted = await this.ensurePermission();
+        if (!granted) return;
+        try {
+          new Notification('새 공지 알림', options);
+        } catch (error) {
+          console.warn('[Notifications] Browser notice notification failed.', error);
         }
       }
     }

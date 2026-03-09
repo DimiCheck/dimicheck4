@@ -48,6 +48,7 @@ instance/*
 !instance/.keep
 
 # 로컬 DB (필요 시 범위 조정)
+*.db
 *.sqlite
 *.sqlite3
 instance/*.db
@@ -56,6 +57,9 @@ instance/*.db
 .env
 .env.*
 *.env
+
+# oh-my-codex runtime state
+.omx/
 
 # ======================
 # OS / IDE

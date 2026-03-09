@@ -176,6 +176,56 @@
     .head{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px}
     .head h2{margin:0; font-size:18px}
     .sub{color:var(--muted); font-size:13px}
+    .notice-mini{
+      border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      border-radius:14px;
+      background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+      padding:12px;
+      margin-bottom:12px;
+    }
+    .notice-mini-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;}
+    .notice-mini-title{font-size:15px;font-weight:700;}
+    .notice-view-all{
+      border:none;
+      background:transparent;
+      color:var(--primary);
+      font-size:13px;
+      font-weight:700;
+      cursor:pointer;
+      padding:0;
+      height:auto;
+    }
+    .notice-mini-item{
+      font-size:14px;
+      line-height:1.45;
+      color:var(--text);
+      border-radius:10px;
+      padding:8px 10px;
+      background:rgba(255,255,255,.05);
+    }
+    .notice-mini-meta{
+      margin-top:6px;
+      font-size:12px;
+      color:var(--muted);
+    }
+    .notice-empty{font-size:13px;color:var(--muted);}
+    .notice-modal-list{
+      display:grid;
+      gap:10px;
+      max-height:58vh;
+      overflow:auto;
+    }
+    .notice-modal-item{
+      border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      border-radius:12px;
+      padding:10px 12px;
+      background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+    }
+    .notice-modal-item .meta{
+      margin-top:6px;
+      font-size:12px;
+      color:var(--muted);
+    }
 
     .list{display:grid; gap:8px}
     .row{
@@ -506,6 +556,13 @@
 <main>
   <!-- 왼쪽: 오늘 시간표 -->
   <section class="panel fade-up" style="--area:left" aria-labelledby="tt-h">
+    <div id="schoollifeNoticeSection" class="notice-mini">
+      <div class="notice-mini-head">
+        <div class="notice-mini-title">공지</div>
+        <button id="noticeViewAllBtn" class="notice-view-all" type="button">전체 보기 -&gt;</button>
+      </div>
+      <div id="schoollifeNoticeLatest" class="notice-empty">공지 불러오는 중…</div>
+    </div>
     <!-- <div class="time" id="nowClock">&#45;&#45;:&#45;&#45;:&#45;&#45;</div> -->
     <div class="head">
       <h2 id="tt-h">오늘 시간표</h2>
@@ -579,6 +636,18 @@
     </div>
     <div id="weeklyContainer">
       <div class="sub" style="margin-bottom:8px">로딩 중…</div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="noticeOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="noticeModalTitle">
+    <div class="modal-head">
+      <h3 class="modal-title" id="noticeModalTitle">공지 전체 보기</h3>
+      <button class="modal-close" id="noticeCloseBtn" aria-label="닫기">×</button>
+    </div>
+    <div id="noticeModalList" class="notice-modal-list">
+      <div class="notice-empty">공지 불러오는 중…</div>
     </div>
   </div>
 </div>
@@ -993,6 +1062,173 @@
     ov.classList.remove('visible');
     ov.addEventListener('transitionend', ()=>{ ov.hidden=true; }, { once:true });
   }
+
+  // -------- notices --------
+  let noticeFirstLoaded = false;
+
+  function getNoticeQueryView() {
+    const params = new URLSearchParams(window.location.search);
+    return (params.get('view') || '').toLowerCase();
+  }
+
+  function buildNoticeLink(grade, section){
+    return `/schoollife.html?grade=${grade}&section=${section}&view=notices`;
+  }
+
+  function formatNoticeDatetime(createdAt){
+    if (!createdAt) return '';
+    const date = new Date(createdAt);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString('ko-KR', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  function trimNoticeText(text, max = 90){
+    const value = String(text || '').trim();
+    if (value.length <= max) return value;
+    return `${value.slice(0, max)}...`;
+  }
+
+  function getNoticeNotifyStorageKey(grade, section) {
+    return `dimicheck:lastNoticeNotification:${grade}-${section}`;
+  }
+
+  async function maybeNotifyNewNotice(notice, grade, section) {
+    if (!notice?.id) return;
+    const key = getNoticeNotifyStorageKey(grade, section);
+    let saved = 0;
+    try {
+      saved = Number(localStorage.getItem(key) || 0);
+    } catch (_) {
+      saved = 0;
+    }
+    if (!noticeFirstLoaded) {
+      try {
+        localStorage.setItem(key, String(notice.id));
+      } catch (_) {}
+      return;
+    }
+    if (saved >= notice.id) return;
+    try {
+      localStorage.setItem(key, String(notice.id));
+    } catch (_) {}
+    window.notificationManager?.notifyTeacherNotice?.(notice, { grade, section });
+  }
+
+  function renderSchoollifeLatestNotice(notice, hasUnread) {
+    const container = document.getElementById('schoollifeNoticeLatest');
+    if (!container) return;
+    if (!notice) {
+      container.className = 'notice-empty';
+      container.textContent = '등록된 공지가 없습니다.';
+      return;
+    }
+    const meta = `${notice.teacherName || '선생님'} · ${formatNoticeDatetime(notice.createdAt)}`;
+    const unreadLabel = hasUnread ? '새 공지' : '최근 공지';
+    container.className = 'notice-mini-item';
+    container.innerHTML = `
+      <div>[${unreadLabel}] ${escapeHtml(trimNoticeText(notice.text, 120))}</div>
+      <div class="notice-mini-meta">${escapeHtml(meta)}</div>
+    `;
+  }
+
+  async function loadLatestNotice() {
+    const { grade, section } = getSelectedGradeSection();
+    if (!grade || !section) return;
+    try {
+      const payload = await fetchJson(`/api/classes/notices?grade=${grade}&section=${section}&mode=latest`);
+      const notice = payload?.notices?.[0] || null;
+      renderSchoollifeLatestNotice(notice, payload?.hasUnread);
+      await maybeNotifyNewNotice(notice, grade, section);
+    } catch (error) {
+      console.error('[Schoollife] failed to load notice', error);
+      const container = document.getElementById('schoollifeNoticeLatest');
+      if (container) {
+        container.className = 'notice-empty';
+        container.textContent = '공지를 불러오지 못했습니다.';
+      }
+    } finally {
+      noticeFirstLoaded = true;
+    }
+  }
+
+  function openNoticeOverlay() {
+    const overlay = document.getElementById('noticeOverlay');
+    if (!overlay) return;
+    overlay.hidden = false;
+    requestAnimationFrame(() => overlay.classList.add('visible'));
+  }
+
+  function closeNoticeOverlay() {
+    const overlay = document.getElementById('noticeOverlay');
+    if (!overlay) return;
+    overlay.classList.remove('visible');
+    overlay.addEventListener('transitionend', () => {
+      overlay.hidden = true;
+    }, { once: true });
+  }
+
+  async function markNoticesReadAll() {
+    const { grade, section } = getSelectedGradeSection();
+    if (!grade || !section) return;
+    try {
+      await fetchJson(`/api/classes/notices/read?grade=${grade}&section=${section}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true }),
+      });
+    } catch (error) {
+      console.warn('[Schoollife] failed to mark notices read', error);
+    }
+  }
+
+  async function openNoticeModal() {
+    openNoticeOverlay();
+    const list = document.getElementById('noticeModalList');
+    if (list) {
+      list.innerHTML = '<div class="notice-empty">공지 불러오는 중…</div>';
+    }
+
+    const { grade, section } = getSelectedGradeSection();
+    if (!grade || !section) return;
+    try {
+      const payload = await fetchJson(`/api/classes/notices?grade=${grade}&section=${section}&mode=all`);
+      const notices = Array.isArray(payload?.notices) ? payload.notices : [];
+      if (!list) return;
+      if (!notices.length) {
+        list.innerHTML = '<div class="notice-empty">등록된 공지가 없습니다.</div>';
+      } else {
+        list.innerHTML = notices.map((notice) => {
+          const meta = `${notice.teacherName || '선생님'} · ${formatNoticeDatetime(notice.createdAt)}`;
+          return `
+            <div class="notice-modal-item">
+              <div>${escapeHtml(notice.text || '')}</div>
+              <div class="meta">${escapeHtml(meta)}</div>
+            </div>
+          `;
+        }).join('');
+      }
+      await markNoticesReadAll();
+      await loadLatestNotice();
+    } catch (error) {
+      console.error('[Schoollife] failed to load full notices', error);
+      if (list) list.innerHTML = '<div class="notice-empty">공지를 불러오지 못했습니다.</div>';
+    }
+  }
+
+  document.getElementById('noticeViewAllBtn').addEventListener('click', () => {
+    openNoticeModal();
+  });
+  document.getElementById('noticeCloseBtn').addEventListener('click', closeNoticeOverlay);
+  document.getElementById('noticeOverlay').addEventListener('click', (event) => {
+    if (event.target?.id === 'noticeOverlay') {
+      closeNoticeOverlay();
+    }
+  });
 
   // -------- meal (based on etc.js example) --------
   function getTodayDateStringDash(){ return fmtYYYY_MM_DD(new Date()); }
@@ -1427,7 +1663,8 @@
     await Promise.all([
       loadTodayAll(),
       loadMealVoteStats(),
-      loadCalendarEvents()
+      loadCalendarEvents(),
+      loadLatestNotice()
     ]);
   }
 
@@ -1435,6 +1672,10 @@
     await hydrateClassSelection();
     await loadAllSchoollifeData();
     initCountdown();
+    if (getNoticeQueryView() === 'notices') {
+      openNoticeModal();
+    }
+    setInterval(() => loadLatestNotice(), 10000);
   }
 
   bootstrapSchoollifePage();

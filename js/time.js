@@ -894,14 +894,76 @@ async function createMagnetsFromServer(grade, section) {
   createMagnets(end, skipNumbers);
 }
 
+let boardNoticesCache = [];
+
+function formatBoardNoticeTime(createdAtMs) {
+  if (!createdAtMs) return '';
+  const date = new Date(createdAtMs);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderBoardNotices(notices = boardNoticesCache) {
+  const container = document.getElementById('boardNoticeList');
+  if (!container) return;
+  if (!Array.isArray(notices) || !notices.length) {
+    container.innerHTML = '<div class="empty">등록된 공지가 없습니다.</div>';
+    return;
+  }
+
+  const now = Date.now();
+  container.innerHTML = notices.map((notice) => {
+    const createdAtMs = Number(notice?.createdAtMs || 0);
+    const ageMs = createdAtMs > 0 ? Math.max(0, now - createdAtMs) : Number.MAX_SAFE_INTEGER;
+    const showGlow = ageMs <= 10_000;
+    const showDot = ageMs > 10_000 && ageMs <= 10 * 60 * 1000;
+    const safeTeacher = String(notice?.teacherName || '선생님')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+    const safeText = String(notice?.text || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+    return `
+      <div class="board-notice-item${showGlow ? ' notice-glow' : ''}">
+        <div>${showDot ? '<span class="board-notice-dot" aria-hidden="true"></span>' : ''}${safeText}</div>
+        <div class="board-notice-meta">${safeTeacher} · ${formatBoardNoticeTime(createdAtMs)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function loadBoardNotices() {
+  if (!grade || !section) return;
+  try {
+    const response = await fetch(`/api/classes/notices?grade=${grade}&section=${section}&mode=board`, {
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    if (!response.ok) return;
+    const payload = await response.json();
+    boardNoticesCache = Array.isArray(payload?.notices) ? payload.notices : [];
+    renderBoardNotices(boardNoticesCache);
+  } catch (error) {
+    console.warn('[board notice] load failed', error);
+  }
+}
+
 async function initBoard() {
   await createMagnetsFromServer(grade, section);
   await loadState(grade, section);
+  await loadBoardNotices();
   await loadRoutineData(true);
   updateAttendance();
   updateEtcReasonPanel();
   updateClock();
   setInterval(updateClock, 1000);
+  setInterval(() => renderBoardNotices(boardNoticesCache), 1000);
 }
 
 window.forceResyncState = async function forceResyncState() {
@@ -940,3 +1002,10 @@ setInterval(() => {
     loadRoutineData(true);
   }
 }, 5 * 60 * 1000);
+
+setInterval(() => {
+  if (!canSyncWithBackend()) {
+    return;
+  }
+  loadBoardNotices();
+}, 5000);
