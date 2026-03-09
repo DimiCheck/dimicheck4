@@ -895,6 +895,7 @@ async function createMagnetsFromServer(grade, section) {
 }
 
 let boardNoticesCache = [];
+let boardNoticeRenderKey = '';
 
 function formatBoardNoticeTime(createdAtMs) {
   if (!createdAtMs) return '';
@@ -906,12 +907,37 @@ function formatBoardNoticeTime(createdAtMs) {
 function renderBoardNotices(notices = boardNoticesCache) {
   const container = document.getElementById('boardNoticeList');
   if (!container) return;
+
+  const now = Date.now();
   if (!Array.isArray(notices) || !notices.length) {
+    if (boardNoticeRenderKey === 'empty') {
+      return;
+    }
+    boardNoticeRenderKey = 'empty';
     container.innerHTML = '<div class="empty">등록된 공지가 없습니다.</div>';
     return;
   }
 
-  const now = Date.now();
+  const renderKey = notices.map((notice) => {
+    const createdAtMs = Number(notice?.createdAtMs || 0);
+    const ageMs = createdAtMs > 0 ? Math.max(0, now - createdAtMs) : Number.MAX_SAFE_INTEGER;
+    const showGlow = ageMs <= 10_000;
+    const showDot = ageMs > 10_000 && ageMs <= 10 * 60 * 1000;
+    return [
+      String(notice?.id || ''),
+      String(createdAtMs || ''),
+      showGlow ? '1' : '0',
+      showDot ? '1' : '0',
+      String(notice?.teacherName || ''),
+      String(notice?.text || ''),
+    ].join(':');
+  }).join('|');
+
+  if (boardNoticeRenderKey === renderKey) {
+    return;
+  }
+  boardNoticeRenderKey = renderKey;
+
   container.innerHTML = notices.map((notice) => {
     const createdAtMs = Number(notice?.createdAtMs || 0);
     const ageMs = createdAtMs > 0 ? Math.max(0, now - createdAtMs) : Number.MAX_SAFE_INTEGER;

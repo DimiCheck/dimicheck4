@@ -1065,6 +1065,7 @@
 
   // -------- notices --------
   let noticeFirstLoaded = false;
+  let schoollifeNoticeRenderKey = '';
 
   function getNoticeQueryView() {
     const params = new URLSearchParams(window.location.search);
@@ -1123,10 +1124,26 @@
     const container = document.getElementById('schoollifeNoticeLatest');
     if (!container) return;
     if (!notice) {
+      if (schoollifeNoticeRenderKey === 'empty') {
+        return;
+      }
+      schoollifeNoticeRenderKey = 'empty';
       container.className = 'notice-empty';
       container.textContent = '등록된 공지가 없습니다.';
       return;
     }
+    const renderKey = [
+      String(notice.id || ''),
+      hasUnread ? '1' : '0',
+      String(notice.teacherName || ''),
+      String(notice.text || ''),
+      String(notice.createdAt || ''),
+    ].join('|');
+    if (schoollifeNoticeRenderKey === renderKey) {
+      return;
+    }
+    schoollifeNoticeRenderKey = renderKey;
+
     const meta = `${notice.teacherName || '선생님'} · ${formatNoticeDatetime(notice.createdAt)}`;
     const unreadLabel = hasUnread ? '새 공지' : '최근 공지';
     container.className = 'notice-mini-item';
@@ -1148,6 +1165,10 @@
       console.error('[Schoollife] failed to load notice', error);
       const container = document.getElementById('schoollifeNoticeLatest');
       if (container) {
+        if (schoollifeNoticeRenderKey === 'error') {
+          return;
+        }
+        schoollifeNoticeRenderKey = 'error';
         container.className = 'notice-empty';
         container.textContent = '공지를 불러오지 못했습니다.';
       }

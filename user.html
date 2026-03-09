@@ -1058,6 +1058,7 @@
     const currentStatusDisplay = document.getElementById('currentStatus');
     const noticeAlertBox = document.getElementById('noticeAlertBox');
     let noticeInitialized = false;
+    let noticeAlertRenderKey = '';
 
     // Get the unsaved indicator element
     const unsavedIndicator = document.getElementById('unsavedIndicator');
@@ -1128,12 +1129,22 @@
       const hasUnread = Boolean(payload?.hasUnread);
       const notice = payload?.latestUnread || payload?.notices?.[0] || null;
       if (!hasUnread || !notice) {
+        if (noticeAlertRenderKey === 'hidden') {
+          return;
+        }
+        noticeAlertRenderKey = 'hidden';
         noticeAlertBox.style.display = 'none';
         noticeAlertBox.textContent = '';
         return;
       }
+      const text = `새 공지 ${trimNoticeText(notice.text)} 가 등록되었습니다 →`;
+      const renderKey = `${notice.id || ''}|${text}`;
+      if (noticeAlertRenderKey === renderKey) {
+        return;
+      }
+      noticeAlertRenderKey = renderKey;
       noticeAlertBox.style.display = 'block';
-      noticeAlertBox.textContent = `새 공지 ${trimNoticeText(notice.text)} 가 등록되었습니다 →`;
+      noticeAlertBox.textContent = text;
     }
 
     async function loadUserNotices() {
