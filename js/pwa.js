@@ -89,6 +89,52 @@
   });
 })();
 
+(function chatNavGate() {
+  const CHAT_NAV_SELECTOR = 'a.nav-item[href="/chat.html"]';
+
+  async function loadChatGateState() {
+    try {
+      const authRes = await fetch('/auth/status', { credentials: 'include', cache: 'no-store' });
+      if (!authRes.ok) return null;
+      const auth = await authRes.json().catch(() => null);
+      if (!auth?.logged_in || String(auth.role || auth.type || '').toLowerCase() !== 'student') {
+        return null;
+      }
+      const grade = Number(auth.grade);
+      const section = Number(auth.section || auth.class);
+      if (!Number.isFinite(grade) || !Number.isFinite(section)) {
+        return null;
+      }
+      const configRes = await fetch(`/api/classes/config?grade=${grade}&section=${section}`, {
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      if (!configRes.ok) return null;
+      const config = await configRes.json().catch(() => null);
+      return { chatEnabled: Boolean(config?.chatEnabled) };
+    } catch (error) {
+      console.warn('[ChatNav] failed to resolve chat gate state', error);
+      return null;
+    }
+  }
+
+  function applyChatNavLabel(state) {
+    if (!state || state.chatEnabled) return;
+    document.querySelectorAll(CHAT_NAV_SELECTOR).forEach((link) => {
+      const label = link.querySelector('span');
+      if (label) {
+        label.textContent = '공지';
+      }
+    });
+  }
+
+  window.addEventListener('DOMContentLoaded', async () => {
+    if (!document.querySelector(CHAT_NAV_SELECTOR)) return;
+    const state = await loadChatGateState();
+    applyChatNavLabel(state);
+  });
+})();
+
 // ---------------------------------------------------------------------------
 // CSRF helper: automatically attach X-CSRF-Token for same-origin mutating requests
 // ---------------------------------------------------------------------------

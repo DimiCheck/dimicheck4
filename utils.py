@@ -250,6 +250,10 @@ def mark_teacher_session(duration_seconds: int, remember: bool) -> None:
 
 
 def is_teacher_session_active() -> bool:
+    user = session.get("user")
+    if isinstance(user, dict) and str(user.get("type", "")).lower() == "teacher":
+        return True
+
     data = _get_teacher_session()
     if not data:
         return False
