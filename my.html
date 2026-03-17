@@ -51,16 +51,19 @@
   <link rel="icon" type="image/png" sizes="16x16" href="src/favicon/favicon-16x16.png" />
   <style>
     :root {
-      --bg: #0b0f14;
-      --bg-2: #0e1218;
-      --card: rgba(255, 255, 255, 0.08);
-      --card-2: rgba(255, 255, 255, 0.06);
-      --text: #e9eef6;
-      --muted: #a7b0c0;
+      --bg: #0f1319;
+      --bg-2: #151a22;
+      --card: rgba(20, 25, 33, 0.94);
+      --card-2: rgba(25, 31, 41, 0.96);
+      --surface: rgba(29, 36, 47, 0.92);
+      --text: #f3f6fb;
+      --muted: #bcc7d6;
       --primary: #d04fff;
       --primary-2: #ff6ad0;
-      --ring: 0 0 0 8px color-mix(in oklab, var(--primary) 30%, transparent);
-      --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      --ring: 0 0 0 5px color-mix(in oklab, var(--primary) 22%, transparent);
+      --shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+      --border: rgba(255, 255, 255, 0.12);
+      --nav-bg: rgba(18, 23, 31, 0.94);
       --radius: 20px;
       --safe-bottom: 0px;
     }
@@ -68,36 +71,45 @@
     :root[data-theme='light'] {
       --bg: #f6f8fb;
       --bg-2: #eef2f8;
-      --card: rgba(255, 255, 255, 0.85);
-      --card-2: rgba(255, 255, 255, 0.7);
+      --card: rgba(255, 255, 255, 0.96);
+      --card-2: rgba(249, 251, 255, 0.98);
+      --surface: rgba(243, 247, 252, 0.96);
       --text: #0f172a;
       --muted: #5b6475;
       --primary: #d04fff;
       --primary-2: #ff6ad0;
-      --shadow: 0 10px 30px rgba(57, 72, 103, 0.15);
+      --shadow: 0 10px 24px rgba(57, 72, 103, 0.10);
+      --border: rgba(15, 23, 42, 0.10);
+      --nav-bg: rgba(255, 255, 255, 0.95);
     }
 
     :root[data-theme='dark'] {
-      --bg: #080b10;
-      --bg-2: #0e1218;
-      --card: rgba(255, 255, 255, 0.08);
-      --card-2: rgba(255, 255, 255, 0.06);
-      --text: #e9eef6;
-      --muted: #a7b0c0;
+      --bg: #0f1319;
+      --bg-2: #151a22;
+      --card: rgba(20, 25, 33, 0.94);
+      --card-2: rgba(25, 31, 41, 0.96);
+      --surface: rgba(29, 36, 47, 0.92);
+      --text: #f3f6fb;
+      --muted: #bcc7d6;
       --primary: #d04fff;
       --primary-2: #ff6ad0;
-      --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      --shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+      --border: rgba(255, 255, 255, 0.12);
+      --nav-bg: rgba(18, 23, 31, 0.94);
     }
 
     @media (prefers-color-scheme: light) {
       :root:not([data-theme='dark']) {
         --bg: #f6f8fb;
         --bg-2: #eef2f8;
-        --card: rgba(255, 255, 255, 0.85);
-        --card-2: rgba(255, 255, 255, 0.7);
+        --card: rgba(255, 255, 255, 0.96);
+        --card-2: rgba(249, 251, 255, 0.98);
+        --surface: rgba(243, 247, 252, 0.96);
         --text: #0f172a;
         --muted: #5b6475;
-        --shadow: 0 10px 30px rgba(57, 72, 103, 0.15);
+        --shadow: 0 10px 24px rgba(57, 72, 103, 0.10);
+        --border: rgba(15, 23, 42, 0.10);
+        --nav-bg: rgba(255, 255, 255, 0.95);
       }
     }
 
@@ -125,15 +137,15 @@
       inset: 0;
       overflow: hidden;
       z-index: -1;
-      background: radial-gradient(1200px 800px at 10% -10%, #5a6cff20, transparent 60%),
-        radial-gradient(1200px 800px at 110% 10%, #ff009025, transparent 60%),
-        radial-gradient(1000px 700px at 50% 120%, #ff00b325, transparent 60%);
+      background: radial-gradient(900px 620px at 10% -10%, #5a6cff18, transparent 60%),
+        radial-gradient(900px 620px at 110% 10%, #ff009018, transparent 62%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
     }
 
     .blob {
       position: absolute;
-      filter: blur(40px);
-      opacity: 0.6;
+      filter: blur(18px);
+      opacity: 0.32;
       pointer-events: none;
     }
 
@@ -207,8 +219,7 @@
       border-radius: var(--radius);
       padding: 24px;
       box-shadow: var(--shadow);
-      border: 1px solid color-mix(in oklab, var(--text) 10%, transparent);
-      backdrop-filter: saturate(140%) blur(14px);
+      border: 1px solid var(--border);
     }
 
     .developer-card {
@@ -601,11 +612,10 @@
       height: 68px;
       padding: 8px 12px calc(8px + var(--safe-bottom));
       display: flex;
-      background: linear-gradient(180deg, var(--card), var(--card-2));
-      backdrop-filter: saturate(180%) blur(20px);
+      background: var(--nav-bg);
       border-radius: 24px;
-      border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, .3), 0 0 0 1px rgba(255, 255, 255, .08) inset;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
       z-index: 1000;
     }
 

@@ -1175,11 +1175,12 @@ def class_config():
     config = load_class_config().get((grade, section))
 
     if not config:
-        config = {"end": 30, "skip_numbers": []}
+        config = {"end": 30, "skip_numbers": [], "chat_enabled": False}
 
     return jsonify({
         "end": config["end"],
-        "skipNumbers": config["skip_numbers"]
+        "skipNumbers": config["skip_numbers"],
+        "chatEnabled": bool(config.get("chat_enabled")),
     })
 # ----------------- Global caching for schoollife data -----------------
 _SCHOOLLIFE_CACHE = {

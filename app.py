@@ -222,6 +222,29 @@ def health() -> Any:
     return {"status": "ok"}
 
 
+def _resolve_student_chat_page() -> str:
+    user = session.get("user") or {}
+    if str(user.get("type", "")).lower() != "student":
+        return "chat.html"
+
+    grade, section, _ = _derive_student_session()
+    if grade is None or section is None:
+        return "chat.html"
+
+    try:
+        class_config = load_class_config().get((grade, section)) or {}
+    except Exception as exc:  # pylint: disable=broad-except
+        app.logger.warning("Failed to load class config for chat gate: %s", exc)
+        return "chat.html"
+
+    return "chat.html" if bool(class_config.get("chat_enabled")) else "notice.html"
+
+
+@app.get("/chat.html")
+def chat_page():
+    return send_from_directory(".", _resolve_student_chat_page())
+
+
 @app.get("/me")
 def me() -> Any:
     user = session.get("user")

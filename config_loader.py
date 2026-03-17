@@ -14,6 +14,21 @@ _cached_configs: dict[tuple[int, int], dict[str, object]] = {}
 _last_fetch_ts = 0.0
 
 
+def _sheet_bool(value: object, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = str(value).strip().lower()
+    if text in {"1", "true", "t", "yes", "y", "on"}:
+        return True
+    if text in {"0", "false", "f", "no", "n", "off", ""}:
+        return False
+    return default
+
+
 def _fetch_configs_from_sheet() -> dict[tuple[int, int], dict[str, object]]:
     gc = gspread.service_account(config.json_file_path)
     sh = gc.open_by_url(config.spreadsheet_url)
@@ -37,6 +52,7 @@ def _fetch_configs_from_sheet() -> dict[tuple[int, int], dict[str, object]]:
             "end": row["end"],
             "skip_numbers": skip_numbers,
             "pin": row["pin"],
+            "chat_enabled": _sheet_bool(row.get("chat_enabled"), False),
         }
     return configs
 
