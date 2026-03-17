@@ -135,6 +135,281 @@ const marqueeState = {
 // Prevent stale poll responses from snapping magnets back right after local save.
 let stateSyncPauseUntil = 0;
 let loadStateInFlight = false;
+const LOCAL_BOARD_STATE_VERSION = 1;
+const BOARD_STATE_SAVE_RETRY_MS = 5000;
+const BOARD_STATE_LOCAL_FIRST_PAUSE_MS = 4000;
+
+let lastAppliedStateSignature = '';
+let boardStateSaveInFlight = false;
+let boardStateSavePromise = null;
+let boardStateSaveRetryTimer = null;
+let pendingBoardStateSave = null;
+let hydratedLocalBoardStateKey = null;
+
+let localBoardState = {
+  key: null,
+  storageKey: null,
+  revision: 0,
+  dirty: false,
+  updatedAt: 0,
+  magnets: {},
+  marquee: null,
+};
+
+function deepCloneJson(value, fallback = null) {
+  try {
+    if (value == null) return fallback;
+    return JSON.parse(JSON.stringify(value));
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function stableStringify(value) {
+  if (value === undefined) {
+    return '"__undefined__"';
+  }
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(',')}]`;
+  }
+  const keys = Object.keys(value).sort();
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+}
+
+function buildBoardStateSignature(magnets, marquee) {
+  const safeMagnets = (magnets && typeof magnets === 'object') ? magnets : {};
+  const normalizedMarquee = normalizeMarqueePayload(marquee);
+  return stableStringify({ magnets: safeMagnets, marquee: normalizedMarquee });
+}
+
+function getBoardStateStorageKey(grade, section) {
+  return `dimicheck:boardState:${grade}-${section}`;
+}
+
+function readLocalBoardStateSnapshot(storageKey) {
+  if (!storageKey) return null;
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    const magnets = (parsed.magnets && typeof parsed.magnets === 'object') ? parsed.magnets : {};
+    const revisionRaw = Number(parsed.revision);
+    const updatedAtRaw = Number(parsed.updatedAt);
+    return {
+      version: LOCAL_BOARD_STATE_VERSION,
+      magnets,
+      marquee: parsed.marquee ?? null,
+      revision: Number.isFinite(revisionRaw) ? Math.max(0, revisionRaw) : 0,
+      dirty: Boolean(parsed.dirty),
+      updatedAt: Number.isFinite(updatedAtRaw) ? updatedAtRaw : 0,
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+function persistLocalBoardStateSnapshot(state) {
+  if (!state || !state.storageKey) return;
+  const payload = {
+    version: LOCAL_BOARD_STATE_VERSION,
+    magnets: deepCloneJson(state.magnets, {}),
+    marquee: deepCloneJson(state.marquee, null),
+    revision: Number.isFinite(Number(state.revision)) ? Number(state.revision) : 0,
+    dirty: Boolean(state.dirty),
+    updatedAt: Number.isFinite(Number(state.updatedAt)) ? Number(state.updatedAt) : Date.now(),
+  };
+  try {
+    localStorage.setItem(state.storageKey, JSON.stringify(payload));
+  } catch (_) {
+    // ignore storage quota/security errors
+  }
+}
+
+function ensureLocalBoardState(grade, section) {
+  const key = `${grade}-${section}`;
+  if (localBoardState.key === key) {
+    return localBoardState;
+  }
+
+  const storageKey = getBoardStateStorageKey(grade, section);
+  const snapshot = readLocalBoardStateSnapshot(storageKey);
+  localBoardState = {
+    key,
+    storageKey,
+    revision: snapshot?.revision || 0,
+    dirty: Boolean(snapshot?.dirty),
+    updatedAt: snapshot?.updatedAt || 0,
+    magnets: deepCloneJson(snapshot?.magnets, {}) || {},
+    marquee: Object.prototype.hasOwnProperty.call(snapshot || {}, 'marquee')
+      ? deepCloneJson(snapshot.marquee, null)
+      : null,
+  };
+  return localBoardState;
+}
+
+function updateLocalBoardState(grade, section, options = {}) {
+  const state = ensureLocalBoardState(grade, section);
+  const {
+    magnets,
+    marquee,
+    incrementRevision = false,
+    markDirty,
+  } = options;
+
+  if (incrementRevision) {
+    state.revision = Math.max(0, Number(state.revision) || 0) + 1;
+  }
+  if (magnets !== undefined) {
+    state.magnets = deepCloneJson(magnets, {}) || {};
+  }
+  if (marquee !== undefined) {
+    state.marquee = deepCloneJson(marquee, null);
+  }
+  if (typeof markDirty === 'boolean') {
+    state.dirty = markDirty;
+  }
+  state.updatedAt = Date.now();
+  persistLocalBoardStateSnapshot(state);
+  return state;
+}
+
+function collectCurrentMagnets() {
+  const magnets = {};
+  document.querySelectorAll('.magnet:not(.placeholder)').forEach(m => {
+    const num = m.dataset.number;
+    const data = {};
+    if (m.dataset.reason) data.reason = m.dataset.reason;
+    if (m.classList.contains('attached')) {
+      const sec = m.closest('.board-section');
+      data.attachedTo = sec ? sec.dataset.category : null;
+    } else {
+      data.attachedTo = null;
+      data.left = parseFloat(m.style.left) || 0;
+      data.top = parseFloat(m.style.top) || 0;
+    }
+    magnets[num] = data;
+  });
+  return magnets;
+}
+
+function scheduleBoardStateRetry() {
+  if (boardStateSaveRetryTimer) return;
+  boardStateSaveRetryTimer = window.setTimeout(() => {
+    boardStateSaveRetryTimer = null;
+    if (!pendingBoardStateSave || boardStateSaveInFlight) {
+      return;
+    }
+    boardStateSavePromise = flushPendingBoardStateSave();
+  }, BOARD_STATE_SAVE_RETRY_MS);
+}
+
+async function flushPendingBoardStateSave() {
+  if (boardStateSaveInFlight) {
+    return boardStateSavePromise || Promise.resolve(false);
+  }
+
+  boardStateSaveInFlight = true;
+  const monitor = window.connectionMonitor;
+  let latestResult = true;
+
+  while (pendingBoardStateSave) {
+    const request = pendingBoardStateSave;
+    pendingBoardStateSave = null;
+
+    try {
+      const res = await fetch(`/api/classes/state/save?grade=${request.grade}&section=${request.section}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ magnets: request.magnets }),
+      });
+      if (!res.ok) {
+        throw new Error(`save failed: ${res.status}`);
+      }
+
+      if (monitor && typeof monitor.markSuccess === 'function') {
+        monitor.markSuccess();
+      }
+
+      const state = ensureLocalBoardState(request.grade, request.section);
+      if (state.revision <= request.revision) {
+        state.dirty = false;
+        state.updatedAt = Date.now();
+        persistLocalBoardStateSnapshot(state);
+      }
+
+      pauseStateSync(1500);
+      latestResult = true;
+    } catch (e) {
+      console.warn('saveState failed:', e);
+      if (monitor && typeof monitor.markFailure === 'function') {
+        monitor.markFailure();
+      }
+
+      latestResult = false;
+      const state = ensureLocalBoardState(request.grade, request.section);
+      state.dirty = true;
+      state.updatedAt = Date.now();
+      persistLocalBoardStateSnapshot(state);
+
+      pendingBoardStateSave = {
+        grade: request.grade,
+        section: request.section,
+        magnets: deepCloneJson(state.magnets, request.magnets) || request.magnets,
+        revision: state.revision,
+      };
+      scheduleBoardStateRetry();
+      break;
+    }
+  }
+
+  boardStateSaveInFlight = false;
+  return latestResult;
+}
+
+function queueBoardStateSave(grade, section, magnets, revision) {
+  pendingBoardStateSave = {
+    grade,
+    section,
+    magnets: deepCloneJson(magnets, {}) || {},
+    revision: Number.isFinite(Number(revision)) ? Number(revision) : 0,
+  };
+
+  if (boardStateSaveRetryTimer) {
+    clearTimeout(boardStateSaveRetryTimer);
+    boardStateSaveRetryTimer = null;
+  }
+
+  if (!boardStateSaveInFlight) {
+    boardStateSavePromise = flushPendingBoardStateSave();
+  }
+
+  return boardStateSavePromise || Promise.resolve(true);
+}
+
+async function hydrateBoardStateFromLocal(grade, section) {
+  const key = `${grade}-${section}`;
+  if (hydratedLocalBoardStateKey === key) {
+    return;
+  }
+  hydratedLocalBoardStateKey = key;
+
+  const state = ensureLocalBoardState(grade, section);
+  const hasLocalPayload = state && (
+    (state.magnets && Object.keys(state.magnets).length > 0) ||
+    normalizeMarqueePayload(state.marquee)
+  );
+  if (!hasLocalPayload) return;
+
+  await applyBoardStatePayload(
+    { magnets: state.magnets, marquee: state.marquee },
+    { grade, section, skipNormalizeSave: true }
+  );
+}
 
 function pauseStateSync(ms = 0) {
   const until = Date.now() + Math.max(0, Number(ms) || 0);
@@ -284,47 +559,18 @@ function handleMarqueePayload(payload) {
 }
 
 async function saveState(grade, section) {
-  const monitor = window.connectionMonitor;
-  const magnets = {};
-  document.querySelectorAll('.magnet:not(.placeholder)').forEach(m => {
-    const num = m.dataset.number;
-    const data = {};
-    if (m.dataset.reason) data.reason = m.dataset.reason;
-    if (m.classList.contains('attached')) {
-      const sec = m.closest('.board-section');
-      data.attachedTo = sec ? sec.dataset.category : null;
-    } else {
-      data.attachedTo = null;
-      data.left = parseFloat(m.style.left) || 0;
-      data.top  = parseFloat(m.style.top)  || 0;
-    }
-    magnets[num] = data;
+  const magnets = collectCurrentMagnets();
+  const state = updateLocalBoardState(grade, section, {
+    magnets,
+    incrementRevision: true,
+    markDirty: true,
   });
 
-  try {
-    // Pause polling immediately so pre-commit stale data does not overwrite local drag result.
-    pauseStateSync(1500);
-    const res = await fetch(`/api/classes/state/save?grade=${grade}&section=${section}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ magnets })
-    });
-    if (!res.ok) {
-      throw new Error(`save failed: ${res.status}`);
-    }
-    if (monitor && typeof monitor.markSuccess === 'function') {
-      monitor.markSuccess();
-    }
-    // Keep a short grace window after successful save to avoid visual bounce.
-    pauseStateSync(1500);
-    return true;
-  } catch (e) {
-    console.warn("saveState failed:", e);
-    if (monitor && typeof monitor.markFailure === 'function') {
-      monitor.markFailure();
-    }
-    return false;
-  }
+  // Immediately trust local state first, then sync remote in background.
+  lastAppliedStateSignature = buildBoardStateSignature(state.magnets, state.marquee);
+  pauseStateSync(BOARD_STATE_LOCAL_FIRST_PAUSE_MS);
+
+  return queueBoardStateSave(grade, section, state.magnets, state.revision);
 }
 
 async function fetchMagnetConfig(grade, section) {
@@ -365,10 +611,114 @@ function restoreToFreePosition(el, data) {
   }
 }
 
+async function applyBoardStatePayload(payload, options = {}) {
+  const magnets = (payload && typeof payload === 'object' && payload.magnets && typeof payload.magnets === 'object')
+    ? payload.magnets
+    : {};
+  const marquee = payload && typeof payload === 'object' ? payload.marquee : null;
+  const signature = buildBoardStateSignature(magnets, marquee);
+
+  if (lastAppliedStateSignature && signature === lastAppliedStateSignature) {
+    return { applied: false, didNormalizeSection: false };
+  }
+
+  let didNormalizeSection = false;
+  const thoughtProcessed = new Set();
+
+  Object.entries(magnets).forEach(([num, rawData]) => {
+    let el = document.querySelector(`.magnet[data-number="${num}"]`);
+    if (!el) {
+      const normalizedNum = String(parseInt(num, 10));
+      if (normalizedNum && normalizedNum !== num) {
+        el = document.querySelector(`.magnet[data-number="${normalizedNum}"]`);
+      }
+    }
+    if (!el) return;
+
+    const magnetData = (rawData && typeof rawData === 'object') ? rawData : {};
+    const magnetNumber = el.dataset.number || String(num);
+    thoughtProcessed.add(magnetNumber);
+
+    if (magnetData.attachedTo === 'section') {
+      restoreToFreePosition(el, magnetData);
+      didNormalizeSection = true;
+    } else if (magnetData.attachedTo) {
+      const sec = document.querySelector(`.board-section[data-category="${magnetData.attachedTo}"] .section-content`);
+      if (sec) {
+        el.classList.add('attached');
+        if (magnetData.reason) {
+          el.dataset.reason = magnetData.reason.trim();
+          el.classList.add('has-reason');
+        } else {
+          delete el.dataset.reason;
+          el.classList.remove('has-reason');
+        }
+        sec.appendChild(el);
+      } else {
+        restoreToFreePosition(el, magnetData);
+      }
+    } else {
+      restoreToFreePosition(el, magnetData);
+    }
+
+    if (typeof window.updateMagnetThoughtBubble === 'function') {
+      window.updateMagnetThoughtBubble(el, magnetData);
+    }
+
+    if (typeof window.updateMagnetReaction === 'function') {
+      window.updateMagnetReaction(el, magnetData);
+    }
+  });
+
+  if (typeof window.updateMagnetThoughtBubble === 'function') {
+    document.querySelectorAll('.magnet:not(.placeholder)').forEach(magnet => {
+      const num = magnet.dataset.number || '';
+      if (!thoughtProcessed.has(num)) {
+        window.updateMagnetThoughtBubble(magnet, null);
+      }
+    });
+  }
+
+  if (typeof window.updateMagnetReaction === 'function') {
+    document.querySelectorAll('.magnet:not(.placeholder)').forEach(magnet => {
+      const num = magnet.dataset.number || '';
+      if (!thoughtProcessed.has(num)) {
+        window.updateMagnetReaction(magnet, null);
+      }
+    });
+  }
+
+  updateEtcReasonPanel();
+  sortAllSections();
+  updateAttendance();
+  updateMagnetOutline();
+  if (typeof window.repositionThoughtBubbles === 'function') {
+    window.repositionThoughtBubbles();
+  }
+
+  handleMarqueePayload(marquee);
+  lastAppliedStateSignature = signature;
+
+  if (didNormalizeSection && !options.skipNormalizeSave) {
+    await saveState(options.grade, options.section);
+  }
+
+  return { applied: true, didNormalizeSection };
+}
+
 async function loadState(grade, section, options = {}) {
   const monitor = window.connectionMonitor;
   const ignoreOffline = Boolean(options && options.ignoreOffline);
   const forceSync = Boolean(options && options.forceSync);
+
+  await hydrateBoardStateFromLocal(grade, section);
+  const localState = ensureLocalBoardState(grade, section);
+
+  if (!forceSync && localState.dirty) {
+    flushPendingBoardStateSave();
+    return;
+  }
+
   if (!ignoreOffline && monitor && typeof monitor.isOffline === 'function' && monitor.isOffline()) {
     return;
   }
@@ -380,93 +730,23 @@ async function loadState(grade, section, options = {}) {
   }
 
   loadStateInFlight = true;
+  const revisionAtRequest = localState.revision;
   try {
     const res = await fetch(`/api/classes/state/load?grade=${grade}&section=${section}`, { cache: 'no-store' });
     if (!res.ok) throw new Error("로드 실패");
     const parsed = await res.json();
-    const magnets = parsed.magnets || {};
-    let didNormalizeSection = false;
-    const thoughtProcessed = new Set();
+    const latestLocalState = ensureLocalBoardState(grade, section);
+    if (!forceSync && latestLocalState.dirty && latestLocalState.revision >= revisionAtRequest) {
+      return;
+    }
 
-    // 자석 반영
-    Object.entries(magnets).forEach(([num, rawData]) => {
-      let el = document.querySelector(`.magnet[data-number="${num}"]`);
-      if (!el) {
-        const normalizedNum = String(parseInt(num, 10));
-        if (normalizedNum && normalizedNum !== num) {
-          el = document.querySelector(`.magnet[data-number="${normalizedNum}"]`);
-        }
-      }
-      if (!el) return;
-
-      const magnetData = (rawData && typeof rawData === 'object') ? rawData : {};
-      const magnetNumber = el.dataset.number || String(num);
-      thoughtProcessed.add(magnetNumber);
-
-      if (magnetData.attachedTo === "section") {
-        restoreToFreePosition(el, magnetData);
-        didNormalizeSection = true;
-      } else if (magnetData.attachedTo) {
-        const sec = document.querySelector(`.board-section[data-category="${magnetData.attachedTo}"] .section-content`);
-        if (sec) {
-          el.classList.add("attached");
-          if (magnetData.reason) {
-            el.dataset.reason = magnetData.reason.trim();   // ✅ reason 저장
-            el.classList.add("has-reason");
-          } else {
-            delete el.dataset.reason;                       // ✅ reason 없을 때는 삭제
-            el.classList.remove("has-reason");
-          }
-          sec.appendChild(el);
-        } else {
-          restoreToFreePosition(el, magnetData);
-        }
-      } else {
-        restoreToFreePosition(el, magnetData);
-      }
-
-      if (typeof window.updateMagnetThoughtBubble === 'function') {
-        window.updateMagnetThoughtBubble(el, magnetData);
-      }
-
-      // Update reaction badge
-      if (typeof window.updateMagnetReaction === 'function') {
-        window.updateMagnetReaction(el, magnetData);
-      }
-    });
-
-    if (typeof window.updateMagnetThoughtBubble === 'function') {
-      document.querySelectorAll('.magnet:not(.placeholder)').forEach(magnet => {
-        const num = magnet.dataset.number || '';
-        if (!thoughtProcessed.has(num)) {
-          window.updateMagnetThoughtBubble(magnet, null);
-        }
+    const applyResult = await applyBoardStatePayload(parsed, { grade, section });
+    if (applyResult.applied) {
+      updateLocalBoardState(grade, section, {
+        magnets: parsed.magnets || {},
+        marquee: parsed.marquee ?? null,
+        markDirty: false,
       });
-    }
-
-    // Clear reactions for magnets not in the loaded state
-    if (typeof window.updateMagnetReaction === 'function') {
-      document.querySelectorAll('.magnet:not(.placeholder)').forEach(magnet => {
-        const num = magnet.dataset.number || '';
-        if (!thoughtProcessed.has(num)) {
-          window.updateMagnetReaction(magnet, null);
-        }
-      });
-    }
-
-    // ✅ 끝나고 기타 패널 갱신
-    updateEtcReasonPanel();
-    sortAllSections();
-    updateAttendance();
-    updateMagnetOutline();
-    if (typeof window.repositionThoughtBubbles === 'function') {
-      window.repositionThoughtBubbles();
-    }
-
-    handleMarqueePayload(parsed.marquee);
-
-    if (didNormalizeSection) {
-      await saveState(grade, section);
     }
 
     if (monitor && typeof monitor.markSuccess === 'function') {
@@ -486,3 +766,12 @@ async function loadState(grade, section, options = {}) {
 window.loadState = loadState;
 window.saveState = saveState;
 window.fetchMagnetConfig = fetchMagnetConfig;
+window.flushBoardStateSync = flushPendingBoardStateSave;
+window.hasPendingBoardSync = function hasPendingBoardSync(grade, section) {
+  const state = ensureLocalBoardState(grade, section);
+  return Boolean(
+    state.dirty ||
+    boardStateSaveInFlight ||
+    pendingBoardStateSave
+  );
+};

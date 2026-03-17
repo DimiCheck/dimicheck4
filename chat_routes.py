@@ -310,6 +310,71 @@ def _get_chat_consent(grade: int | None, section: int | None, number: int | None
     ).first()
 
 
+def _has_current_chat_consent(grade: int | None, section: int | None, number: int | None) -> bool:
+    consent = _get_chat_consent(grade, section, number)
+    return bool(consent and consent.version == CHAT_CONSENT_VERSION)
+
+
+def _message_member_classes(msg: ChatMessage) -> list[dict]:
+    channel = _normalize_channel_name(msg.channel)
+    channels, _, _, memberships, _ = _ensure_channels_for_class(msg.grade, msg.section, persist=True)
+    if not _channel_exists(channels, channel):
+        channel = DEFAULT_CHANNEL
+    return memberships.get(channel) or [{"grade": msg.grade, "section": msg.section}]
+
+
+def _is_member_class(member_classes: list[dict], grade: int | None, section: int | None) -> bool:
+    if grade is None or section is None:
+        return False
+    return any(
+        _normalize_class_value(m.get("grade")) == grade
+        and _normalize_class_value(m.get("section")) == section
+        for m in member_classes
+    )
+
+
+def _resolve_message_channel(
+    grade: int,
+    section: int,
+    requested_channel: str,
+) -> tuple[str | None, list[dict] | None, tuple | None]:
+    channels, state, state_payload, memberships, _ = _ensure_channels_for_class(grade, section)
+    if not _channel_exists(channels, requested_channel):
+        if len(channels) >= MAX_CHANNELS_PER_CLASS:
+            return None, None, (jsonify({"error": "채널을 더 만들 수 없습니다"}), 400)
+        channels.append(requested_channel)
+        state_payload["channels"] = channels
+        memberships = _normalize_channel_memberships(
+            state_payload.get("channelMemberships"),
+            channels,
+            grade,
+            section,
+        )
+        state_payload["channelMemberships"] = memberships
+        state.data = json.dumps(state_payload, ensure_ascii=False)
+        db.session.add(state)
+        db.session.commit()
+    member_classes = memberships.get(requested_channel) or [{"grade": grade, "section": section}]
+    if not _is_member_class(member_classes, grade, section):
+        return None, None, (jsonify({"error": "forbidden"}), 403)
+    return requested_channel, member_classes, None
+
+
+def _message_matches_channel_scope(msg: ChatMessage, channel: str, member_classes: list[dict]) -> bool:
+    if not msg or msg.deleted_at is not None:
+        return False
+    if _normalize_channel_name(msg.channel) != channel:
+        return False
+    return _is_member_class(member_classes, msg.grade, msg.section)
+
+
+def _can_access_message(msg: ChatMessage) -> bool:
+    if is_teacher_session_active() or is_board_session_active(msg.grade, msg.section):
+        return True
+    session_grade, session_section, _ = _get_student_session_info()
+    return _is_member_class(_message_member_classes(msg), session_grade, session_section)
+
+
 def _load_state_blob(state: ClassState | None) -> dict:
     if not state or not state.data:
         return {
@@ -557,7 +622,7 @@ def create_channel():
     """Create a new channel for the class"""
     grade = request.args.get("grade", type=int)
     section = request.args.get("section", type=int)
-    payload = request.get_json() or {}
+    payload = request.get_json(silent=True) or {}
     session_grade, session_section, session_number = _get_student_session_info()
 
     if grade is None or section is None:
@@ -756,8 +821,10 @@ def send_message():
     # Only students from the same class can send messages
     if session_grade != grade or session_section != section or session_number is None:
         return jsonify({"error": "forbidden"}), 403
+    if not _has_current_chat_consent(grade, section, session_number):
+        return jsonify({"error": "chat consent required", "requiredVersion": CHAT_CONSENT_VERSION}), 403
 
-    payload = request.get_json() or {}
+    payload = request.get_json(silent=True) or {}
     requested_channel = _normalize_channel_name(
         request.args.get("channel") or payload.get("channel")
     )
@@ -777,26 +844,9 @@ def send_message():
     elif target in ("chat", "chat-only", "chat_only"):
         send_board_preview = False
 
-    channels, state, state_payload, memberships, owners = _ensure_channels_for_class(grade, section)
-    if not _channel_exists(channels, requested_channel):
-        if len(channels) >= MAX_CHANNELS_PER_CLASS:
-            return jsonify({"error": "채널을 더 만들 수 없습니다"}), 400
-        channels.append(requested_channel)
-        state_payload["channels"] = channels
-        memberships = _normalize_channel_memberships(
-            state_payload.get("channelMemberships"),
-            channels,
-            grade,
-            section,
-        )
-        state_payload["channelMemberships"] = memberships
-        state.data = json.dumps(state_payload, ensure_ascii=False)
-        db.session.add(state)
-        db.session.commit()
-    channel = requested_channel
-    member_classes = memberships.get(channel) or [{"grade": grade, "section": section}]
-    if not any(_normalize_class_value(m.get("grade")) == grade and _normalize_class_value(m.get("section")) == section for m in member_classes):
-        return jsonify({"error": "forbidden"}), 403
+    channel, member_classes, channel_error = _resolve_message_channel(grade, section, requested_channel)
+    if channel_error:
+        return channel_error
     message_text = (payload.get("message") or "").strip()
 
     image_url = payload.get("imageUrl")
@@ -823,7 +873,7 @@ def send_message():
     # Validate image URL
     if image_url:
         # Check URL format (https only, common image extensions)
-        url_pattern = r'^https?://.+\.(jpg|jpeg|png|gif|webp)$'
+        url_pattern = r"^https?://[^\s]+\.(jpg|jpeg|png|gif|webp)(?:\?[^\s]*)?$"
         if not re.match(url_pattern, image_url, re.IGNORECASE):
             return jsonify({"error": "invalid image URL format"}), 400
 
@@ -837,7 +887,7 @@ def send_message():
             reply_to_id = int(reply_to_id)
             # Check if replied message exists
             replied_msg = ChatMessage.query.get(reply_to_id)
-            if not replied_msg or replied_msg.deleted_at is not None:
+            if not replied_msg or not _message_matches_channel_scope(replied_msg, channel, member_classes):
                 return jsonify({"error": "replied message not found"}), 400
         except (TypeError, ValueError):
             return jsonify({"error": "invalid replyToId"}), 400
@@ -1011,8 +1061,7 @@ def add_reaction(message_id):
     if not msg or msg.deleted_at is not None:
         return jsonify({"error": "message not found"}), 404
 
-    # 같은 반 학생만 반응 가능
-    if msg.grade != session_grade or msg.section != session_section:
+    if not _can_access_message(msg):
         return jsonify({"error": "forbidden"}), 403
 
     # 이미 같은 반응이 있는지 확인
@@ -1051,7 +1100,12 @@ def remove_reaction(message_id):
     if not emoji:
         return jsonify({"error": "emoji is required"}), 400
 
-    # 반응 찾기
+    msg = ChatMessage.query.get(message_id)
+    if not msg or msg.deleted_at is not None:
+        return jsonify({"error": "message not found"}), 404
+    if not _can_access_message(msg):
+        return jsonify({"error": "forbidden"}), 403
+
     reaction = ChatReaction.query.filter_by(
         message_id=message_id,
         student_number=session_number,
@@ -1071,8 +1125,10 @@ def remove_reaction(message_id):
 def get_reactions(message_id):
     """메시지의 모든 반응 가져오기"""
     msg = ChatMessage.query.get(message_id)
-    if not msg:
+    if not msg or msg.deleted_at is not None:
         return jsonify({"error": "message not found"}), 404
+    if not _can_access_message(msg):
+        return jsonify({"error": "forbidden"}), 403
 
     reactions = ChatReaction.query.filter_by(message_id=message_id).all()
 

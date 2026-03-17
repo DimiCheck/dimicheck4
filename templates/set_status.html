@@ -285,6 +285,15 @@
       <img class="logo" id="logoImg" src="/logo.png" alt="DIMICHECK 로고" loading="lazy" decoding="async" />
     </div>
     <div class="verify-msg" id="verifyMsg"></div>
+    {% set quick_status = pending_status or status_code %}
+    {% set quick_reason = pending_reason or reason %}
+    {% if csrf_token and quick_status %}
+      <form id="quickApplyForm" method="post" action="/set" hidden data-autosubmit="{{ 'true' if pending_apply else 'false' }}">
+        <input type="hidden" name="status" value="{{ quick_status }}">
+        <input type="hidden" name="reason" value="{{ quick_reason or '' }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      </form>
+    {% endif %}
     {% if success %}
       <h1 id="primaryTitle">{{ status_label or "상태" }} 상태를 적용했어요.</h1>
       <p id="primaryDesc">요청한 상태가 서버에 저장됐습니다.</p>
@@ -308,7 +317,7 @@
       {% endif %}
       {% if status_code != "section" %}
         <div class="actions">
-          <button type="button" onclick="location.href='/set?status=class'">교실로 변경</button>
+          <button type="button" onclick="submitQuickApply('class')">교실로 변경</button>
           <button type="button" class="secondary" onclick="closeTab()">닫기</button>
         </div>
       {% else %}
@@ -316,6 +325,30 @@
           <button type="button" class="secondary" onclick="closeTab()">닫기</button>
         </div>
       {% endif %}
+    {% elif pending_apply %}
+      <h1 id="primaryTitle">{{ status_label or "상태" }} 상태를 적용하는 중이에요.</h1>
+      <p id="primaryDesc">잠시만 기다리면 서버에 바로 반영됩니다.</p>
+      <div class="pill">상태: {{ status_label }}</div>
+      {% if quick_reason %}
+        <div class="pill">사유: {{ quick_reason }}</div>
+      {% endif %}
+      <div class="actions">
+        <button type="button" onclick="submitQuickApply('{{ quick_status }}', {{ quick_reason|tojson }})">지금 적용</button>
+        <button type="button" class="secondary" onclick="closeTab()">취소</button>
+      </div>
+    {% elif requires_login %}
+      <h1>로그인이 필요해요.</h1>
+      <p>{{ status_label or "요청한 상태" }} 상태를 적용하려면 먼저 로그인해 주세요. 로그인 후 이 화면으로 돌아오면 자동으로 적용됩니다.</p>
+      {% if quick_status %}
+        <div class="pill">상태: {{ status_label }}</div>
+      {% endif %}
+      {% if quick_reason %}
+        <div class="pill">사유: {{ quick_reason }}</div>
+      {% endif %}
+      <div class="actions">
+        <button type="button" onclick="location.href='{{ url_for('auth.login', next=request.url) }}'">로그인하고 적용</button>
+        <button type="button" class="secondary" onclick="closeTab()">닫기</button>
+      </div>
     {% else %}
       <h1>상태를 적용하지 못했어요.</h1>
       {% if error == "invalid_status" %}
@@ -338,6 +371,16 @@
     {% endif %}
   </main>
   <script>
+    function submitQuickApply(status, reason = '') {
+      const form = document.getElementById('quickApplyForm');
+      if (!form) return;
+      const statusInput = form.querySelector('input[name="status"]');
+      const reasonInput = form.querySelector('input[name="reason"]');
+      if (statusInput && status) statusInput.value = status;
+      if (reasonInput) reasonInput.value = reason || '';
+      form.submit();
+    }
+
     function closeTab() {
       try {
         window.close();
@@ -411,6 +454,11 @@
     document.addEventListener('DOMContentLoaded', () => {
       const desiredStatus = "{{ status_code }}";
       const desiredReason = "{{ reason or '' }}";
+      const autoForm = document.getElementById('quickApplyForm');
+      if (autoForm?.dataset.autosubmit === 'true') {
+        setTimeout(() => autoForm.submit(), 0);
+        return;
+      }
       {% if success %}
       verifyApplied(desiredStatus, desiredReason);
       {% endif %}
@@ -430,7 +478,7 @@
         handle.style.transform = `translateX(${PADDING + max}px)`;
         fill.style.width = `${PADDING + max + handle.clientWidth / 2}px`;
         if (label) label.textContent = '교실로 변경 중...';
-        setTimeout(() => { window.location.href = "/set?status=class"; }, 180);
+        setTimeout(() => { submitQuickApply('class'); }, 180);
       };
 
       let dragging = false;

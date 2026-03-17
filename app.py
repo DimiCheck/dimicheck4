@@ -225,7 +225,8 @@ def health() -> Any:
 @app.get("/me")
 def me() -> Any:
     user = session.get("user")
-    if not user:
+    teacher_session_active = is_teacher_session_active()
+    if not user and not teacher_session_active:
         return jsonify({"error": {"code": "unauthorized", "message": "login required"}}), 401
     token = session.get("csrf_token")
     if not token:
@@ -233,6 +234,8 @@ def me() -> Any:
 
         token = secrets.token_hex(16)
         session["csrf_token"] = token
+    if not user and teacher_session_active:
+        return jsonify({"type": "teacher", "csrf_token": token})
     user_data = {k: v for k, v in user.items() if k in {"id", "email", "name", "type", "grade", "class", "number"}}
     user_data["csrf_token"] = token
     return jsonify(user_data)
@@ -643,9 +646,141 @@ def privacy():
 
 
 @app.get("/set")
-def quick_apply_status():
+def quick_apply_status_get():
     raw_status = request.args.get("status")
-    reason = (request.args.get("reason") or "").strip() or None
+    reason_input = request.args.get("reason") or ""
+    reason = str(reason_input).strip() or None
+    status_code = _normalize_status_param(raw_status)
+    allowed_codes = sorted(STATUS_LABELS.keys())
+    user = session.get("user") or {}
+    status_label = STATUS_LABELS.get(status_code, status_code) if status_code else None
+
+    if reason and contains_slang(reason):
+        return (
+            render_template(
+                "set_status.html",
+                success=False,
+                status_code=status_code or raw_status,
+                status_label=status_label,
+                allowed_codes=allowed_codes,
+                labels=STATUS_LABELS,
+                error="invalid_reason",
+                pending_status=None,
+                pending_reason=None,
+                pending_apply=False,
+                requires_login=False,
+                csrf_token=session.get("csrf_token"),
+            ),
+            400,
+        )
+
+    if status_code:
+        if not user:
+            return render_template(
+                "set_status.html",
+                success=False,
+                pending_status=status_code,
+                pending_reason=reason if status_code == "etc" else None,
+                pending_apply=False,
+                requires_login=True,
+                status_code=status_code,
+                status_label=status_label,
+                allowed_codes=allowed_codes,
+                labels=STATUS_LABELS,
+                csrf_token=None,
+                error=None,
+            )
+
+        if str(user.get("type", "")).lower() != "student":
+            return (
+                render_template(
+                    "set_status.html",
+                    success=False,
+                    status_code=status_code,
+                    status_label=status_label,
+                    allowed_codes=allowed_codes,
+                    labels=STATUS_LABELS,
+                    error="unsupported_user",
+                    pending_status=None,
+                    pending_reason=None,
+                    pending_apply=False,
+                    requires_login=False,
+                    csrf_token=session.get("csrf_token"),
+                ),
+                403,
+            )
+
+        grade, section, seat = _derive_student_session()
+        if grade is None or section is None or seat is None:
+            return (
+                render_template(
+                    "set_status.html",
+                    success=False,
+                    status_code=status_code,
+                    status_label=status_label,
+                    allowed_codes=allowed_codes,
+                    labels=STATUS_LABELS,
+                    error="missing_profile",
+                    pending_status=None,
+                    pending_reason=None,
+                    pending_apply=False,
+                    requires_login=False,
+                    csrf_token=session.get("csrf_token"),
+                ),
+                400,
+            )
+
+        if not session.get("csrf_token"):
+            session["csrf_token"] = secrets.token_hex(16)
+        return render_template(
+            "set_status.html",
+            success=False,
+            pending_status=status_code,
+            pending_reason=reason if status_code == "etc" else None,
+            pending_apply=True,
+            requires_login=False,
+            status_code=status_code,
+            status_label=status_label,
+            allowed_codes=allowed_codes,
+            labels=STATUS_LABELS,
+            csrf_token=session.get("csrf_token"),
+            error=None,
+        )
+
+    return (
+        render_template(
+            "set_status.html",
+            success=False,
+            status_code=None,
+            status_label=None,
+            allowed_codes=allowed_codes,
+            labels=STATUS_LABELS,
+            error="method_not_allowed",
+            pending_status=None,
+            pending_reason=None,
+            pending_apply=False,
+            requires_login=False,
+            csrf_token=session.get("csrf_token"),
+        ),
+        405,
+    )
+
+
+@app.post("/set")
+def quick_apply_status():
+    payload = request.get_json(silent=True) if request.is_json else None
+    raw_status = (
+        (payload.get("status") if isinstance(payload, dict) else None)
+        or request.form.get("status")
+        or request.args.get("status")
+    )
+    reason_input = (
+        (payload.get("reason") if isinstance(payload, dict) else None)
+        or request.form.get("reason")
+        or request.args.get("reason")
+        or ""
+    )
+    reason = str(reason_input).strip() or None
     status_code = _normalize_status_param(raw_status)
     allowed_codes = sorted(STATUS_LABELS.keys())
 
@@ -659,6 +794,11 @@ def quick_apply_status():
                 allowed_codes=allowed_codes,
                 labels=STATUS_LABELS,
                 error="invalid_status",
+                pending_status=None,
+                pending_reason=None,
+                pending_apply=False,
+                requires_login=False,
+                csrf_token=session.get("csrf_token"),
             ),
             400,
         )
@@ -673,13 +813,27 @@ def quick_apply_status():
                 allowed_codes=allowed_codes,
                 labels=STATUS_LABELS,
                 error="invalid_reason",
+                pending_status=None,
+                pending_reason=None,
+                pending_apply=False,
+                requires_login=False,
+                csrf_token=session.get("csrf_token"),
             ),
             400,
         )
 
     user = session.get("user")
     if not user:
-        return redirect(url_for("auth.login", next=request.url))
+        return redirect(
+            url_for(
+                "auth.login",
+                next=url_for(
+                    "quick_apply_status_get",
+                    status=status_code,
+                    reason=reason or "",
+                ),
+            )
+        )
 
     if str(user.get("type", "")).lower() != "student":
         return (
@@ -691,6 +845,11 @@ def quick_apply_status():
                 allowed_codes=allowed_codes,
                 labels=STATUS_LABELS,
                 error="unsupported_user",
+                pending_status=None,
+                pending_reason=None,
+                pending_apply=False,
+                requires_login=False,
+                csrf_token=session.get("csrf_token"),
             ),
             403,
         )
@@ -706,6 +865,11 @@ def quick_apply_status():
                 allowed_codes=allowed_codes,
                 labels=STATUS_LABELS,
                 error="missing_profile",
+                pending_status=None,
+                pending_reason=None,
+                pending_apply=False,
+                requires_login=False,
+                csrf_token=session.get("csrf_token"),
             ),
             400,
         )
@@ -731,6 +895,11 @@ def quick_apply_status():
                 allowed_codes=allowed_codes,
                 labels=STATUS_LABELS,
                 error="save_failed",
+                pending_status=None,
+                pending_reason=None,
+                pending_apply=False,
+                requires_login=False,
+                csrf_token=session.get("csrf_token"),
             ),
             500,
         )
@@ -761,6 +930,11 @@ def quick_apply_status():
         labels=STATUS_LABELS,
         grade=grade,
         section=section,
+        pending_status=None,
+        pending_reason=None,
+        pending_apply=False,
+        requires_login=False,
+        csrf_token=session.get("csrf_token"),
     )
 
 

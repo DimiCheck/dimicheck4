@@ -118,9 +118,6 @@ def _csrf_token_from_request() -> str | None:
         token = request.form.get("csrf_token")
         if token:
             return token
-    cookie_token = request.cookies.get("csrf_token")
-    if cookie_token:
-        return cookie_token
     return None
 
 
@@ -136,11 +133,10 @@ def verify_csrf():
     expected = session.get("csrf_token")
     if not expected:
         session["csrf_token"] = uuid.uuid4().hex
-        return
+        return jsonify({"error": {"code": "csrf_required", "message": "CSRF token required"}}), 403
     provided = _csrf_token_from_request()
     if not provided:
-        # allow but log missing token; cookie is set in response for next time
-        return
+        return jsonify({"error": {"code": "csrf_required", "message": "CSRF token required"}}), 403
     if provided != expected:
         return jsonify({"error": {"code": "csrf_failed", "message": "invalid CSRF token"}}), 403
 

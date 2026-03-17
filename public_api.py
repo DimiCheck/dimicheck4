@@ -33,6 +33,10 @@ QUEUE_WAIT_TIMEOUT = 10.0
 _concurrency_semaphore = threading.BoundedSemaphore(MAX_CONCURRENT_REQUESTS)
 _queue_depth = 0
 _queue_lock = threading.Lock()
+_rate_limit_locks: dict[int, threading.Lock] = {}
+_rate_limit_locks_guard = threading.Lock()
+_counter_locks: dict[tuple[int, int], threading.Lock] = {}
+_counter_locks_guard = threading.Lock()
 
 
 def _json_error(status: int, message: str):
@@ -91,6 +95,25 @@ def _acquire_concurrency_slot():
     with _queue_lock:
         _queue_depth = max(0, _queue_depth - 1)
     return acquired
+
+
+def _get_rate_limit_lock(user_id: int) -> threading.Lock:
+    with _rate_limit_locks_guard:
+        lock = _rate_limit_locks.get(user_id)
+        if lock is None:
+            lock = threading.Lock()
+            _rate_limit_locks[user_id] = lock
+        return lock
+
+
+def _get_counter_lock(user_id: int, counter_id: int) -> threading.Lock:
+    key = (user_id, counter_id)
+    with _counter_locks_guard:
+        lock = _counter_locks.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _counter_locks[key] = lock
+        return lock
 
 
 def limit_concurrency(func):
@@ -174,69 +197,66 @@ def enforce_rate_limit(func):
         if not isinstance(cost_units, int) or cost_units < 1:
             cost_units = 1
 
-        now = datetime.utcnow()
-        minute_window = now.replace(second=0, microsecond=0)
-        today = now.date()
-        yesterday = today - timedelta(days=1)
+        with _get_rate_limit_lock(api_key.user_id):
+            now = datetime.utcnow()
+            minute_window = now.replace(second=0, microsecond=0)
+            today = now.date()
 
-        user_keys = APIKey.query.filter_by(user_id=api_key.user_id).all()
-        account_tier = _determine_account_tier(user_keys)
-        minute_cap, daily_cap = get_limits_for_tier(account_tier)
+            user_keys = APIKey.query.filter_by(user_id=api_key.user_id).all()
+            account_tier = _determine_account_tier(user_keys)
+            minute_cap, daily_cap = get_limits_for_tier(account_tier)
 
-        limits = APIRateLimit.query.filter_by(api_key_id=api_key.id).first()
-        if not limits:
-            limits = APIRateLimit(
-                api_key_id=api_key.id,
-                minute_window_start=minute_window,
-                day=today,
+            limits = APIRateLimit.query.filter_by(api_key_id=api_key.id).first()
+            if not limits:
+                limits = APIRateLimit(
+                    api_key_id=api_key.id,
+                    minute_window_start=minute_window,
+                    day=today,
+                )
+                db.session.add(limits)
+
+            user_limits = (
+                APIRateLimit.query.join(APIKey)
+                .filter(APIKey.user_id == api_key.user_id)
+                .all()
             )
-            db.session.add(limits)
 
-        user_limits = (
-            APIRateLimit.query.join(APIKey)
-            .filter(APIKey.user_id == api_key.user_id)
-            .all()
-        )
-        aggregated_yesterday = sum(
-            (limit.day_count or 0) for limit in user_limits if limit.day == yesterday
-        )
+            if limits.minute_window_start != minute_window:
+                limits.minute_window_start = minute_window
+                limits.minute_count = 0
 
-        if limits.minute_window_start != minute_window:
-            limits.minute_window_start = minute_window
-            limits.minute_count = 0
+            if limits.minute_count is None:
+                limits.minute_count = 0
 
-        if limits.minute_count is None:
-            limits.minute_count = 0
+            if limits.day != today:
+                limits.day = today
+                limits.day_count = 0
 
-        if limits.day != today:
-            limits.day = today
-            limits.day_count = 0
+            if limits.day_count is None:
+                limits.day_count = 0
 
-        if limits.day_count is None:
-            limits.day_count = 0
+            aggregated_minute = sum(
+                (limit.minute_count or 0)
+                for limit in user_limits
+                if limit.minute_window_start == minute_window
+            )
+            aggregated_day = sum(
+                (limit.day_count or 0) for limit in user_limits if limit.day == today
+            )
 
-        aggregated_minute = sum(
-            (limit.minute_count or 0)
-            for limit in user_limits
-            if limit.minute_window_start == minute_window
-        )
-        aggregated_day = sum(
-            (limit.day_count or 0) for limit in user_limits if limit.day == today
-        )
+            minute_projection = aggregated_minute + cost_units
+            daily_projection = aggregated_day + cost_units
 
-        minute_projection = aggregated_minute + cost_units
-        daily_projection = aggregated_day + cost_units
+            if minute_projection > minute_cap or daily_projection > daily_cap:
+                db.session.rollback()
+                return _json_error(429, "rate limit exceeded")
 
-        if minute_projection > minute_cap or daily_projection > daily_cap:
-            db.session.rollback()
-            return _json_error(429, "rate limit exceeded")
-
-        limits.minute_count += cost_units
-        limits.day_count += cost_units
-        limits.updated_at = now
-        api_key.last_used_at = now
-        db.session.commit()
-        _bump_usage_hour(api_key.user_id, now, cost_units)
+            limits.minute_count += cost_units
+            limits.day_count += cost_units
+            limits.updated_at = now
+            api_key.last_used_at = now
+            db.session.commit()
+            _bump_usage_hour(api_key.user_id, now, cost_units)
 
         return func(*args, **kwargs)
 
@@ -464,32 +484,34 @@ def get_counter(counter_id: int):
 
 def _apply_counter_delta(counter_id: int, delta: int):
     _ensure_counter_table()
-    counter = _get_counter_for_user(counter_id, g.api_key.user_id)
-    if not counter:
-        return None, _json_error(404, "counter not found")
+    with _get_counter_lock(g.api_key.user_id, counter_id):
+        counter = _get_counter_for_user(counter_id, g.api_key.user_id)
+        if not counter:
+            return None, _json_error(404, "counter not found")
 
-    current_value = counter.value or 0
-    new_value = current_value + delta
-    if new_value < MIN_COUNTER_VALUE or new_value > MAX_COUNTER_VALUE:
-        return None, _json_error(400, f"value must stay between {MIN_COUNTER_VALUE} and {MAX_COUNTER_VALUE}")
+        current_value = counter.value or 0
+        new_value = current_value + delta
+        if new_value < MIN_COUNTER_VALUE or new_value > MAX_COUNTER_VALUE:
+            return None, _json_error(400, f"value must stay between {MIN_COUNTER_VALUE} and {MAX_COUNTER_VALUE}")
 
-    counter.value = new_value
-    counter.updated_at = datetime.utcnow()
-    db.session.commit()
-    return counter, None
+        counter.value = new_value
+        counter.updated_at = datetime.utcnow()
+        db.session.commit()
+        return counter, None
 
 
 def _set_counter_value(counter_id: int, value: int):
     _ensure_counter_table()
-    counter = _get_counter_for_user(counter_id, g.api_key.user_id)
-    if not counter:
-        return None, _json_error(404, "counter not found")
-    if value < MIN_COUNTER_VALUE or value > MAX_COUNTER_VALUE:
-        return None, _json_error(400, f"value must be between {MIN_COUNTER_VALUE} and {MAX_COUNTER_VALUE}")
-    counter.value = value
-    counter.updated_at = datetime.utcnow()
-    db.session.commit()
-    return counter, None
+    with _get_counter_lock(g.api_key.user_id, counter_id):
+        counter = _get_counter_for_user(counter_id, g.api_key.user_id)
+        if not counter:
+            return None, _json_error(404, "counter not found")
+        if value < MIN_COUNTER_VALUE or value > MAX_COUNTER_VALUE:
+            return None, _json_error(400, f"value must be between {MIN_COUNTER_VALUE} and {MAX_COUNTER_VALUE}")
+        counter.value = value
+        counter.updated_at = datetime.utcnow()
+        db.session.commit()
+        return counter, None
 
 
 @public_api_bp.post("/api/counters/<int:counter_id>/increment")

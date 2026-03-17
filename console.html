@@ -796,12 +796,21 @@ curl https://dimicheck.com/public/api/counters/{id} \
       renderTierProgress();
     }
 
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function renderOAuthClients() {
       const tbody = document.querySelector('#oauthClientsTable tbody'); const resultEl = document.getElementById('oauthCreateResult'); const editResultEl = document.getElementById('oauthEditResult'); const editForm = document.getElementById('editOAuthClientForm');
       if (!tbody) return;
-      if (state.oauth.error) { tbody.innerHTML = `<tr><td colspan="6" style="color:var(--muted)">${state.oauth.error}</td></tr>`; return; }
+      if (state.oauth.error) { tbody.innerHTML = `<tr><td colspan="6" style="color:var(--muted)">${escapeHtml(state.oauth.error)}</td></tr>`; return; }
       if (!state.oauth.clients.length) { tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted)">등록된 클라이언트가 없습니다.</td></tr>'; return; }
-      tbody.innerHTML = state.oauth.clients.map((client) => { const lastSecret = client.last_secret_rotated_at ? formatKSTDate(client.last_secret_rotated_at) : '-'; const lastJwt = client.last_jwt_rotated_at ? formatKSTDate(client.last_jwt_rotated_at) : '-'; return `<tr data-id="${client.id}" class="oauth-row"><td>${client.name}</td><td style="word-break:break-all">${client.client_id}</td><td style="max-width:220px;white-space:pre-wrap;word-break:break-word">${client.redirect_uris || '-'}</td><td>${client.scopes || '-'}</td><td style="font-size:12px;color:var(--muted)">Secret: ${lastSecret}<br/>JWT: ${lastJwt}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-ghost" type="button" data-action="rotate-secret" data-id="${client.id}">Secret 회전</button><button class="btn-ghost" type="button" data-action="rotate-jwt" data-id="${client.id}">JWT 회전</button><button class="btn-ghost" type="button" data-action="delete" data-id="${client.id}">삭제</button></div></td></tr>`; }).join('');
+      tbody.innerHTML = state.oauth.clients.map((client) => { const lastSecret = client.last_secret_rotated_at ? formatKSTDate(client.last_secret_rotated_at) : '-'; const lastJwt = client.last_jwt_rotated_at ? formatKSTDate(client.last_jwt_rotated_at) : '-'; return `<tr data-id="${client.id}" class="oauth-row"><td>${escapeHtml(client.name)}</td><td style="word-break:break-all">${escapeHtml(client.client_id)}</td><td style="max-width:220px;white-space:pre-wrap;word-break:break-word">${escapeHtml(client.redirect_uris || '-')}</td><td>${escapeHtml(client.scopes || '-')}</td><td style="font-size:12px;color:var(--muted)">Secret: ${escapeHtml(lastSecret)}<br/>JWT: ${escapeHtml(lastJwt)}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-ghost" type="button" data-action="rotate-secret" data-id="${client.id}">Secret 회전</button><button class="btn-ghost" type="button" data-action="rotate-jwt" data-id="${client.id}">JWT 회전</button><button class="btn-ghost" type="button" data-action="delete" data-id="${client.id}">삭제</button></div></td></tr>`; }).join('');
       tbody.querySelectorAll('.oauth-row').forEach((row) => row.addEventListener('click', () => selectClientForEdit(row.getAttribute('data-id'))));
       tbody.querySelectorAll('button[data-action]').forEach((btn) => btn.addEventListener('click', async (ev) => { ev.stopPropagation(); const id = btn.getAttribute('data-id'); const payload = {}; if (btn.dataset.action === 'rotate-secret') payload.rotate_secret = true; if (btn.dataset.action === 'rotate-jwt') payload.rotate_jwt_secret = true; if (btn.dataset.action === 'delete') { if (!confirm('클라이언트를 삭제할까요?')) return; try { await fetchJSON(`/api/dev/oauth/clients/${id}`, { method: 'DELETE' }); showToast('삭제되었습니다.'); await loadOAuthClients(); } catch (err) { showToast(err.message); } return; } try { await fetchJSON(`/api/dev/oauth/clients/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); showToast('갱신되었습니다.'); await loadOAuthClients(); } catch (err) { showToast(err.message); } }));
       if (resultEl) resultEl.textContent = '';

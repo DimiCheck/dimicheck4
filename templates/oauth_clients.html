@@ -48,10 +48,25 @@
       const data = await res.json();
       const tbody = document.querySelector('#client-table tbody');
       tbody.innerHTML = '';
+      const appendCell = (row, text) => {
+        const td = document.createElement('td');
+        td.textContent = text ?? '';
+        row.appendChild(td);
+      };
       data.clients.forEach(c => {
         const row = document.createElement('tr');
-        row.innerHTML = `<td>${c.name}</td><td>${c.client_id}</td><td>${c.redirect_uris}</td><td>${c.scopes}</td><td><button data-id="${c.id}">삭제</button></td>`;
-        row.querySelector('button').onclick = () => deleteClient(c.id);
+        appendCell(row, c.name);
+        appendCell(row, c.client_id);
+        appendCell(row, c.redirect_uris);
+        appendCell(row, c.scopes);
+        const actionTd = document.createElement('td');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.id = String(c.id);
+        btn.textContent = '삭제';
+        btn.onclick = () => deleteClient(c.id);
+        actionTd.appendChild(btn);
+        row.appendChild(actionTd);
         tbody.appendChild(row);
       });
     }

@@ -15,6 +15,7 @@ from models import (
     ClassState,
     ClassRoutine,
     ChatMessage,
+    ChatConsent,
     MealVote,
     CalendarEvent,
     TeacherNotice,
@@ -731,6 +732,8 @@ def upsert_thought():
         skip_chat_log = skip_chat_raw.lower() in ("true", "1", "yes", "y", "on")
     elif target in ("board", "board-only", "board_only"):
         skip_chat_log = True
+    if is_teacher:
+        skip_chat_log = True
 
     state = ClassState.query.filter_by(grade=grade, section=section).first()
     created_state = False
@@ -801,6 +804,13 @@ def upsert_thought():
 
     # Also save to ChatMessage table for persistent chat
     if thought_text and not skip_chat_log:
+        consent = ChatConsent.query.filter_by(
+            grade=grade,
+            section=section,
+            student_number=target_number,
+        ).first()
+        if not consent or consent.version != "v1":
+            return jsonify({"error": "chat consent required", "requiredVersion": "v1"}), 403
         chat_message = ChatMessage(
             grade=grade,
             section=section,
@@ -1653,7 +1663,11 @@ def update_calendar_event(event_id):
 
     # Only the creator, teacher, or board can edit
     if not is_teacher and not is_board:
-        if session_number != event.created_by:
+        if (
+            session_grade != event.grade
+            or session_section != event.section
+            or session_number != event.created_by
+        ):
             return jsonify({"error": "forbidden"}), 403
 
     payload = request.get_json() or {}
@@ -1702,7 +1716,11 @@ def delete_calendar_event(event_id):
 
     # Only the creator, teacher, or board can delete
     if not is_teacher and not is_board:
-        if session_number != event.created_by:
+        if (
+            session_grade != event.grade
+            or session_section != event.section
+            or session_number != event.created_by
+        ):
             return jsonify({"error": "forbidden"}), 403
 
     db.session.delete(event)

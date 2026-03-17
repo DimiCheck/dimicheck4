@@ -37,6 +37,8 @@ def register_authorize_routes(bp):
         allowed_scopes = client_allowed_scopes(client) or DEFAULT_SCOPE
         if not ensure_scopes_subset(requested_scopes, allowed_scopes):
             return None, (jsonify({"error": "invalid_scope"}), 400)
+        if not client.client_secret and not code_challenge:
+            return None, (jsonify({"error": "invalid_request", "message": "pkce_required"}), 400)
         if code_challenge and code_challenge_method not in {"PLAIN", "S256"}:
             return None, (jsonify({"error": "invalid_request", "message": "unsupported code_challenge_method"}), 400)
         return {

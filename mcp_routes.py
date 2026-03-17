@@ -17,11 +17,63 @@ from class_routes import (
     _normalize_channels,
     _normalize_participant_map,
 )
+from chat_routes import (
+    CHAT_CONSENT_VERSION,
+    DEFAULT_CHANNEL,
+    _has_current_chat_consent,
+    _is_valid_channel_name,
+    _resolve_message_channel,
+    _normalize_channel_name,
+)
+from content_filter import contains_slang
 from extensions import db
 from models import CalendarEvent, ChatMessage, ClassRoutine, ClassState, HomeTarget, User, UserType
 from oauth.utils import decode_access_token
 
 blueprint = Blueprint("mcp_api", __name__, url_prefix="/api/mcp")
+
+
+def _coerce_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _split_student_identifier(value: Any) -> tuple[int | None, int | None, int | None]:
+    if value is None:
+        return None, None, None
+    digits = "".join(ch for ch in str(value) if ch.isdigit())
+    if not digits:
+        return None, None, None
+    if len(digits) >= 3:
+        grade = _coerce_int(digits[0])
+        seat = _coerce_int(digits[-2:])
+        section_digits = digits[1:-2]
+        section = _coerce_int(section_digits) if section_digits else None
+        return grade, section, seat
+    return None, None, _coerce_int(digits)
+
+
+def _student_identity_from_user(user: User) -> tuple[int | None, int | None, int | None]:
+    """
+    Resolve student context from server-side user record only.
+    Never trust query/claim overrides for student context.
+    """
+    grade = _coerce_int(getattr(user, "grade", None))
+    section = _coerce_int(getattr(user, "class_no", None))
+    raw_number = getattr(user, "number", None)
+    number = _coerce_int(raw_number)
+    derived_grade, derived_section, derived_number = _split_student_identifier(raw_number)
+
+    if grade is None:
+        grade = derived_grade
+    if section is None:
+        section = derived_section
+    if derived_number is not None and (number is None or number > 99):
+        number = derived_number
+
+    return grade, section, number
 
 
 def _decode_bearer() -> tuple[User | None, dict[str, Any]]:
@@ -56,6 +108,9 @@ def _require_user() -> tuple[User, dict[str, Any]] | tuple[None, None]:
 
 
 def _resolve_class_context(user: User, claims: dict[str, Any]) -> Tuple[int | None, int | None, int | None]:
+    if user.type == UserType.STUDENT:
+        return _student_identity_from_user(user)
+
     grade = request.args.get("grade", type=int)
     section = request.args.get("section", type=int)
     number = request.args.get("number", type=int)
@@ -359,16 +414,41 @@ def mcp_chat_send():
     user, claims = _require_user()
     if not user:
         return jsonify({"error": {"code": "unauthorized", "message": "login required"}}), 401
-    grade, section, number = _resolve_class_context(user, claims or {})
+    if user.type != UserType.STUDENT:
+        return jsonify({"error": {"code": "forbidden", "message": "student account required"}}), 403
+
+    grade, section, number = _student_identity_from_user(user)
     if grade is None or section is None or number is None:
         return jsonify({"error": {"code": "bad_request", "message": "grade/section/number required"}}), 400
+
+    if not _has_current_chat_consent(grade, section, number):
+        return jsonify(
+            {
+                "error": {
+                    "code": "consent_required",
+                    "message": "chat consent required",
+                },
+                "requiredVersion": CHAT_CONSENT_VERSION,
+            }
+        ), 403
+
     payload = request.get_json(silent=True) or {}
     message_text = (payload.get("message") or "").strip()
     if not message_text:
         return jsonify({"error": {"code": "bad_request", "message": "message required"}}), 400
     if len(message_text) > 500:
         message_text = message_text[:500]
-    channel = (payload.get("channel") or "home").strip() or "home"
+    if contains_slang(message_text):
+        return jsonify({"error": {"code": "bad_request", "message": "message contains prohibited words"}}), 400
+
+    requested_channel = _normalize_channel_name(payload.get("channel"))
+    if not _is_valid_channel_name(requested_channel):
+        requested_channel = DEFAULT_CHANNEL
+
+    channel, _, channel_error = _resolve_message_channel(grade, section, requested_channel)
+    if channel_error:
+        return channel_error
+
     chat_message = ChatMessage(
         grade=grade,
         section=section,

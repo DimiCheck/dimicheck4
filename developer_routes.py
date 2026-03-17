@@ -279,7 +279,7 @@ def list_oauth_clients():
 @blueprint.post("/oauth/clients")
 def create_oauth_client():
     _ensure_oauth_rotation_columns()
-    _require_user()
+    _require_teacher_user()
     payload = request.get_json(silent=True) or {}
     name = (payload.get("name") or "").strip()
     redirect_uris = (payload.get("redirect_uris") or "").strip()

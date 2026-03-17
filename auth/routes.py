@@ -155,6 +155,28 @@ def _build_app_redirect(uri: str, params: Dict[str, Any]) -> str:
     return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment))
 
 
+def _resolve_post_login_redirect(target: str | None) -> str:
+    """Only allow relative or same-origin redirects after login."""
+    default_target = "/user.html"
+    if not target:
+        return default_target
+
+    parsed = urlparse(str(target))
+    if parsed.scheme or parsed.netloc:
+        current_host = (request.host or "").split(":", 1)[0].lower()
+        if parsed.scheme in {"http", "https"} and (parsed.hostname or "").lower() == current_host:
+            path = parsed.path or default_target
+            if not path.startswith("/") or path.startswith("//"):
+                return default_target
+            return urlunparse(("", "", path, parsed.params, parsed.query, parsed.fragment))
+        return default_target
+
+    path = parsed.path or default_target
+    if not path.startswith("/") or path.startswith("//"):
+        return default_target
+    return urlunparse(("", "", path, parsed.params, parsed.query, parsed.fragment))
+
+
 def _get_legacy_public_key() -> str:
     resp = requests.get(config.OAUTH_PUBLIC_KEY_URL or LEGACY_PUBLIC_KEY_URL, timeout=5)
     resp.raise_for_status()
@@ -220,7 +242,7 @@ def _finalize_login(user: User, remember: bool) -> Response:
     issue_session(user)
     if not session.get("csrf_token"):
         session["csrf_token"] = secrets.token_hex(16)
-    redirect_target = session.pop("post_login_redirect", "/user.html")
+    redirect_target = _resolve_post_login_redirect(session.pop("post_login_redirect", "/user.html"))
 
     # 기본 서비스 약관 동의 체크
     if _requires_terms_consent(user):
@@ -262,7 +284,7 @@ def login() -> Response:
     remember = str(request.args.get("remember", "1")).lower() not in {"0", "false", "off"}
     next_url = request.args.get("next")
     if next_url:
-        session["post_login_redirect"] = next_url
+        session["post_login_redirect"] = _resolve_post_login_redirect(next_url)
     session["remember_me_requested"] = remember
     if not config.USE_DIMICHECK_OAUTH:
         return redirect(_build_legacy_login_url())
@@ -356,6 +378,9 @@ def app_login_complete() -> Response:
         remember_token, expires_at = issue_remember_token(db_user, device_info="flutter_app")
         remember_expires = int(expires_at.timestamp())
 
+    parsed_redirect = urlparse(redirect_uri)
+    is_web_redirect = parsed_redirect.scheme in {"http", "https"}
+
     payload = {
         "status": "ok",
         "user_id": db_user.id,
@@ -365,11 +390,13 @@ def app_login_complete() -> Response:
         "class": db_user.class_no,
         "section": db_user.class_no,
         "number": db_user.number,
-        "remember_token": remember_token,
-        "remember_cookie": current_app.config["REMEMBER_ME_COOKIE_NAME"] if remember_token else None,
-        "remember_expires": remember_expires,
-        "csrf_token": session.get("csrf_token"),
     }
+    if not is_web_redirect:
+        payload["csrf_token"] = session.get("csrf_token")
+        if remember_token:
+            payload["remember_token"] = remember_token
+            payload["remember_cookie"] = current_app.config["REMEMBER_ME_COOKIE_NAME"]
+            payload["remember_expires"] = remember_expires
 
     session.pop("app_login_redirect", None)
 

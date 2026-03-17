@@ -307,37 +307,48 @@ class MediaManager {
       return;
     }
 
-    this.classEmojiGrid.innerHTML = this.classEmojis.map(emoji => {
+    this.classEmojiGrid.innerHTML = '';
+
+    this.classEmojis.forEach((emoji) => {
       const canDelete = this.currentStudentNumber === emoji.uploadedBy;
-      return `
-        <div class="emoji-item" data-emoji-id="${emoji.id}" data-emoji-url="${emoji.imageUrl}">
-          <img src="${emoji.imageUrl}" alt="${emoji.name}" loading="lazy" />
-          <div class="emoji-item-name">${emoji.name}</div>
-          ${canDelete ? '<button class="emoji-item-delete" data-emoji-id="' + emoji.id + '">×</button>' : ''}
-        </div>
-      `;
-    }).join('');
+      const item = document.createElement('div');
+      item.className = 'emoji-item';
+      item.dataset.emojiId = String(emoji.id ?? '');
+      item.dataset.emojiUrl = String(emoji.imageUrl ?? '');
 
-    // Add click handlers
-    this.classEmojiGrid.querySelectorAll('.emoji-item').forEach(item => {
+      const image = document.createElement('img');
+      image.src = String(emoji.imageUrl ?? '');
+      image.alt = String(emoji.name ?? '');
+      image.loading = 'lazy';
+
+      const name = document.createElement('div');
+      name.className = 'emoji-item-name';
+      name.textContent = String(emoji.name ?? '');
+
+      item.appendChild(image);
+      item.appendChild(name);
+
+      if (canDelete) {
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'emoji-item-delete';
+        deleteBtn.dataset.emojiId = String(emoji.id ?? '');
+        deleteBtn.textContent = '×';
+        deleteBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (confirm('이 이모티콘을 삭제하시겠습니까?')) {
+            await this.deleteEmoji(deleteBtn.dataset.emojiId);
+          }
+        });
+        item.appendChild(deleteBtn);
+      }
+
       item.addEventListener('click', (e) => {
-        // Don't trigger if clicking delete button
         if (e.target.classList.contains('emoji-item-delete')) return;
-
-        const emojiUrl = item.dataset.emojiUrl;
-        this.selectClassEmoji(emojiUrl);
+        this.selectClassEmoji(item.dataset.emojiUrl);
       });
-    });
 
-    // Add delete handlers
-    this.classEmojiGrid.querySelectorAll('.emoji-item-delete').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const emojiId = btn.dataset.emojiId;
-        if (confirm('이 이모티콘을 삭제하시겠습니까?')) {
-          await this.deleteEmoji(emojiId);
-        }
-      });
+      this.classEmojiGrid.appendChild(item);
     });
   }
 

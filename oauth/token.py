@@ -62,7 +62,7 @@ def register_token_routes(bp):
         return jsonify({"revoked": True}), 200
 
 
-def _authenticate_client(allow_public: bool = False) -> OAuthClient | None:
+def _authenticate_client() -> OAuthClient | None:
     client_id = request.form.get("client_id")
     client_secret = request.form.get("client_secret")
     auth_header = request.headers.get("Authorization", "")
@@ -79,10 +79,10 @@ def _authenticate_client(allow_public: bool = False) -> OAuthClient | None:
     if not client:
         _log_token_request("auth.client_not_found", request.form, extra={"client_id": client_id})
         return None
-    if allow_public and not client_secret:
-        _log_token_request("auth.public_client_ok", request.form, extra={"client_id": client_id})
-        return client
     if not client_secret:
+        if not client.client_secret:
+            _log_token_request("auth.public_client_ok", request.form, extra={"client_id": client_id})
+            return client
         _log_token_request("auth.missing_secret", request.form, extra={"client_id": client_id})
         return None
     if client.client_secret != client_secret:
@@ -108,10 +108,6 @@ def _verify_pkce(code, verifier: str | None) -> bool:
 
 def _handle_authorization_code():
     client = _authenticate_client()
-    public_client = False
-    if not client:
-        client = _authenticate_client(allow_public=True)
-        public_client = client is not None
     if not client:
         _log_token_request("authz.invalid_client", request.form)
         return jsonify({"error": "invalid_client"}), 401
@@ -138,21 +134,30 @@ def _handle_authorization_code():
         return jsonify({"error": "expired_code"}), 400
     if code.used:
         _log_token_request("authz.reuse_code", request.form)
-    if public_client and code.code_challenge and not request.form.get("code_verifier"):
-        _log_token_request("authz.code_verifier_missing", request.form)
-        return jsonify({"error": "invalid_request", "error_description": "code_verifier_required"}), 400
+        return jsonify({"error": "invalid_grant"}), 400
+    if not client.client_secret and not code.code_challenge:
+        _log_token_request("authz.pkce_required", request.form)
+        return jsonify({"error": "invalid_grant", "error_description": "pkce_required"}), 400
     if not _verify_pkce(code, request.form.get("code_verifier")):
         _log_token_request("authz.pkce_failed", request.form)
         return jsonify({"error": "invalid_grant", "error_description": "pkce_verification_failed"}), 400
     user = User.query.get(code.user_id)
     if not user:
         return jsonify({"error": "user_not_found"}), 400
-    code.used = True
+    consumed = (
+        OAuthAuthorizationCode.query
+        .filter_by(id=code.id, used=False)
+        .update({"used": True}, synchronize_session=False)
+    )
+    if consumed != 1:
+        db.session.rollback()
+        _log_token_request("authz.reuse_race", request.form)
+        return jsonify({"error": "invalid_grant"}), 400
     db.session.commit()
     scopes = split_scopes(code.scope)
     access_token, expires_in = issue_access_token(user, client, scopes)
     refresh_record = issue_refresh_token(user, client, scopes)
-    _log_token_request("authz.success", request.form, extra={"user_id": user.id, "scopes": scopes, "public": public_client})
+    _log_token_request("authz.success", request.form, extra={"user_id": user.id, "scopes": scopes})
     return jsonify(
         {
             "access_token": access_token,

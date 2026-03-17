@@ -998,6 +998,9 @@ window.forceResyncState = async function forceResyncState() {
   }
   try {
     await saveState(grade, section);
+    if (typeof window.flushBoardStateSync === 'function') {
+      await window.flushBoardStateSync();
+    }
     await loadState(grade, section, { ignoreOffline: true, forceSync: true });
     await loadRoutineData(true);
   } catch (err) {
@@ -1014,9 +1017,12 @@ setInterval(() => {
     !window.isAutoReturning &&
     !window.isRoutineApplying
   ) {
+    if (typeof window.hasPendingBoardSync === 'function' && window.hasPendingBoardSync(grade, section)) {
+      return;
+    }
     loadState(grade, section);
   }
-}, 1000);
+}, 4000);
 
 setInterval(() => {
   if (
@@ -1034,4 +1040,4 @@ setInterval(() => {
     return;
   }
   loadBoardNotices();
-}, 5000);
+}, 10000);

@@ -338,15 +338,28 @@ class VotingManager {
       const percent = total > 0 ? Math.round((count / total) * 100) : 0;
       const row = document.createElement('div');
       row.className = 'vote-result-row';
-      row.innerHTML = `
-        <div class="vote-result-meta">
-          <span>${option}</span>
-          <span>${count}표 ・ ${percent}%</span>
-        </div>
-        <div class="vote-result-bar-wrap">
-          <div class="vote-result-bar" style="width:${percent}%"></div>
-        </div>
-      `;
+      const meta = document.createElement('div');
+      meta.className = 'vote-result-meta';
+
+      const optionSpan = document.createElement('span');
+      optionSpan.textContent = option;
+
+      const countSpan = document.createElement('span');
+      countSpan.textContent = `${count}표 ・ ${percent}%`;
+
+      meta.appendChild(optionSpan);
+      meta.appendChild(countSpan);
+
+      const barWrap = document.createElement('div');
+      barWrap.className = 'vote-result-bar-wrap';
+
+      const bar = document.createElement('div');
+      bar.className = 'vote-result-bar';
+      bar.style.width = `${percent}%`;
+
+      barWrap.appendChild(bar);
+      row.appendChild(meta);
+      row.appendChild(barWrap);
       this.resultList.appendChild(row);
     });
 
