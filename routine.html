@@ -54,7 +54,7 @@
       --bg-2: #151a22;
       --card: rgba(20,25,33,.94);
       --card-2: rgba(25,31,41,.96);
-      --surface: rgba(29,36,47,.92);
+      --surface: rgba(38,46,59,.98);
       --text: #f3f6fb;
       --muted: #bcc7d6;
       --primary: #d04fff;
@@ -71,7 +71,7 @@
       --bg-2: #eef2f8;
       --card: rgba(255,255,255,.96);
       --card-2: rgba(249,251,255,.98);
-      --surface: rgba(243,247,252,.96);
+      --surface: rgba(235,240,247,.98);
       --text: #0f172a;
       --muted: #5b6475;
       --primary: #d04fff;
@@ -85,7 +85,7 @@
       --bg-2: #151a22;
       --card: rgba(20,25,33,.94);
       --card-2: rgba(25,31,41,.96);
-      --surface: rgba(29,36,47,.92);
+      --surface: rgba(38,46,59,.98);
       --text: #f3f6fb;
       --muted: #bcc7d6;
       --primary: #d04fff;
@@ -100,7 +100,7 @@
         --bg-2: #eef2f8;
         --card: rgba(255,255,255,.96);
         --card-2: rgba(249,251,255,.98);
-        --surface: rgba(243,247,252,.96);
+        --surface: rgba(235,240,247,.98);
         --text: #0f172a;
         --muted: #5b6475;
         --primary: #d04fff;
@@ -177,7 +177,7 @@
       padding:16px;
       border:1px solid var(--border);
       border-radius:16px;
-      background:var(--surface);
+      background:linear-gradient(180deg, color-mix(in oklab, var(--surface) 90%, white 10%), var(--surface));
       transition:transform .3s ease, box-shadow .3s ease;
     }
     .card:hover{
@@ -187,8 +187,8 @@
 
     .pill-row{display:flex; flex-wrap:wrap; gap:10px}
     .pill{
-      appearance:none; border:1px solid color-mix(in oklab, var(--text) 18%, transparent);
-      background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      appearance:none; border:1px solid var(--border);
+      background:linear-gradient(180deg, color-mix(in oklab, var(--surface) 92%, white 8%), var(--surface));
       color:var(--text); padding:10px 14px; border-radius:999px;
       cursor:pointer; font-weight:700; letter-spacing:.1px; font-size:14px;
       transition:all .3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -213,7 +213,7 @@
     }
     .pill:hover{
       transform:translateY(-2px) scale(1.05);
-      box-shadow:0 4px 12px rgba(0,0,0,.15);
+      box-shadow:0 4px 10px rgba(0,0,0,.12);
     }
     .pill:active{
       transform:scale(0.94);
@@ -247,8 +247,8 @@
       box-shadow:0 0 0 4px color-mix(in oklab, var(--primary) 20%, transparent), 0 4px 12px rgba(0,0,0,.15);
     }
     .btn.ghost{
-      background:transparent; color:var(--text);
-      border:1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      background:var(--surface); color:var(--text);
+      border:1px solid var(--border);
     }
     .btn.ghost:active{
       box-shadow:0 0 0 4px color-mix(in oklab, var(--text) 15%, transparent);

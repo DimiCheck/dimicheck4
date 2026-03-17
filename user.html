@@ -56,7 +56,7 @@
       --bg-2: #151a22;
       --card: rgba(20,25,33,.94);
       --card-2: rgba(25,31,41,.96);
-      --surface: rgba(29,36,47,.92);
+      --surface: rgba(38,46,59,.98);
       --text: #f3f6fb;
       --muted: #bcc7d6;
       --primary: #d04fff;
@@ -73,7 +73,7 @@
       --bg-2: #eef2f8;
       --card: rgba(255,255,255,.96);
       --card-2: rgba(249,251,255,.98);
-      --surface: rgba(243,247,252,.96);
+      --surface: rgba(235,240,247,.98);
       --text: #0f172a;
       --muted: #5b6475;
       --primary: #d04fff;
@@ -87,7 +87,7 @@
       --bg-2: #151a22;
       --card: rgba(20,25,33,.94);
       --card-2: rgba(25,31,41,.96);
-      --surface: rgba(29,36,47,.92);
+      --surface: rgba(38,46,59,.98);
       --text: #f3f6fb;
       --muted: #bcc7d6;
       --primary: #d04fff;
@@ -102,7 +102,7 @@
         --bg-2: #eef2f8;
         --card: rgba(255,255,255,.96);
         --card-2: rgba(249,251,255,.98);
-        --surface: rgba(243,247,252,.96);
+        --surface: rgba(235,240,247,.98);
         --text: #0f172a;
         --muted: #5b6475;
         --primary: #d04fff;
@@ -197,7 +197,7 @@
       padding:16px;
       border:1px solid var(--border);
       border-radius:calc(var(--radius) + 4px);
-      background:var(--surface);
+      background:linear-gradient(180deg, color-mix(in oklab, var(--surface) 92%, white 8%), var(--surface));
     }
     .now.glow{
       box-shadow:0 0 0 10px color-mix(in oklab, #38d67a 32%, transparent);
@@ -247,7 +247,7 @@
     .status-card{
       cursor:pointer; position:relative; padding:16px 16px 18px;
       border-radius:16px; border:1px solid var(--border);
-      background:var(--surface);
+      background:linear-gradient(180deg, color-mix(in oklab, var(--surface) 90%, white 10%), var(--surface));
       transition:all .3s cubic-bezier(0.34, 1.56, 0.64, 1);
       overflow:hidden;
     }
@@ -277,9 +277,9 @@
     }
     .status-card.selected{
       transform:translateY(-2px) scale(1.02);
-      box-shadow:0 0 0 10px color-mix(in oklab, #38d67a 32%, transparent);
+      box-shadow:0 0 0 6px color-mix(in oklab, #38d67a 24%, transparent);
       border-color: color-mix(in oklab, #38d67a 45%, transparent);
-      background:linear-gradient(180deg, color-mix(in oklab, #38d67a 10%, rgba(255,255,255,.1)), rgba(255,255,255,.05));
+      background:linear-gradient(180deg, color-mix(in oklab, #38d67a 14%, var(--surface)), color-mix(in oklab, #38d67a 8%, var(--surface)));
       animation:bounce-in .4s cubic-bezier(0.34, 1.2, 0.64, 1);
     }
     .status-card:not(.selected){
@@ -299,22 +299,22 @@
     .status-card.selected:active{
       box-shadow:0 0 0 10px color-mix(in oklab, var(--primary) 35%, transparent);
     }
-    .status-label{font-weight:800; letter-spacing:.2px; margin-bottom:6px}
-    .status-desc{color:var(--muted); font-size:13px}
+    .status-label{font-weight:800; letter-spacing:.2px; margin-bottom:6px; color:var(--text)}
+    .status-desc{color:color-mix(in oklab, var(--muted) 90%, var(--text)); font-size:13px}
 
     .etc-box{ display:none; gap:10px; margin-top:12px; flex-wrap:wrap }
     .etc-row{ display:flex; gap:10px; width:100% }
     .input{
       width:100%; height:44px; padding:0 14px; border-radius:12px; outline:none; font-size:14px; color:var(--text);
-      background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
-      border:1px solid color-mix(in oklab, var(--text) 18%, transparent);
+      background:var(--surface);
+      border:1px solid var(--border);
       box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
     }
     .chip-list{display:flex; flex-wrap:wrap; gap:8px}
     .chip{
       display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px;
-      border:1px solid color-mix(in oklab, var(--text) 18%, transparent);
-      background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      border:1px solid var(--border);
+      background:var(--surface);
       font-size:13px;
     }
     .chip .del{
@@ -352,8 +352,8 @@
       box-shadow:0 0 0 4px color-mix(in oklab, var(--primary) 20%, transparent), 0 4px 12px rgba(0,0,0,.15);
     }
     .btn.ghost{
-      background:transparent; color:var(--text);
-      border:1px solid color-mix(in oklab, var(--text) 12%, transparent); width:auto; padding:10px 12px;
+      background:var(--surface); color:var(--text);
+      border:1px solid var(--border); width:auto; padding:10px 12px;
     }
     .btn.ghost:active{
       box-shadow:0 0 0 4px color-mix(in oklab, var(--text) 15%, transparent);
