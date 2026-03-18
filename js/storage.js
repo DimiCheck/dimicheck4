@@ -49,7 +49,14 @@ const connectionMonitor = (() => {
       if (!res.ok) throw new Error(`health ${res.status}`);
       markSuccess();
     } catch {
-      // keep waiting
+      failureStreak += 1;
+      successStreak = 0;
+      if (state !== 'offline' && failureStreak >= FAILURE_THRESHOLD) {
+        failureStreak = 0;
+        state = 'offline';
+        showBanner('offline', OFFLINE_HTML);
+        startHealthMonitoring();
+      }
     }
   }
 
@@ -91,14 +98,9 @@ const connectionMonitor = (() => {
   }
 
   function markFailure() {
-    if (state === 'offline') return;
     successStreak = 0;
-    failureStreak += 1;
-    if (failureStreak < FAILURE_THRESHOLD) return;
-    failureStreak = 0;
-    state = 'offline';
-    showBanner('offline', OFFLINE_HTML);
     startHealthMonitoring();
+    runHealthCheck();
   }
 
   function markSuccess() {
@@ -108,6 +110,10 @@ const connectionMonitor = (() => {
       if (successStreak < RECOVERY_SUCCESS_THRESHOLD) return;
       successStreak = 0;
       handleRecovery();
+      return;
+    }
+    if (healthTimer) {
+      stopHealthMonitoring();
     }
   }
 
