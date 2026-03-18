@@ -235,6 +235,56 @@ def _normalize_notice_targets(payload: dict) -> tuple[bool, list[str]]:
     return False, targets
 
 
+_PRESENT_SPECIAL_TAGS = {"toilet", "hallway"}
+
+
+def _filtered_magnets_for_class(
+    state: ClassState | None,
+    grade: int,
+    section: int,
+    class_config: dict | None = None,
+) -> tuple[dict[str, dict[str, object]], dict | None]:
+    skip_numbers = set((class_config or {}).get("skip_numbers", []))
+    data = _load_state_payload(state)
+    magnets = data.get("magnets", {})
+    filtered_magnets: dict[str, dict[str, object]] = {}
+    for num, value in magnets.items():
+        normalized_key = _normalize_magnet_number_key(num)
+        if normalized_key is None:
+            continue
+        if int(normalized_key) in skip_numbers:
+            continue
+        filtered_magnets[normalized_key] = value
+    return filtered_magnets, data.get("marquee")
+
+
+def _serialize_grade_state_section(
+    grade: int,
+    section: int,
+    state: ClassState | None,
+    class_config: dict | None,
+) -> dict[str, object]:
+    magnets, marquee = _filtered_magnets_for_class(state, grade, section, class_config)
+    total = len(magnets)
+    absence = 0
+    for magnet_data in magnets.values():
+        category = magnet_data.get("attachedTo")
+        is_present_normal = not category or category == "section"
+        is_present_special = category in _PRESENT_SPECIAL_TAGS
+        if not is_present_normal and not is_present_special:
+            absence += 1
+
+    return {
+        "section": section,
+        "magnets": magnets,
+        "marquee": marquee,
+        "total": total,
+        "absence": absence,
+        "present": total - absence,
+        "updatedAt": state.updated_at.isoformat() if state and state.updated_at else None,
+    }
+
+
 def _notice_matches_class(notice: TeacherNotice, grade: int, section: int) -> bool:
     if notice.target_all:
         return True
@@ -859,30 +909,37 @@ def load_class_state():
     if not state:
         return jsonify({"magnets": {}, "marquee": None})
 
-    # Load class config to filter skip_numbers
-    class_config = load_class_config().get((grade, section))
-    skip_numbers = set(class_config.get("skip_numbers", [])) if class_config else set()
-
-    # Parse state data and filter out skip_numbers
     try:
-        data = _load_state_payload(state)
-        magnets = data.get("magnets", {})
-
-        # Filter out students in skip_numbers
-        filtered_magnets = {}
-        for num, value in magnets.items():
-            try:
-                # Try to convert to int for comparison
-                num_int = int(float(num))  # Handle "12.5" -> 12
-                if num_int not in skip_numbers:
-                    filtered_magnets[num] = value
-            except (ValueError, TypeError):
-                # Keep non-numeric keys
-                filtered_magnets[num] = value
-
-        return jsonify({"magnets": filtered_magnets, "marquee": data.get("marquee")})
+        class_config = load_class_config().get((grade, section))
+        magnets, marquee = _filtered_magnets_for_class(state, grade, section, class_config)
+        return jsonify({"magnets": magnets, "marquee": marquee})
     except json.JSONDecodeError:
         return jsonify({"magnets": {}, "marquee": None})
+
+
+@blueprint.get("/grade-state")
+def load_grade_state():
+    grade = request.args.get("grade", type=int)
+    if grade is None:
+        return jsonify({"error": "grade required"}), 400
+    if not _teacher_only():
+        return jsonify({"error": "forbidden"}), 403
+
+    class_configs = load_class_config()
+    states_by_section = {
+        state.section: state
+        for state in ClassState.query.filter_by(grade=grade).all()
+    }
+    sections = [
+        _serialize_grade_state_section(
+            grade,
+            section,
+            states_by_section.get(section),
+            class_configs.get((grade, section)),
+        )
+        for section in range(1, 7)
+    ]
+    return jsonify({"grade": grade, "sections": sections})
 
 
 @blueprint.post("/marquee")

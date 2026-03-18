@@ -477,15 +477,20 @@
   noticeSendBtn.addEventListener('click', sendTeacherNotice);
   initNoticeTargetSelector();
   const gradeButtons=document.querySelectorAll('.grade-btn');
-  gradeButtons.forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const g=Number(btn.dataset.grade);
-      setActiveGrade(g); updateMainTitle(g); updateClassDisplay(g);
-    });
+  const classCards = Array.from(document.querySelectorAll('#classGrid .class-card'));
+  classCards.forEach((card, index) => {
+    card.dataset.section = String(index + 1);
+    if (!card.dataset.view) card.dataset.view = 'away';
   });
 
   const AWAY_TAGS = new Set(["club", "afterschool", "project", "early", "etc", "absence"]);
   const PRESENT_SPECIAL_TAGS = new Set(["toilet","hallway"]);
+  const EMPTY_SNAPSHOT = Object.freeze({ magnets: {}, total: 0, absence: 0, present: 0 });
+  let gradeStateSnapshot = new Map();
+  let gradeStateRequestToken = 0;
+  let gradeStateAbortController = null;
+  let gradeReloadTimer = null;
+  let skipRealtimeReloadUntil = 0;
 
   const LABELS={toilet:"화장실",hallway:"복도",club:"동아리",afterschool:"방과후",project:"프로젝트",early:"조기입실",etc:"기타",absence:"결석",section:"교실"};
 
@@ -576,114 +581,84 @@ function setActiveSlot(card, which /* 'total' | 'away' | 'present' */) {
     return `${h}:${m}`;
   }
 
-  async function loadClassState(grade){
-    let totalG=0,absG=0,presG=0;
+  function getSectionSnapshot(section) {
+    return gradeStateSnapshot.get(section) || EMPTY_SNAPSHOT;
+  }
 
-    for (let section = 1; section <= 6; section++) {
-      try {
-        const res = await fetch(`/api/classes/state/load?grade=${grade}&section=${section}`);
-        if (!res.ok) continue;
-        const parsed  = await res.json();
-        const magnets = Object.fromEntries(
-          Object.entries(parsed.magnets || {}).filter(([num]) => {
-            const parsedNum = Number(num);
-            return Number.isFinite(parsedNum) && parsedNum > 0;
-          })
-        );
-        const total   = Object.keys(magnets).length;
+  function renderClassCard(card, grade, section, snapshot) {
+    const view = card.dataset.view || 'away';
+    const slots = card.querySelectorAll(".student-slot .empty-slot");
+    const footer = card.querySelector(".class-footer");
+    const magnets = snapshot?.magnets || {};
+    const total = Number(snapshot?.total) || 0;
+    const absence = Number(snapshot?.absence) || 0;
+    const present = Number(snapshot?.present) || 0;
 
-        // 결원 집계: 교실(null/section) + 화장실/복도는 제외!
-        let absence = 0;
-        for (const [, data] of Object.entries(magnets)) {
-          const cat = data?.attachedTo;
-          const isPresentNormal  = !cat || cat === "section";
-          const isPresentSpecial = PRESENT_SPECIAL_TAGS.has(cat); // 화장실/복도
-          if (!isPresentNormal && !isPresentSpecial) absence++;
-        }
-        const present = total - absence;
+    if (slots[0]) slots[0].textContent = total;
+    if (slots[1]) slots[1].textContent = absence;
+    if (slots[2]) slots[2].textContent = present;
 
-        // 카드 DOM
-        const card  = document.querySelector(`#classGrid .class-card:nth-child(${section})`);
-        const slots = card.querySelectorAll(".student-slot .empty-slot");
-        const footer = card.querySelector(".class-footer");
+    footer.innerHTML = buildCardChips(magnets, grade, section, view) || "";
+    if (total === 0) footer.textContent = "DIMICHECK 등록 없음";
+    setActiveSlot(card, view);
+  }
 
-        // 숫자 반영
-        if (slots[0]) slots[0].textContent = total;   // 총원
-        if (slots[1]) slots[1].textContent = absence; // 결원
-        if (slots[2]) slots[2].textContent = present; // 현원
+  function renderGradeState(grade, sections) {
+    gradeStateSnapshot = new Map((sections || []).map((snapshot) => [Number(snapshot.section), snapshot]));
 
-        // 기본 보기: 결원
-        if (!card.dataset.view) card.dataset.view = "away";
+    let totalG = 0;
+    let absG = 0;
+    let presG = 0;
+    classCards.forEach((card, index) => {
+      const section = index + 1;
+      const snapshot = getSectionSnapshot(section);
+      totalG += Number(snapshot.total) || 0;
+      absG += Number(snapshot.absence) || 0;
+      presG += Number(snapshot.present) || 0;
+      renderClassCard(card, grade, section, snapshot);
+    });
 
-        // 칩 렌더
-        footer.innerHTML = buildCardChips(magnets, grade, section, card.dataset.view) || "";
-        if (total === 0) footer.textContent = "DIMICHECK 등록 없음";
-
-        // 칩 클릭(상태 변경)
-        footer.querySelectorAll(".chip").forEach(chip => {
-          chip.onclick = () => {
-            openStatusSelector(chip.dataset.grade, chip.dataset.section, chip.dataset.number, chip.dataset.status);
-          };
-        });
-
-        // 슬롯 클릭 시 보기 전환
-        const rowEls = card.querySelectorAll(".student-slots .student-slot");
-        const [slotTotal, slotAway, slotPresent] = rowEls;
-
-        if (slotTotal) {
-          slotTotal.onclick = () => {
-            card.dataset.view = "total";
-            setActiveSlot(card, "total");
-            footer.innerHTML = buildCardChips(magnets, grade, section, "total");
-            footer.querySelectorAll(".chip").forEach(chip => {
-              chip.onclick = () => openStatusSelector(chip.dataset.grade, chip.dataset.section, chip.dataset.number, chip.dataset.status);
-            });
-          };
-        }
-        if (slotAway) {
-          slotAway.onclick = () => {
-            card.dataset.view = "away";
-            setActiveSlot(card, "away");
-            footer.innerHTML = buildCardChips(magnets, grade, section, "away");
-            footer.querySelectorAll(".chip").forEach(chip => {
-              chip.onclick = () => openStatusSelector(chip.dataset.grade, chip.dataset.section, chip.dataset.number, chip.dataset.status);
-            });
-          };
-        }
-        if (slotPresent) {
-          slotPresent.onclick = () => {
-            card.dataset.view = "present";
-            setActiveSlot(card, "present");
-            footer.innerHTML = buildCardChips(magnets, grade, section, "present");
-            footer.querySelectorAll(".chip").forEach(chip => {
-              chip.onclick = () => openStatusSelector(chip.dataset.grade, chip.dataset.section, chip.dataset.number, chip.dataset.status);
-            });
-          };
-        }
-
-        // 현재 보기 하이라이트
-        setActiveSlot(card, card.dataset.view);
-
-        // 학년 합산
-        totalG += total; absG += absence; presG += present;
-
-      } catch(e) {
-        console.warn("loadClassState failed", e);
-      }
-    }
-
-    // 헤더 합계
     document.getElementById("grade-total").textContent   = `총원 ${totalG}`;
     document.getElementById("grade-absence").textContent = `결원 ${absG}`;
     document.getElementById("grade-present").textContent = `현원 ${presG}`;
     document.getElementById("updateTime").textContent    = "마지막 업데이트: " + formatTime(new Date());
   }
 
+  async function loadClassState(grade){
+    const requestToken = ++gradeStateRequestToken;
+    if (gradeStateAbortController) {
+      gradeStateAbortController.abort();
+    }
+    gradeStateAbortController = new AbortController();
+
+    try {
+      const res = await fetch(`/api/classes/grade-state?grade=${grade}`, {
+        signal: gradeStateAbortController.signal,
+        cache: 'no-store',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const parsed = await res.json();
+      if (requestToken !== gradeStateRequestToken) return;
+      renderGradeState(grade, parsed.sections || []);
+    } catch(e) {
+      if (e.name === 'AbortError') return;
+      console.warn("loadClassState failed", e);
+    }
+  }
+
+  function scheduleGradeReload(grade, delay = 120) {
+    if (gradeReloadTimer) clearTimeout(gradeReloadTimer);
+    gradeReloadTimer = setTimeout(() => {
+      gradeReloadTimer = null;
+      loadClassState(grade);
+    }, delay);
+  }
+
   function updateClassDisplay(g){
     document.querySelectorAll('#classGrid .class-card').forEach((c,i)=>{
       c.querySelector('.class-header').textContent=`${g}-${i+1}반`;
     });
-    loadClassState(g);
+    scheduleGradeReload(g, 0);
   }
 
   // ===== 모달 제어 =====
@@ -735,7 +710,8 @@ function setActiveSlot(card, which /* 'total' | 'away' | 'present' */) {
         body:JSON.stringify({magnets})
       });
       if(!res.ok) throw new Error(await res.text());
-      loadClassState(grade);
+      skipRealtimeReloadUntil = Date.now() + 1500;
+      scheduleGradeReload(grade, 0);
     }catch(e){ alert("저장 실패: "+e.message); }
   }
 
@@ -774,7 +750,8 @@ function setActiveSlot(card, which /* 'total' | 'away' | 'present' */) {
 
         // Only reload if it's the current grade
         if (Number(data.grade) === currentGrade) {
-          loadClassState(currentGrade);
+          if (Date.now() < skipRealtimeReloadUntil) return;
+          scheduleGradeReload(currentGrade, 120);
         }
       });
 
@@ -788,22 +765,42 @@ function setActiveSlot(card, which /* 'total' | 'away' | 'present' */) {
 
   // 초기 실행
   updateMainTitle(currentGrade);
+  gradeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const g = Number(btn.dataset.grade);
+      setActiveGrade(g);
+      updateMainTitle(g);
+      currentGrade = g;
+      connectToGradeWebSockets(g);
+      updateClassDisplay(g);
+    });
+  });
+  document.getElementById('classGrid').addEventListener('click', (event) => {
+    const chip = event.target.closest('.chip');
+    if (chip) {
+      openStatusSelector(chip.dataset.grade, chip.dataset.section, chip.dataset.number, chip.dataset.status);
+      return;
+    }
+    const slot = event.target.closest('.student-slot');
+    if (!slot) return;
+    const card = slot.closest('.class-card');
+    if (!card) return;
+    const section = Number(card.dataset.section);
+    const rowEls = Array.from(card.querySelectorAll(".student-slots .student-slot"));
+    const slotIndex = rowEls.indexOf(slot);
+    const view = slotIndex === 0 ? 'total' : slotIndex === 1 ? 'away' : slotIndex === 2 ? 'present' : null;
+    if (!view) return;
+    card.dataset.view = view;
+    renderClassCard(card, currentGrade, section, getSectionSnapshot(section));
+  });
+
   updateClassDisplay(currentGrade);
 
   // WebSocket 연결
   connectToGradeWebSockets(currentGrade);
 
-  // Fallback polling (reduced frequency since we have WebSocket)
-  setInterval(() => loadClassState(currentGrade), 30000); // 30초로 늘림
-
-  // Update grade button handlers to reconnect WebSocket
-  const originalGradeHandlers = [];
-  gradeButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const g = Number(btn.dataset.grade);
-      connectToGradeWebSockets(g); // WebSocket reconnect
-    });
-  });
+  // Fallback polling
+  setInterval(() => scheduleGradeReload(currentGrade, 0), 60000);
 
   // 세션 유지 하트비트 (iOS Safari 대응)
   (function startHeartbeat() {
