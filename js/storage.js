@@ -4,9 +4,11 @@ const connectionMonitor = (() => {
   const ONLINE_HTML = '디미체크에 다시 연결되었습니다. 최신 상태를 동기화했습니다.';
   const FAILURE_THRESHOLD = 3;
   const RECOVERY_SUCCESS_THRESHOLD = 2;
+  const OFFLINE_BANNER_DELAY_MS = 8000;
   let state = 'online';
   let healthTimer = null;
   let hideTimer = null;
+  let offlineBannerTimer = null;
   let resyncInFlight = false;
   let failureStreak = 0;
   let successStreak = 0;
@@ -53,11 +55,29 @@ const connectionMonitor = (() => {
       successStreak = 0;
       if (state !== 'offline' && failureStreak >= FAILURE_THRESHOLD) {
         failureStreak = 0;
+        queueOfflineBanner();
+        startHealthMonitoring();
+      }
+    }
+  }
+
+  function clearOfflineBannerTimer() {
+    if (!offlineBannerTimer) return;
+    clearTimeout(offlineBannerTimer);
+    offlineBannerTimer = null;
+  }
+
+  function queueOfflineBanner() {
+    if (state === 'offline' || offlineBannerTimer) return;
+    offlineBannerTimer = window.setTimeout(() => {
+      offlineBannerTimer = null;
+      if (state === 'offline') return;
+      if (navigator.onLine === false || failureStreak > 0) {
         state = 'offline';
         showBanner('offline', OFFLINE_HTML);
         startHealthMonitoring();
       }
-    }
+    }, OFFLINE_BANNER_DELAY_MS);
   }
 
   function startHealthMonitoring() {
@@ -89,6 +109,7 @@ const connectionMonitor = (() => {
 
   function handleRecovery() {
     if (state !== 'offline') return;
+    clearOfflineBannerTimer();
     failureStreak = 0;
     successStreak = 0;
     state = 'online';
@@ -98,12 +119,15 @@ const connectionMonitor = (() => {
   }
 
   function markFailure() {
-    successStreak = 0;
-    startHealthMonitoring();
-    runHealthCheck();
+    if (state === 'offline') {
+      startHealthMonitoring();
+      return;
+    }
+    queueOfflineBanner();
   }
 
   function markSuccess() {
+    clearOfflineBannerTimer();
     failureStreak = 0;
     if (state === 'offline') {
       successStreak += 1;
@@ -120,6 +144,19 @@ const connectionMonitor = (() => {
   function isOffline() {
     return state === 'offline';
   }
+
+  window.addEventListener('offline', () => {
+    failureStreak = 0;
+    successStreak = 0;
+    queueOfflineBanner();
+    startHealthMonitoring();
+  });
+
+  window.addEventListener('online', () => {
+    clearOfflineBannerTimer();
+    startHealthMonitoring();
+    runHealthCheck();
+  });
 
   return {
     markFailure,
@@ -353,10 +390,6 @@ async function flushPendingBoardStateSave() {
       latestResult = true;
     } catch (e) {
       console.warn('saveState failed:', e);
-      if (monitor && typeof monitor.markFailure === 'function') {
-        monitor.markFailure();
-      }
-
       latestResult = false;
       const state = ensureLocalBoardState(request.grade, request.section);
       state.dirty = true;
@@ -765,9 +798,6 @@ async function loadState(grade, section, options = {}) {
     }
   } catch (e) {
     console.error("loadState error:", e);
-    if (monitor && typeof monitor.markFailure === 'function') {
-      monitor.markFailure();
-    }
   } finally {
     loadStateInFlight = false;
   }
