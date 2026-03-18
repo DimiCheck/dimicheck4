@@ -992,6 +992,71 @@ async function initBoard() {
   setInterval(() => renderBoardNotices(boardNoticesCache), 1000);
 }
 
+let boardSocket = null;
+let boardRealtimeConnected = false;
+
+function connectBoardRealtime() {
+  if (!window.io || !grade || !section) return;
+  if (boardSocket) {
+    try {
+      boardSocket.disconnect();
+    } catch (err) {
+      console.warn('[board realtime] disconnect failed', err);
+    }
+    boardSocket = null;
+  }
+
+  const namespace = `/ws/classes/${grade}/${section}`;
+  boardSocket = io(namespace, {
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    reconnectionAttempts: Infinity,
+  });
+
+  boardSocket.on('connect', () => {
+    boardRealtimeConnected = true;
+    console.log('[board realtime] connected', namespace);
+  });
+
+  boardSocket.on('disconnect', () => {
+    boardRealtimeConnected = false;
+    console.warn('[board realtime] disconnected', namespace);
+  });
+
+  boardSocket.on('connect_error', (error) => {
+    boardRealtimeConnected = false;
+    console.warn('[board realtime] connection error', error);
+  });
+
+  boardSocket.on('state_updated', async (payload) => {
+    if (Number(payload?.grade) !== Number(grade) || Number(payload?.section) !== Number(section)) {
+      return;
+    }
+    try {
+      const currentLocalState = ensureLocalBoardState(grade, section);
+      const parsed = {
+        magnets: payload?.magnets || {},
+        marquee: Object.prototype.hasOwnProperty.call(payload || {}, 'marquee')
+          ? (payload?.marquee ?? null)
+          : (currentLocalState?.marquee ?? null),
+      };
+      const applyResult = await applyBoardStatePayload(parsed, { grade, section });
+      if (applyResult.applied) {
+        updateLocalBoardState(grade, section, {
+          magnets: parsed.magnets,
+          marquee: parsed.marquee,
+          markDirty: false,
+        });
+      }
+    } catch (err) {
+      console.warn('[board realtime] apply failed, falling back to loadState', err);
+      loadState(grade, section, { ignoreOffline: true, forceSync: true });
+    }
+  });
+}
+
 window.forceResyncState = async function forceResyncState() {
   if (grade == null || section == null) {
     return;
@@ -1009,10 +1074,12 @@ window.forceResyncState = async function forceResyncState() {
 };
 
 initBoard();
+connectBoardRealtime();
 
 setInterval(() => {
   if (
     canSyncWithBackend() &&
+    !boardRealtimeConnected &&
     !window.isMagnetDragging &&
     !window.isAutoReturning &&
     !window.isRoutineApplying
@@ -1022,7 +1089,7 @@ setInterval(() => {
     }
     loadState(grade, section);
   }
-}, 4000);
+}, 30000);
 
 setInterval(() => {
   if (

@@ -316,6 +316,30 @@ def _serialize_grade_state_section(
     }
 
 
+def _emit_class_state_update(
+    grade: int,
+    section: int,
+    state: ClassState | None = None,
+    class_config: dict | None = None,
+) -> None:
+    if not socketio:
+        return
+    if state is None:
+        state = ClassState.query.filter_by(grade=grade, section=section).first()
+    if class_config is None:
+        class_config = load_class_config().get((grade, section))
+    payload = _serialize_grade_state_section(grade, section, state, class_config)
+    socketio.emit(
+        'state_updated',
+        {
+            'grade': grade,
+            'section': section,
+            **payload,
+        },
+        namespace=f'/ws/classes/{grade}/{section}',
+    )
+
+
 def _notice_matches_class(notice: TeacherNotice, grade: int, section: int) -> bool:
     if notice.target_all:
         return True
@@ -633,16 +657,7 @@ def save_state():
 
     db.session.commit()
 
-    # Broadcast state update via WebSocket
-    if socketio:
-        try:
-            socketio.emit('state_updated', {
-                'grade': grade,
-                'section': section,
-                'magnets': magnets
-            }, namespace=f'/ws/classes/{grade}/{section}')
-        except Exception as e:
-            print(f"[WebSocket] Failed to broadcast state update: {e}")
+    _emit_class_state_update(grade, section, state, class_config)
 
     try:
         broadcast_public_status_update(grade, section)
@@ -946,6 +961,8 @@ def upsert_thought():
     if created_state:
         response_payload["created"] = True
 
+    _emit_class_state_update(grade, section, state)
+
     return jsonify(response_payload)
 
 @blueprint.get("/state/load")
@@ -963,6 +980,7 @@ def load_class_state():
         return jsonify({"magnets": {}, "marquee": None})
 
     try:
+        class_config = load_class_config().get((grade, section))
         magnets, marquee = _filtered_magnets_for_class(state, grade, section, class_config)
         return jsonify({"magnets": magnets, "marquee": marquee})
     except json.JSONDecodeError:
@@ -1044,6 +1062,8 @@ def set_marquee():
     state_payload["marquee"] = marquee_payload
     state.data = json.dumps(state_payload, ensure_ascii=False)
     db.session.commit()
+
+    _emit_class_state_update(grade, section, state)
 
     return jsonify({"ok": True, "marquee": marquee_payload})
 
@@ -1278,6 +1298,8 @@ def send_reaction():
     )
 
     db.session.commit()
+
+    _emit_class_state_update(grade, section, state)
 
     return jsonify({
         "ok": True,
