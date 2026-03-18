@@ -503,6 +503,7 @@
 
     for (const [numStr, data] of Object.entries(magnets)) {
       const num = Number(numStr);
+      if (!Number.isFinite(num) || num <= 0) continue;
       const cat = data?.attachedTo;
 
       const isPresentNormal  = !cat || cat === "section";
@@ -583,7 +584,12 @@ function setActiveSlot(card, which /* 'total' | 'away' | 'present' */) {
         const res = await fetch(`/api/classes/state/load?grade=${grade}&section=${section}`);
         if (!res.ok) continue;
         const parsed  = await res.json();
-        const magnets = parsed.magnets || {};
+        const magnets = Object.fromEntries(
+          Object.entries(parsed.magnets || {}).filter(([num]) => {
+            const parsedNum = Number(num);
+            return Number.isFinite(parsedNum) && parsedNum > 0;
+          })
+        );
         const total   = Object.keys(magnets).length;
 
         // 결원 집계: 교실(null/section) + 화장실/복도는 제외!

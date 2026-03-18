@@ -42,6 +42,13 @@ def _normalize_class_value(value: int | str | None) -> int | None:
         return None
 
 
+def _normalize_magnet_number_key(value: int | str | None) -> str | None:
+    number = _normalize_class_value(value)
+    if number is None or number < 1 or number > 99:
+        return None
+    return str(number)
+
+
 def _extract_first(mapping: dict, *keys: str) -> int | str | None:
     for key in keys:
         if key in mapping:
@@ -472,7 +479,13 @@ def save_state():
 
     payload = request.get_json() or {}
     incoming_magnets = payload.get("magnets", {})
-    normalized_magnets = {str(key): value for key, value in incoming_magnets.items()}
+    normalized_magnets = {}
+    if isinstance(incoming_magnets, dict):
+        for key, value in incoming_magnets.items():
+            normalized_key = _normalize_magnet_number_key(key)
+            if normalized_key is None:
+                continue
+            normalized_magnets[normalized_key] = value
 
     # Students are allowed to move any magnet within their class;
     # payload is no longer restricted to the student's own number.
@@ -653,9 +666,14 @@ def _load_state_payload(state: ClassState | None) -> dict[str, dict[str, object]
             "marquee": None,
         }
 
-    magnets = raw.get("magnets")
-    if not isinstance(magnets, dict):
-        magnets = {}
+    raw_magnets = raw.get("magnets")
+    magnets: dict[str, dict[str, object]] = {}
+    if isinstance(raw_magnets, dict):
+        for num, value in raw_magnets.items():
+            normalized_key = _normalize_magnet_number_key(num)
+            if normalized_key is None or not isinstance(value, dict):
+                continue
+            magnets[normalized_key] = value
 
     channels = _normalize_channels(raw.get("channels"))
     memberships = _normalize_channel_memberships(

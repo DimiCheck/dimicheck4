@@ -55,6 +55,13 @@ def _split_student_identifier(value: Any) -> tuple[int | None, int | None, int |
     return None, None, _coerce_int(digits)
 
 
+def _normalize_magnet_number_key(value: Any) -> str | None:
+    number = _coerce_int(value)
+    if number is None or number < 1 or number > 99:
+        return None
+    return str(number)
+
+
 def _student_identity_from_user(user: User) -> tuple[int | None, int | None, int | None]:
     """
     Resolve student context from server-side user record only.
@@ -184,7 +191,13 @@ def mcp_save_state():
 
     payload = request.get_json(silent=True) or {}
     incoming_magnets = payload.get("magnets", {})
-    normalized_magnets = {str(key): value for key, value in incoming_magnets.items()} if isinstance(incoming_magnets, dict) else {}
+    normalized_magnets = {}
+    if isinstance(incoming_magnets, dict):
+        for key, value in incoming_magnets.items():
+            normalized_key = _normalize_magnet_number_key(key)
+            if normalized_key is None:
+                continue
+            normalized_magnets[normalized_key] = value
 
     state = ClassState.query.filter_by(grade=grade, section=section).first()
     state_payload = _load_state_payload(state)
