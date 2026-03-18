@@ -54,16 +54,17 @@ def after_request(response: Response) -> Response:
     )
     user = session.get("user")
     user_id = str(user.get("id")) if isinstance(user, dict) and user.get("id") is not None else None
-    send_ga4_event(
-        "backend_request",
-        {
-            "path": request.path,
-            "method": request.method,
-            "status": response.status_code,
-        "has_user": 1 if user else 0,
-    },
-        user_id=user_id,
-    )
+    if request.method == "GET" and (response.mimetype or "").lower() == "text/html":
+        send_ga4_event(
+            "backend_request",
+            {
+                "path": request.path,
+                "method": request.method,
+                "status": response.status_code,
+                "has_user": 1 if user else 0,
+            },
+            user_id=user_id,
+        )
     token = session.get("csrf_token")
     if token:
         response.set_cookie(

@@ -91,8 +91,40 @@
 
 (function chatNavGate() {
   const CHAT_NAV_SELECTOR = 'a.nav-item[href="/chat.html"]';
+  const CHAT_GATE_CACHE_KEY = 'dimicheck.chatNavGate';
+  const CHAT_GATE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+  function readCachedChatGateState() {
+    try {
+      const raw = sessionStorage.getItem(CHAT_GATE_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      const ts = Number(parsed.ts || 0);
+      if (!Number.isFinite(ts) || (Date.now() - ts) > CHAT_GATE_CACHE_TTL_MS) {
+        return null;
+      }
+      return { chatEnabled: Boolean(parsed.chatEnabled) };
+    } catch {
+      return null;
+    }
+  }
+
+  function writeCachedChatGateState(state) {
+    try {
+      sessionStorage.setItem(
+        CHAT_GATE_CACHE_KEY,
+        JSON.stringify({ chatEnabled: Boolean(state?.chatEnabled), ts: Date.now() }),
+      );
+    } catch {
+      // ignore cache failures
+    }
+  }
 
   async function loadChatGateState() {
+    const cached = readCachedChatGateState();
+    if (cached) return cached;
+
     try {
       const authRes = await fetch('/auth/status', { credentials: 'include', cache: 'no-store' });
       if (!authRes.ok) return null;
@@ -111,7 +143,9 @@
       });
       if (!configRes.ok) return null;
       const config = await configRes.json().catch(() => null);
-      return { chatEnabled: Boolean(config?.chatEnabled) };
+      const state = { chatEnabled: Boolean(config?.chatEnabled) };
+      writeCachedChatGateState(state);
+      return state;
     } catch (error) {
       console.warn('[ChatNav] failed to resolve chat gate state', error);
       return null;
