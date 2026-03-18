@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 import os
 import requests
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, current_app, jsonify, request, session
 from sqlalchemy import or_
 
 from content_filter import contains_slang
@@ -24,12 +24,6 @@ from models import (
 from config_loader import load_class_config
 from utils import is_board_session_active, is_teacher_session_active
 from public_api import broadcast_public_status_update
-
-# Import socketio for broadcasting
-try:
-    from app import socketio
-except ImportError:
-    socketio = None
 
 blueprint = Blueprint("classes", __name__, url_prefix="/api/classes")
 DEFAULT_CHAT_CHANNEL = "home"
@@ -322,6 +316,7 @@ def _emit_class_state_update(
     state: ClassState | None = None,
     class_config: dict | None = None,
 ) -> None:
+    socketio = current_app.extensions.get("socketio") if current_app else None
     if not socketio:
         return
     if state is None:
