@@ -10,6 +10,7 @@ from class_routes import (
     ALLOWED_ROUTINE_DAYS,
     _fetch_meal_from_api,
     _fetch_timetable_from_api,
+    _allowed_class_numbers,
     _get_kst,
     _load_state_payload,
     _normalize_channel_memberships,
@@ -26,6 +27,7 @@ from chat_routes import (
     _normalize_channel_name,
 )
 from content_filter import contains_slang
+from config_loader import load_class_config
 from extensions import db
 from models import CalendarEvent, ChatMessage, ClassRoutine, ClassState, HomeTarget, User, UserType
 from oauth.utils import decode_access_token
@@ -60,6 +62,16 @@ def _normalize_magnet_number_key(value: Any) -> str | None:
     if number is None or number < 1 or number > 99:
         return None
     return str(number)
+
+
+def _normalize_magnet_number_key_for_class(value: Any, class_config: dict | None) -> str | None:
+    normalized_key = _normalize_magnet_number_key(value)
+    if normalized_key is None:
+        return None
+    allowed_numbers = _allowed_class_numbers(class_config)
+    if allowed_numbers is not None and int(normalized_key) not in allowed_numbers:
+        return None
+    return normalized_key
 
 
 def _student_identity_from_user(user: User) -> tuple[int | None, int | None, int | None]:
@@ -189,12 +201,13 @@ def mcp_save_state():
     if grade is None or section is None:
         return jsonify({"error": {"code": "bad_request", "message": "grade/section required"}}), 400
 
+    class_config = load_class_config().get((grade, section))
     payload = request.get_json(silent=True) or {}
     incoming_magnets = payload.get("magnets", {})
     normalized_magnets = {}
     if isinstance(incoming_magnets, dict):
         for key, value in incoming_magnets.items():
-            normalized_key = _normalize_magnet_number_key(key)
+            normalized_key = _normalize_magnet_number_key_for_class(key, class_config)
             if normalized_key is None:
                 continue
             normalized_magnets[normalized_key] = value

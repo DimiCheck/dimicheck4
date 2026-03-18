@@ -49,6 +49,36 @@ def _normalize_magnet_number_key(value: int | str | None) -> str | None:
     return str(number)
 
 
+def _allowed_class_numbers(class_config: dict | None) -> set[int] | None:
+    if not class_config:
+        return None
+    end = _normalize_class_value(class_config.get("end"))
+    if end is None or end < 1:
+        return None
+    skip_numbers = {
+        num for num in (
+            _normalize_class_value(value)
+            for value in (class_config.get("skip_numbers") or [])
+        )
+        if num is not None
+    }
+    return {
+        number
+        for number in range(1, end + 1)
+        if number not in skip_numbers
+    }
+
+
+def _normalize_magnet_number_key_for_class(value: int | str | None, class_config: dict | None) -> str | None:
+    normalized_key = _normalize_magnet_number_key(value)
+    if normalized_key is None:
+        return None
+    allowed_numbers = _allowed_class_numbers(class_config)
+    if allowed_numbers is not None and int(normalized_key) not in allowed_numbers:
+        return None
+    return normalized_key
+
+
 def _extract_first(mapping: dict, *keys: str) -> int | str | None:
     for key in keys:
         if key in mapping:
@@ -244,7 +274,7 @@ def _filtered_magnets_for_class(
     section: int,
     class_config: dict | None = None,
 ) -> tuple[dict[str, dict[str, object]], dict | None]:
-    skip_numbers = set((class_config or {}).get("skip_numbers", []))
+    allowed_numbers = _allowed_class_numbers(class_config)
     data = _load_state_payload(state)
     magnets = data.get("magnets", {})
     filtered_magnets: dict[str, dict[str, object]] = {}
@@ -252,7 +282,7 @@ def _filtered_magnets_for_class(
         normalized_key = _normalize_magnet_number_key(num)
         if normalized_key is None:
             continue
-        if int(normalized_key) in skip_numbers:
+        if allowed_numbers is not None and int(normalized_key) not in allowed_numbers:
             continue
         filtered_magnets[normalized_key] = value
     return filtered_magnets, data.get("marquee")
@@ -527,12 +557,13 @@ def save_state():
     if not _is_authorized(grade, section):
         return jsonify({"error": "forbidden"}), 403
 
+    class_config = load_class_config().get((grade, section))
     payload = request.get_json() or {}
     incoming_magnets = payload.get("magnets", {})
     normalized_magnets = {}
     if isinstance(incoming_magnets, dict):
         for key, value in incoming_magnets.items():
-            normalized_key = _normalize_magnet_number_key(key)
+            normalized_key = _normalize_magnet_number_key_for_class(key, class_config)
             if normalized_key is None:
                 continue
             normalized_magnets[normalized_key] = value
@@ -910,7 +941,6 @@ def load_class_state():
         return jsonify({"magnets": {}, "marquee": None})
 
     try:
-        class_config = load_class_config().get((grade, section))
         magnets, marquee = _filtered_magnets_for_class(state, grade, section, class_config)
         return jsonify({"magnets": magnets, "marquee": marquee})
     except json.JSONDecodeError:
