@@ -2,14 +2,9 @@
   const STORAGE_KEY = 'dimicheck.wallpaper.selection';
   const FALLBACK_WALLPAPERS = [
     {
-      id: 'city-night-2024',
-      name: '야경 네온 시티',
-      url: 'https://cdn.pixabay.com/photo/2024/09/30/16/36/background-9086186_1280.jpg'
-    },
-    {
-      id: 'ai-grid-2024',
-      name: 'AI 패턴 스카이라인',
-      url: 'https://cdn.pixabay.com/photo/2024/11/27/05/42/ai-generated-9227230_1280.jpg'
+      id: 'just-black-2024',
+      name: '단색 검정',
+      url: 'src/wallpaper-black.svg'
     }
   ];
 
@@ -92,6 +87,11 @@
     renderGrid();
   }
 
+  function getDefaultWallpaper(list) {
+    if (!Array.isArray(list) || !list.length) return null;
+    return list.find((item) => item?.id === 'just-black-2024') || list[0];
+  }
+
   function renderGrid() {
     if (!grid) return;
     grid.innerHTML = '';
@@ -154,7 +154,7 @@
       selectedId = saved.id || saved.url;
       applyWallpaper(saved.url);
     } else if (wallpapers[0]) {
-      selectWallpaper(wallpapers[0]);
+      selectWallpaper(getDefaultWallpaper(wallpapers));
       renderedViaSelect = true;
     } else if (saved?.url) {
       applyWallpaper(saved.url);
