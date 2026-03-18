@@ -138,6 +138,7 @@ let loadStateInFlight = false;
 const LOCAL_BOARD_STATE_VERSION = 1;
 const BOARD_STATE_SAVE_RETRY_MS = 5000;
 const BOARD_STATE_LOCAL_FIRST_PAUSE_MS = 4000;
+const MARQUEE_MAX_AGE_MS = 30 * 60 * 1000;
 
 let lastAppliedStateSignature = '';
 let boardStateSaveInFlight = false;
@@ -506,10 +507,14 @@ function normalizeMarqueePayload(payload) {
   const colorRaw = String(payload.color || '#fdfcff').trim();
   const allowedLengths = [4, 5, 7, 9];
   const color = (colorRaw.startsWith('#') && allowedLengths.includes(colorRaw.length)) ? colorRaw : '#fdfcff';
+  const updatedAt = payload.updatedAt || payload.updated_at || payload.postedAt || null;
+  const updatedAtMs = updatedAt ? Date.parse(String(updatedAt)) : NaN;
+  if (!Number.isFinite(updatedAtMs)) return null;
+  if (Date.now() - updatedAtMs > MARQUEE_MAX_AGE_MS) return null;
   return {
     text: text.slice(0, 20),
     color,
-    updatedAt: payload.updatedAt || payload.updated_at || payload.postedAt || null,
+    updatedAt,
   };
 }
 

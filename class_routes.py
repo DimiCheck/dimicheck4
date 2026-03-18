@@ -173,6 +173,7 @@ def _teacher_only() -> bool:
 _NOTICE_FRESH_SECONDS = 10
 _NOTICE_DOT_SECONDS = 10 * 60
 _NOTICE_BURST_WINDOW = timedelta(minutes=10)
+_MARQUEE_MAX_AGE = timedelta(minutes=30)
 
 
 def _ensure_notice_tables() -> bool:
@@ -327,6 +328,18 @@ def _notice_created_at_utc(notice: TeacherNotice) -> datetime:
     if created_at.tzinfo is None:
         return created_at.replace(tzinfo=timezone.utc)
     return created_at.astimezone(timezone.utc)
+
+
+def _parse_payload_datetime(value: object) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _serialize_notice(notice: TeacherNotice, *, now_utc: datetime | None = None) -> dict:
@@ -773,11 +786,20 @@ def _load_state_payload(state: ClassState | None) -> dict[str, dict[str, object]
             color = str(marquee.get("color") or "#fdfcff").strip()
             if not color.startswith("#") or len(color) not in {4, 5, 7, 9}:
                 color = "#fdfcff"
-            marquee = {
-                "text": text[:20],
-                "color": color,
-                "updatedAt": marquee.get("updatedAt") or marquee.get("updated_at") or marquee.get("postedAt")
-            }
+            updated_at = (
+                marquee.get("updatedAt")
+                or marquee.get("updated_at")
+                or marquee.get("postedAt")
+            )
+            updated_at_dt = _parse_payload_datetime(updated_at)
+            if not updated_at_dt or datetime.now(timezone.utc) - updated_at_dt > _MARQUEE_MAX_AGE:
+                marquee = None
+            else:
+                marquee = {
+                    "text": text[:20],
+                    "color": color,
+                    "updatedAt": updated_at_dt.isoformat(),
+                }
     else:
         marquee = None
 
