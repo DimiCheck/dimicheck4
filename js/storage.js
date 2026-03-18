@@ -759,8 +759,13 @@ async function loadState(grade, section, options = {}) {
   const localState = ensureLocalBoardState(grade, section);
 
   if (!forceSync && localState.dirty) {
-    flushPendingBoardStateSave();
-    return;
+    if (pendingBoardStateSave || boardStateSaveInFlight) {
+      flushPendingBoardStateSave();
+      return;
+    }
+    // Stale dirty snapshots should not block server truth forever on display boards.
+    localState.dirty = false;
+    persistLocalBoardStateSnapshot(localState);
   }
 
   if (!ignoreOffline && monitor && typeof monitor.isOffline === 'function' && monitor.isOffline()) {
