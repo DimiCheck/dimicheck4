@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import secrets
 from typing import Any
 from dotenv import load_dotenv
@@ -581,6 +582,31 @@ def board():
         return render_template("index.html")
 
     return send_from_directory(".", "enter_pin.html")
+
+
+def _parse_short_board_code(code: str) -> tuple[int | None, int | None]:
+    if not re.fullmatch(r"\d{2}", str(code or "")):
+        return None, None
+
+    grade = int(code[0])
+    section = int(code[1])
+
+    if grade not in {1, 2, 3} or section not in {1, 2, 3, 4, 5, 6}:
+        return None, None
+
+    return grade, section
+
+
+@app.get("/<class_code>")
+def short_board_redirect(class_code: str):
+    grade, section = _parse_short_board_code(class_code)
+    if grade is None or section is None:
+        abort(404)
+
+    if not load_class_config().get((grade, section)):
+        abort(404)
+
+    return redirect(url_for("board", grade=grade, section=section))
 
 
 def _validate_teacher_pin(pin: str) -> bool:
