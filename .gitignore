@@ -27,18 +27,25 @@ node_modules/
 .coverage
 .coverage.*
 htmlcov/
+coverage.xml
 .mypy_cache/
 .dmypy.json
 .pyre/
 .pytype/
+.ruff_cache/
+.hypothesis/
+.tox/
+.nox/
 
 # 로그/임시파일
 *.log
+*.pid
 *.tmp
 *.temp
 *.swp
 *.swo
 nohup.out
+.cache/
 
 # ======================
 # Flask / App data
@@ -56,10 +63,12 @@ instance/*.db
 # 환경변수 파일
 .env
 .env.*
+.envrc
 *.env
 
 # oh-my-codex runtime state
 .omx/
+.codex/
 
 # ======================
 # OS / IDE

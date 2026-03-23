@@ -246,6 +246,19 @@ def chat_page():
     return send_from_directory(".", _resolve_student_chat_page())
 
 
+@app.get("/user")
+def user_page_alias():
+    return redirect("/user.html")
+
+
+@app.get("/user.html")
+def user_page():
+    user = session.get("user") or {}
+    if str(user.get("type", "")).lower() == "teacher":
+        return redirect(url_for("teacher_dashboard"))
+    return send_from_directory(".", "user.html")
+
+
 @app.get("/me")
 def me() -> Any:
     user = session.get("user")
@@ -597,11 +610,15 @@ def _parse_short_board_code(code: str) -> tuple[int | None, int | None]:
     return grade, section
 
 
-@app.get("/<class_code>")
-def short_board_redirect(class_code: str):
-    grade, section = _parse_short_board_code(class_code)
+@app.before_request
+def _redirect_short_board_code():
+    path = (request.path or "").strip("/")
+    if "/" in path:
+        return None
+
+    grade, section = _parse_short_board_code(path)
     if grade is None or section is None:
-        abort(404)
+        return None
 
     if not load_class_config().get((grade, section)):
         abort(404)
