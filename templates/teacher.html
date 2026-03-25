@@ -108,6 +108,22 @@
       gap: 18px;
     }
 
+    .search-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .search-header-bar {
+      width: min(760px, 100%);
+      padding: 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.68);
+      border: 1px solid rgba(124, 96, 69, 0.12);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+    }
+
     .card,
     .hero-card,
     .search-card,
@@ -405,6 +421,20 @@
       padding: 24px 26px;
     }
 
+    .search-header .search-input {
+      border-radius: 999px;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      padding: 8px 14px;
+      font-size: 16px;
+    }
+
+    .search-header .search-input:focus {
+      border: none;
+      box-shadow: none;
+    }
+
     .section-heading-row,
     .classes-heading-row {
       display: flex;
@@ -550,10 +580,18 @@
       align-items: flex-start;
     }
 
+    .class-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
     .class-title {
       font-size: 22px;
       letter-spacing: -0.03em;
-      margin-bottom: 6px;
+      margin-bottom: 0;
     }
 
     .class-subtitle {
@@ -561,39 +599,43 @@
       font-size: 13px;
     }
 
-    .metric-tabs {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+    .class-inline-stats {
+      display: inline-flex;
+      align-items: center;
       gap: 10px;
-    }
-
-    .metric-tab {
-      border-radius: 18px;
-      padding: 14px 12px;
-      background: rgba(255,255,255,0.56);
-      border: 1px solid rgba(124, 96, 69, 0.08);
-      text-align: left;
-      color: var(--muted);
-    }
-
-    .metric-tab span {
-      display: block;
+      flex-wrap: wrap;
       font-size: 12px;
-      margin-bottom: 8px;
     }
 
-    .metric-tab strong {
-      display: block;
-      font-size: 22px;
-      color: var(--text);
-      letter-spacing: -0.04em;
+    .class-inline-stat {
+      appearance: none;
+      border: 1px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.45);
+      padding: 6px 10px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
     }
 
-    .metric-tab.active {
+    .class-inline-stat[data-tone="total"] { color: var(--present-soft); }
+    .class-inline-stat[data-tone="away"] { color: var(--away); }
+    .class-inline-stat[data-tone="present"] { color: var(--present); }
+
+    .class-inline-stat:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 18px rgba(156, 119, 83, 0.12);
+    }
+
+    .class-inline-stat.active {
       background: rgba(255,255,255,0.96);
       border-color: rgba(219, 135, 83, 0.2);
       box-shadow: 0 14px 24px rgba(228, 177, 141, 0.16);
-      color: #7a563e;
     }
 
     .chip-list {
@@ -763,7 +805,6 @@
       }
 
       .summary-grid,
-      .metric-tabs,
       .status-options {
         grid-template-columns: 1fr;
       }
@@ -808,6 +849,12 @@
   </div>
 
   <main class="shell">
+    <section class="search-header" aria-label="학생 검색">
+      <div class="search-header-bar">
+        <input id="studentSearchInput" class="search-input" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="학번 입력 (예: 1330)" />
+      </div>
+    </section>
+
     <section class="hero-card">
       <div class="hero-top">
         <div>
@@ -852,20 +899,6 @@
       </div>
     </section>
 
-    <section class="search-card">
-      <div class="section-heading-row">
-        <div class="section-heading">
-          <div class="eyebrow">Quick search</div>
-          <h2>학생 상태 바로 찾기</h2>
-          <p>학번을 입력하면 예를 들어 <strong>1330 → 1학년 3반 30번</strong>처럼 바로 현재 상태를 보여줘요.</p>
-        </div>
-      </div>
-      <div class="search-field">
-        <input id="studentSearchInput" class="search-input" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="학번 입력 (예: 1330)" />
-      </div>
-      <div id="studentSearchResult" class="search-result">학번을 입력하면 현재 위치와 상태가 바로 나타나요.</div>
-    </section>
-
     <section class="summary-card">
       <div class="section-heading-row">
         <div class="section-heading">
@@ -893,6 +926,7 @@
 
       <p id="summaryHeadline" class="summary-headline">현재 요약 데이터를 불러오는 중이에요.</p>
       <div id="summaryBadges" class="summary-badges"></div>
+      <div id="studentSearchResult" class="search-result" style="margin-top:16px;">학번을 입력하면 현재 위치와 상태가 바로 나타나요.</div>
     </section>
 
     <section class="classes-section">
@@ -1065,23 +1099,16 @@
           <article class="class-card" data-section="${section}" data-view="away">
             <div class="class-card-top">
               <div>
-                <h3 class="class-title">${currentGrade}-${section}반</h3>
+                <div class="class-title-row">
+                  <h3 class="class-title">${currentGrade}-${section}반</h3>
+                  <div class="class-inline-stats">
+                    <button class="class-inline-stat" type="button" data-tone="total" data-view="total">총원 <strong>0</strong></button>
+                    <button class="class-inline-stat active" type="button" data-tone="away" data-view="away">결원 <strong>0</strong></button>
+                    <button class="class-inline-stat" type="button" data-tone="present" data-view="present">현원 <strong>0</strong></button>
+                  </div>
+                </div>
                 <p class="class-subtitle">기본 보기: 결원</p>
               </div>
-            </div>
-            <div class="metric-tabs">
-              <button class="metric-tab" type="button" data-view="total">
-                <span>총원</span>
-                <strong>0</strong>
-              </button>
-              <button class="metric-tab active" type="button" data-view="away">
-                <span>결원</span>
-                <strong>0</strong>
-              </button>
-              <button class="metric-tab" type="button" data-view="present">
-                <span>현원</span>
-                <strong>0</strong>
-              </button>
             </div>
             <div class="chip-list"></div>
           </article>
@@ -1183,7 +1210,7 @@
       const absence = Number(snapshot?.absence) || 0;
       const present = Number(snapshot?.present) || 0;
 
-      card.querySelectorAll('.metric-tab').forEach((button) => {
+      card.querySelectorAll('.class-inline-stat').forEach((button) => {
         const buttonView = button.dataset.view;
         button.classList.toggle('active', buttonView === view);
         const valueEl = button.querySelector('strong');
@@ -1752,12 +1779,12 @@
         return;
       }
 
-      const tab = event.target.closest('.metric-tab');
-      if (!tab) return;
-      const card = tab.closest('.class-card');
+      const inlineStat = event.target.closest('.class-inline-stat');
+      if (!inlineStat) return;
+      const card = inlineStat.closest('.class-card');
       if (!card) return;
       const section = Number(card.dataset.section);
-      card.dataset.view = tab.dataset.view;
+      card.dataset.view = inlineStat.dataset.view;
       renderClassCard(card, currentGrade, section, getSectionSnapshot(section));
     });
 
