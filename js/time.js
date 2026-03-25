@@ -1045,8 +1045,8 @@ function connectBoardRealtime() {
       const applyResult = await applyBoardStatePayload(parsed, { grade, section });
       if (applyResult.applied) {
         updateLocalBoardState(grade, section, {
-          magnets: parsed.magnets,
-          marquee: parsed.marquee,
+          magnets: applyResult.magnets,
+          marquee: applyResult.marquee,
           markDirty: false,
         });
       }

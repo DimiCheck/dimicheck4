@@ -181,6 +181,7 @@ let loadStateInFlight = false;
 const LOCAL_BOARD_STATE_VERSION = 1;
 const BOARD_STATE_SAVE_RETRY_MS = 5000;
 const BOARD_STATE_LOCAL_FIRST_PAUSE_MS = 4000;
+const BOARD_STATE_LOCAL_PLACEMENT_GUARD_MS = 8000;
 const MARQUEE_MAX_AGE_MS = 30 * 60 * 1000;
 
 let lastAppliedStateSignature = '';
@@ -189,6 +190,7 @@ let boardStateSavePromise = null;
 let boardStateSaveRetryTimer = null;
 let pendingBoardStateSave = null;
 let hydratedLocalBoardStateKey = null;
+const recentLocalPlacementGuards = new Map();
 
 let localBoardState = {
   key: null,
@@ -227,6 +229,162 @@ function buildBoardStateSignature(magnets, marquee) {
   const safeMagnets = (magnets && typeof magnets === 'object') ? magnets : {};
   const normalizedMarquee = normalizeMarqueePayload(marquee);
   return stableStringify({ magnets: safeMagnets, marquee: normalizedMarquee });
+}
+
+function normalizeMagnetAttachedTarget(value) {
+  if (value == null) return null;
+  const normalized = String(value).trim();
+  if (!normalized || normalized === 'section' || normalized === 'classroom') {
+    return null;
+  }
+  return normalized;
+}
+
+function normalizeMagnetPlacementData(value) {
+  const data = (value && typeof value === 'object') ? value : {};
+  const attachedTo = normalizeMagnetAttachedTarget(data.attachedTo);
+  const reason = typeof data.reason === 'string' ? data.reason.trim() : '';
+  const left = Number(data.left);
+  const top = Number(data.top);
+  const roundedLeft = Number.isFinite(left) ? Math.round(left * 100) / 100 : null;
+  const roundedTop = Number.isFinite(top) ? Math.round(top * 100) / 100 : null;
+
+  if (attachedTo) {
+    return {
+      attachedTo,
+      reason: reason || null,
+    };
+  }
+
+  return {
+    attachedTo: null,
+    left: roundedLeft,
+    top: roundedTop,
+    reason: reason || null,
+  };
+}
+
+function buildMagnetPlacementSignature(value) {
+  return stableStringify(normalizeMagnetPlacementData(value));
+}
+
+function pruneRecentLocalPlacementGuards(now = Date.now()) {
+  recentLocalPlacementGuards.forEach((until, magnetNumber) => {
+    if (!Number.isFinite(until) || until <= now) {
+      recentLocalPlacementGuards.delete(magnetNumber);
+    }
+  });
+}
+
+function markRecentLocalPlacementChanges(previousMagnets, nextMagnets) {
+  const previous = (previousMagnets && typeof previousMagnets === 'object') ? previousMagnets : {};
+  const next = (nextMagnets && typeof nextMagnets === 'object') ? nextMagnets : {};
+  const guardUntil = Date.now() + BOARD_STATE_LOCAL_PLACEMENT_GUARD_MS;
+  const keys = new Set([...Object.keys(previous), ...Object.keys(next)]);
+
+  pruneRecentLocalPlacementGuards();
+
+  keys.forEach((magnetNumber) => {
+    if (buildMagnetPlacementSignature(previous[magnetNumber]) === buildMagnetPlacementSignature(next[magnetNumber])) {
+      return;
+    }
+    recentLocalPlacementGuards.set(String(magnetNumber), guardUntil);
+  });
+}
+
+function mergeLocalPlacementIntoRemoteMagnet(localMagnet, remoteMagnet) {
+  const local = (localMagnet && typeof localMagnet === 'object') ? localMagnet : {};
+  const remote = (remoteMagnet && typeof remoteMagnet === 'object') ? remoteMagnet : {};
+  const merged = { ...remote };
+  const attachedTo = normalizeMagnetAttachedTarget(local.attachedTo);
+  const reason = typeof local.reason === 'string' ? local.reason.trim() : '';
+
+  if (attachedTo) {
+    merged.attachedTo = attachedTo;
+    delete merged.left;
+    delete merged.top;
+  } else {
+    merged.attachedTo = null;
+
+    const left = Number(local.left);
+    const top = Number(local.top);
+
+    if (Number.isFinite(left)) {
+      merged.left = left;
+    } else {
+      delete merged.left;
+    }
+
+    if (Number.isFinite(top)) {
+      merged.top = top;
+    } else {
+      delete merged.top;
+    }
+  }
+
+  if (reason) {
+    merged.reason = reason;
+  } else {
+    delete merged.reason;
+  }
+
+  return merged;
+}
+
+function reconcileIncomingBoardStatePayload(payload, options = {}) {
+  if (options.skipLocalPlacementGuard) {
+    return payload;
+  }
+
+  const { grade, section } = options;
+  if (grade == null || section == null) {
+    return payload;
+  }
+
+  pruneRecentLocalPlacementGuards();
+  if (!recentLocalPlacementGuards.size) {
+    return payload;
+  }
+
+  const incomingPayload = (payload && typeof payload === 'object') ? payload : {};
+  const incomingMagnets = (incomingPayload.magnets && typeof incomingPayload.magnets === 'object')
+    ? incomingPayload.magnets
+    : {};
+  const localState = ensureLocalBoardState(grade, section);
+  const localMagnets = (localState.magnets && typeof localState.magnets === 'object')
+    ? localState.magnets
+    : {};
+
+  let nextMagnets = null;
+
+  recentLocalPlacementGuards.forEach((_, magnetNumber) => {
+    const localMagnet = localMagnets[magnetNumber];
+    if (!localMagnet) {
+      recentLocalPlacementGuards.delete(magnetNumber);
+      return;
+    }
+
+    const localSignature = buildMagnetPlacementSignature(localMagnet);
+    const incomingSignature = buildMagnetPlacementSignature(incomingMagnets[magnetNumber]);
+    if (localSignature === incomingSignature) {
+      recentLocalPlacementGuards.delete(magnetNumber);
+      return;
+    }
+
+    if (!nextMagnets) {
+      nextMagnets = deepCloneJson(incomingMagnets, {}) || {};
+    }
+    nextMagnets[magnetNumber] = mergeLocalPlacementIntoRemoteMagnet(localMagnet, nextMagnets[magnetNumber]);
+  });
+
+  if (!nextMagnets) {
+    return payload;
+  }
+
+  return {
+    ...incomingPayload,
+    magnets: nextMagnets,
+  };
 }
 
 function getBoardStateStorageKey(grade, section) {
@@ -603,12 +761,15 @@ function handleMarqueePayload(payload) {
 }
 
 async function saveState(grade, section) {
+  const previousState = ensureLocalBoardState(grade, section);
+  const previousMagnets = deepCloneJson(previousState.magnets, {}) || {};
   const magnets = collectCurrentMagnets();
   const state = updateLocalBoardState(grade, section, {
     magnets,
     incrementRevision: true,
     markDirty: true,
   });
+  markRecentLocalPlacementChanges(previousMagnets, state.magnets);
 
   // Immediately trust local state first, then sync remote in background.
   lastAppliedStateSignature = buildBoardStateSignature(state.magnets, state.marquee);
@@ -656,14 +817,15 @@ function restoreToFreePosition(el, data) {
 }
 
 async function applyBoardStatePayload(payload, options = {}) {
-  const magnets = (payload && typeof payload === 'object' && payload.magnets && typeof payload.magnets === 'object')
-    ? payload.magnets
+  const resolvedPayload = reconcileIncomingBoardStatePayload(payload, options);
+  const magnets = (resolvedPayload && typeof resolvedPayload === 'object' && resolvedPayload.magnets && typeof resolvedPayload.magnets === 'object')
+    ? resolvedPayload.magnets
     : {};
-  const marquee = payload && typeof payload === 'object' ? payload.marquee : null;
+  const marquee = resolvedPayload && typeof resolvedPayload === 'object' ? resolvedPayload.marquee : null;
   const signature = buildBoardStateSignature(magnets, marquee);
 
   if (lastAppliedStateSignature && signature === lastAppliedStateSignature) {
-    return { applied: false, didNormalizeSection: false };
+    return { applied: false, didNormalizeSection: false, magnets, marquee };
   }
 
   let didNormalizeSection = false;
@@ -747,7 +909,7 @@ async function applyBoardStatePayload(payload, options = {}) {
     await saveState(options.grade, options.section);
   }
 
-  return { applied: true, didNormalizeSection };
+  return { applied: true, didNormalizeSection, magnets, marquee };
 }
 
 async function loadState(grade, section, options = {}) {
@@ -792,8 +954,8 @@ async function loadState(grade, section, options = {}) {
     const applyResult = await applyBoardStatePayload(parsed, { grade, section });
     if (applyResult.applied) {
       updateLocalBoardState(grade, section, {
-        magnets: parsed.magnets || {},
-        marquee: parsed.marquee ?? null,
+        magnets: applyResult.magnets || {},
+        marquee: applyResult.marquee ?? null,
         markDirty: false,
       });
     }
