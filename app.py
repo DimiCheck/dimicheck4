@@ -51,6 +51,7 @@ from content_filter import contains_slang
 from ws import namespaces
 
 import gspread
+import eventlet
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 app.config.from_object(config)
@@ -71,7 +72,16 @@ app.register_blueprint(mcp_bp)
 app.add_url_rule("/metrics", "metrics", metrics)
 
 db.init_app(app)
-socketio = SocketIO(app, cors_allowed_origins=config.FRONTEND_ORIGIN, async_mode="threading")
+
+
+eventlet.monkey_patch()
+
+socketio = SocketIO(
+    app,
+    cors_allowed_origins=config.FRONTEND_ORIGIN,
+    async_mode="eventlet"
+)
+
 CORS(
     app,
     resources={
