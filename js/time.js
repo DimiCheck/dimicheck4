@@ -1107,4 +1107,4 @@ setInterval(() => {
     return;
   }
   loadBoardNotices();
-}, 10000);
+}, 60000);
