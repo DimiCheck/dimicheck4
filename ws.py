@@ -5,9 +5,19 @@ from typing import Any
 from flask import session, request
 from flask_socketio import Namespace, emit
 
+from config import config
 from models import UserType, APIKey
-from utils import is_board_session_active, is_teacher_session_active
+from utils import burst_guard_allow, burst_guard_key, is_board_session_active, is_teacher_session_active
 HEADER_NAME = "Dimicheck-API-Key"
+
+
+def _allow_socket_connect(label: str) -> bool:
+    allowed, _ = burst_guard_allow(
+        burst_guard_key(f"ws:{label}"),
+        max_requests=config.DDOS_GUARD_WS_CONNECT_MAX_REQUESTS,
+        window_seconds=config.DDOS_GUARD_WINDOW_SECONDS,
+    )
+    return allowed
 
 
 class ClassNamespace(Namespace):
@@ -17,6 +27,8 @@ class ClassNamespace(Namespace):
         self.class_no = class_no
 
     def on_connect(self):  # type: ignore[override]
+        if not _allow_socket_connect(self.namespace):
+            return False
         # Allow teachers or board-verified sessions without requiring user payload
         if is_teacher_session_active():
             emit("presence.subscribe", {"message": "connected"})
@@ -39,6 +51,8 @@ class PublicStatusNamespace(Namespace):
     namespace = "/ws/public-status"
 
     def on_connect(self):  # type: ignore[override]
+        if not _allow_socket_connect(self.namespace):
+            return False
         api_key_value = request.args.get("api_key") or request.headers.get(HEADER_NAME)
         if not api_key_value:
             return False

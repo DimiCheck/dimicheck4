@@ -36,6 +36,8 @@ from config_loader import load_class_config
 from utils import (
     after_request,
     before_request,
+    burst_guard_allow,
+    burst_guard_key,
     clear_teacher_session,
     is_teacher_session_active,
     mark_teacher_session,
@@ -51,7 +53,25 @@ from content_filter import contains_slang
 from ws import namespaces
 
 import gspread
-import eventlet
+try:
+    import eventlet
+except ImportError:  # pragma: no cover - optional runtime dependency
+    eventlet = None
+
+
+class _NoopSocketIO:
+    def __init__(self, app: Flask):
+        self.app = app
+        self.app.extensions["socketio"] = self
+
+    def on_namespace(self, _namespace) -> None:
+        return None
+
+    def emit(self, *_args, **_kwargs) -> None:
+        return None
+
+    def run(self, *_args, **_kwargs) -> None:
+        raise RuntimeError("Socket.IO backend is unavailable")
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 app.config.from_object(config)
@@ -73,14 +93,18 @@ app.add_url_rule("/metrics", "metrics", metrics)
 
 db.init_app(app)
 
-
-eventlet.monkey_patch()
-
-socketio = SocketIO(
-    app,
-    cors_allowed_origins=config.FRONTEND_ORIGIN,
-    async_mode="eventlet"
-)
+if eventlet is not None:
+    eventlet.monkey_patch()
+socketio_async_mode = "eventlet" if eventlet is not None else "threading"
+try:
+    socketio = SocketIO(
+        app,
+        cors_allowed_origins=config.FRONTEND_ORIGIN,
+        async_mode=socketio_async_mode
+    )
+except ValueError as exc:  # pragma: no cover - depends on optional socket backends
+    app.logger.warning("Socket.IO disabled: %s", exc)
+    socketio = _NoopSocketIO(app)
 
 CORS(
     app,
@@ -95,6 +119,40 @@ for ns in namespaces:
 app.before_request(before_request)
 app.after_request(after_request)
 app.before_request(verify_csrf)
+
+
+@app.before_request
+def _apply_ddos_guard():
+    path = request.path or ""
+    rule_map = {
+        "/api/version": config.DDOS_GUARD_API_VERSION_MAX_REQUESTS,
+        "/healthz": config.DDOS_GUARD_HEALTHZ_MAX_REQUESTS,
+        "/metrics": config.DDOS_GUARD_METRICS_MAX_REQUESTS,
+        "/api/qrng": config.DDOS_GUARD_QRNG_MAX_REQUESTS,
+    }
+    max_requests = rule_map.get(path)
+    if max_requests is None:
+        return None
+
+    allowed, retry_after = burst_guard_allow(
+        burst_guard_key(f"http:{path}"),
+        max_requests=max_requests,
+        window_seconds=config.DDOS_GUARD_WINDOW_SECONDS,
+    )
+    if allowed:
+        return None
+
+    response = jsonify(
+        {
+            "error": {
+                "code": "429",
+                "message": "too many requests",
+            }
+        }
+    )
+    response.status_code = 429
+    response.headers["Retry-After"] = str(retry_after)
+    return response
 
 
 def _set_no_store(response):

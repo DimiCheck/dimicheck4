@@ -365,6 +365,8 @@ def send_ga4_event(
 # ---------------------------------------------------------------------------
 _PIN_GUARD: dict[str, dict[str, float | int]] = {}
 _PIN_GUARD_LOCK = Lock()
+_BURST_GUARD: dict[str, list[float]] = {}
+_BURST_GUARD_LOCK = Lock()
 
 
 def _client_identifier() -> str:
@@ -373,6 +375,31 @@ def _client_identifier() -> str:
         if value:
             return value.split(",")[0].strip()
     return request.remote_addr or "unknown"
+
+
+def burst_guard_key(label: str) -> str:
+    return f"{label}:{_client_identifier()}"
+
+
+def burst_guard_allow(
+    key: str,
+    *,
+    max_requests: int,
+    window_seconds: int,
+) -> tuple[bool, int]:
+    now = time.time()
+    with _BURST_GUARD_LOCK:
+        entries = [
+            ts for ts in _BURST_GUARD.get(key, [])
+            if now - ts < window_seconds
+        ]
+        if len(entries) >= max_requests:
+            retry_after = max(1, int(window_seconds - (now - entries[0])))
+            _BURST_GUARD[key] = entries
+            return False, retry_after
+        entries.append(now)
+        _BURST_GUARD[key] = entries
+        return True, 0
 
 
 def pin_guard_key(label: str) -> str:
