@@ -178,7 +178,19 @@
       flex-direction: column;
       gap: 18px;
       min-width: 0;
+    }
+
+    .main-stage,
+    .search-header {
       margin-left: 190px;
+      width: calc(100% - 190px);
+      padding: 0 24px;
+    }
+
+    .content-column {
+      width: 100%;
+      max-width: 1180px;
+      margin: 0 auto;
     }
 
     .search-header {
@@ -936,7 +948,7 @@
       min-height: 18px;
     }
 
-    @media (max-width: 1080px) {
+    @media (max-width: 920px) {
       .page-layout,
       .class-grid {
         grid-template-columns: 1fr;
@@ -947,8 +959,14 @@
       }
 
       .main-stage,
-      .content-column {
+      .search-header {
         margin-left: 0;
+        width: 100%;
+        padding: 0;
+      }
+
+      .content-column {
+        max-width: none;
       }
 
       .mobile-notice-btn {
@@ -1381,7 +1399,7 @@
     }
 
     function isMobileNoticeDrawerMode() {
-      return window.matchMedia('(max-width: 1080px)').matches;
+      return window.matchMedia('(max-width: 920px)').matches;
     }
 
     function openNoticeDrawer() {
