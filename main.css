@@ -60,15 +60,12 @@ body::before {
 
 .magnet {
   --ornament-base: #d64242;
-  --ornament-sheen: #ff9aa8;
   --ornament-rim: rgba(255, 255, 255, 0.18);
   --ornament-glow: rgba(220, 72, 94, 0.45);
   position: absolute;
   width: 56px;
   height: 56px;
-  background:
-    radial-gradient(circle at 72% 76%, rgba(0, 0, 0, 0.32), transparent 55%),
-    linear-gradient(145deg, var(--ornament-sheen), var(--ornament-base));
+  background: var(--ornament-base);
   border-radius: 50%;
   border: 1px solid var(--ornament-rim);
   display: flex;
@@ -84,7 +81,6 @@ body::before {
   box-shadow:
     0 12px 28px rgba(0, 0, 0, 0.35),
     0 6px 14px rgba(0, 0, 0, 0.45),
-    inset 0 -5px 12px rgba(0, 0, 0, 0.32),
     0 0 18px var(--ornament-glow);
   transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
   pointer-events: auto;
@@ -94,15 +90,11 @@ body::before {
 }
 
 .magnet.placeholder {
-  background:
-    radial-gradient(circle at 32% 30%, rgba(255, 255, 255, 0.5), transparent 46%),
-    linear-gradient(145deg, #8d9296, #4c545b);
+  background: #626a72;
   opacity: 0.6;
   cursor: pointer;
   box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.35),
-    inset 0 2px 6px rgba(255, 255, 255, 0.12),
-    inset 0 -4px 8px rgba(0, 0, 0, 0.35);
+    0 4px 12px rgba(0, 0, 0, 0.35);
   pointer-events: auto;
   z-index: 50;
   border: 1px dashed rgba(255, 255, 255, 0.18);
@@ -741,37 +733,31 @@ body.fullscreen .fullscreen-btn {
 /* 색상 군 */
 .magnet.color-red {
   --ornament-base: #e30517;
-  --ornament-sheen: #e76345;
   --ornament-glow: rgba(242, 71, 83, 0.6);
 }
 
 .magnet.color-orange {
   --ornament-base: #ff8000;
-  --ornament-sheen: #ffb44a;
   --ornament-glow: rgba(251, 149, 24, 0.58);
 }
 
 .magnet.color-yellow {
   --ornament-base: #ffbb00;
-  --ornament-sheen: #ffc342;
   --ornament-glow: rgba(255, 187, 0, 0.54);
 }
 /* wtf */
 .magnet.color-green {
   --ornament-base: #5be98d;
-  --ornament-sheen: #8afda5;
   --ornament-glow: rgba(84, 170, 114, 0.57);
 }
 
 .magnet.color-blue {
   --ornament-base: #1781eb;
-  --ornament-sheen: #90b9ff;
   --ornament-glow: rgba(96, 142, 210, 0.56);
 }
 
 .magnet.color-purple {
   --ornament-base: #a838dc;
-  --ornament-sheen: #c583e6;
   --ornament-glow: rgba(148, 53, 199, 0.56);
 }
 
