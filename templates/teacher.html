@@ -108,6 +108,20 @@
       gap: 18px;
     }
 
+    .page-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .content-column {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-width: 0;
+    }
+
     .search-header {
       display: flex;
       align-items: center;
@@ -134,6 +148,7 @@
     .summary-card,
     .classes-section,
     .class-card,
+    .notice-sidebar,
     .modal-card,
     .onboarding-card {
       background: var(--surface);
@@ -238,6 +253,11 @@
       font-weight: 600;
     }
 
+    .mobile-notice-btn,
+    .drawer-close-btn {
+      display: none;
+    }
+
     .notice-layout {
       display: grid;
       grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
@@ -256,6 +276,90 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
+    }
+
+    .notice-sidebar {
+      border-radius: var(--radius-xl);
+      padding: 22px;
+      position: sticky;
+      top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      max-height: calc(100vh - 48px);
+      overflow: auto;
+    }
+
+    .notice-sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .notice-sidebar-header h2,
+    .notice-history h3 {
+      font-size: 20px;
+      letter-spacing: -0.02em;
+    }
+
+    .notice-history {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .notice-history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .notice-history-item {
+      border-radius: 18px;
+      border: 1px solid rgba(124, 96, 69, 0.1);
+      background: rgba(255,255,255,0.76);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .notice-history-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      flex-wrap: wrap;
+    }
+
+    .notice-history-text {
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .notice-history-target {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .notice-history-empty {
+      border-radius: 18px;
+      border: 1px dashed rgba(124, 96, 69, 0.18);
+      background: rgba(255,255,255,0.56);
+      color: var(--muted);
+      padding: 16px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .drawer-backdrop {
+      display: none;
     }
 
     .notice-row,
@@ -773,9 +877,44 @@
     }
 
     @media (max-width: 1080px) {
-      .notice-layout,
+      .page-layout,
       .class-grid {
         grid-template-columns: 1fr;
+      }
+
+      .mobile-notice-btn {
+        display: inline-flex;
+      }
+
+      .notice-sidebar {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(92vw, 380px);
+        max-height: none;
+        border-radius: 28px 0 0 28px;
+        z-index: 80;
+        transform: translateX(100%);
+        transition: transform .24s ease;
+        background: rgba(255,255,255,0.98);
+      }
+
+      .notice-sidebar.visible {
+        transform: translateX(0);
+      }
+
+      .drawer-close-btn {
+        display: inline-flex;
+      }
+
+      .drawer-backdrop.visible {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(85, 59, 37, 0.18);
+        backdrop-filter: blur(4px);
+        z-index: 70;
       }
     }
 
@@ -845,31 +984,74 @@
       <div id="studentSearchResult" class="search-result search-result-overlay"></div>
     </section>
 
-    <section class="hero-card">
-      <div class="hero-top">
-        <div>
-          <h1 id="greetingTitle" class="hero-title">선생님, 좋은 하루예요.</h1>
-        </div>
-        <div class="hero-actions">
-          <div class="grade-switch" id="gradeButtons">
-            <button class="grade-btn active" data-grade="1" type="button">1학년</button>
-            <button class="grade-btn" data-grade="2" type="button">2학년</button>
-            <button class="grade-btn" data-grade="3" type="button">3학년</button>
+    <div class="page-layout">
+      <div class="content-column">
+        <section class="hero-card">
+          <div class="hero-top">
+            <div>
+              <h1 id="greetingTitle" class="hero-title">선생님, 좋은 하루예요.</h1>
+            </div>
+            <div class="hero-actions">
+              <div class="grade-switch" id="gradeButtons">
+                <button class="grade-btn active" data-grade="1" type="button">1학년</button>
+                <button class="grade-btn" data-grade="2" type="button">2학년</button>
+                <button class="grade-btn" data-grade="3" type="button">3학년</button>
+              </div>
+              <button id="openNoticeDrawerBtn" class="ghost-btn mobile-notice-btn" type="button">공지</button>
+              <button id="editTeacherNameBtn" class="ghost-btn" type="button">이름 수정</button>
+            </div>
           </div>
-          <button id="editTeacherNameBtn" class="ghost-btn" type="button">이름 수정</button>
-        </div>
+        </section>
+
+        <section class="summary-card">
+          <div class="section-heading-row">
+            <div class="section-heading">
+              <h2><span id="gradeLabel">1</span>학년 요약</h2>
+            </div>
+            <div class="update-time" id="updateTime">마지막 업데이트: --:--</div>
+          </div>
+
+          <div class="summary-grid">
+            <div class="summary-stat" data-tone="total">
+              <span>총원</span>
+              <strong id="grade-total">0</strong>
+            </div>
+            <div class="summary-stat" data-tone="present">
+              <span>현원</span>
+              <strong id="grade-present">0</strong>
+            </div>
+            <div class="summary-stat" data-tone="away">
+              <span>결원</span>
+              <strong id="grade-absence">0</strong>
+            </div>
+          </div>
+
+          <p id="summaryHeadline" class="summary-headline">현재 요약 데이터를 불러오는 중이에요.</p>
+          <div id="summaryBadges" class="summary-badges"></div>
+        </section>
+
+        <section class="classes-section">
+          <div class="classes-heading-row">
+            <div class="classes-heading">
+              <h2>반별 현황</h2>
+            </div>
+          </div>
+          <div id="classGrid" class="class-grid"></div>
+        </section>
       </div>
 
-      <div class="notice-layout">
-        <div class="notice-panel-title">
-          <h2>교사 공지 등록</h2>
+      <aside id="noticeSidebar" class="notice-sidebar" aria-label="공지">
+        <div class="notice-sidebar-header">
+          <h2>공지</h2>
+          <button id="closeNoticeDrawerBtn" class="ghost-btn drawer-close-btn" type="button">닫기</button>
         </div>
+
         <div class="notice-form">
           <div class="notice-row">
             <input id="noticeTeacherName" class="notice-input" type="text" placeholder="선생님 이름" maxlength="80" />
             <label class="notice-target-toggle">
               <input id="noticeAllTargets" type="checkbox" checked />
-              전체(모든 반)에 공지하기
+              전체(모든 반)
             </label>
           </div>
           <textarea id="noticeText" class="notice-textarea" placeholder="공지 내용을 입력하세요 (최대 500자)" maxlength="500"></textarea>
@@ -882,45 +1064,16 @@
             <span id="noticeFeedback" class="notice-feedback"></span>
           </div>
         </div>
-      </div>
-    </section>
 
-    <section class="summary-card">
-      <div class="section-heading-row">
-        <div class="section-heading">
-          <h2><span id="gradeLabel">1</span>학년 요약</h2>
-        </div>
-        <div class="update-time" id="updateTime">마지막 업데이트: --:--</div>
-      </div>
-
-      <div class="summary-grid">
-        <div class="summary-stat" data-tone="total">
-          <span>총원</span>
-          <strong id="grade-total">0</strong>
-        </div>
-        <div class="summary-stat" data-tone="present">
-          <span>현원</span>
-          <strong id="grade-present">0</strong>
-        </div>
-        <div class="summary-stat" data-tone="away">
-          <span>결원</span>
-          <strong id="grade-absence">0</strong>
-        </div>
-      </div>
-
-      <p id="summaryHeadline" class="summary-headline">현재 요약 데이터를 불러오는 중이에요.</p>
-      <div id="summaryBadges" class="summary-badges"></div>
-    </section>
-
-    <section class="classes-section">
-      <div class="classes-heading-row">
-        <div class="classes-heading">
-          <h2>반별 현황</h2>
-        </div>
-      </div>
-      <div id="classGrid" class="class-grid"></div>
-    </section>
+        <section class="notice-history">
+          <h3>공지 히스토리</h3>
+          <div id="noticeHistoryList" class="notice-history-list"></div>
+          <div id="noticeHistoryEmpty" class="notice-history-empty">아직 공지가 없습니다.</div>
+        </section>
+      </aside>
+    </div>
   </main>
+  <div id="noticeDrawerBackdrop" class="drawer-backdrop"></div>
 
   <div id="statusModal" class="modal" aria-modal="true" role="dialog">
     <div class="modal-card">
@@ -997,6 +1150,12 @@
     const noticeTargetContainer = document.getElementById('noticeTargets');
     const noticeSendBtn = document.getElementById('noticeSendBtn');
     const noticeFeedback = document.getElementById('noticeFeedback');
+    const noticeSidebar = document.getElementById('noticeSidebar');
+    const openNoticeDrawerBtn = document.getElementById('openNoticeDrawerBtn');
+    const closeNoticeDrawerBtn = document.getElementById('closeNoticeDrawerBtn');
+    const noticeDrawerBackdrop = document.getElementById('noticeDrawerBackdrop');
+    const noticeHistoryList = document.getElementById('noticeHistoryList');
+    const noticeHistoryEmpty = document.getElementById('noticeHistoryEmpty');
     const teacherNameOverlay = document.getElementById('teacherNameOverlay');
     const teacherNameForm = document.getElementById('teacherNameForm');
     const teacherNameInput = document.getElementById('teacherNameInput');
@@ -1007,6 +1166,7 @@
     const modalTitle = document.getElementById('modalTitle');
     const etcBoxModal = document.getElementById('etcBoxModal');
     const etcReasonModal = document.getElementById('etcReasonModal');
+    let noticeHistoryRequestToken = 0;
 
     function escapeHTML(value) {
       return String(value ?? '')
@@ -1099,6 +1259,92 @@
       const h = String(date.getHours()).padStart(2, '0');
       const m = String(date.getMinutes()).padStart(2, '0');
       return `${h}:${m}`;
+    }
+
+    function formatNoticeTime(dateLike) {
+      const date = dateLike instanceof Date ? dateLike : new Date(dateLike);
+      if (Number.isNaN(date.getTime())) return '--:--';
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      const h = String(date.getHours()).padStart(2, '0');
+      const m = String(date.getMinutes()).padStart(2, '0');
+      return `${month}/${day} ${h}:${m}`;
+    }
+
+    function isMobileNoticeDrawerMode() {
+      return window.matchMedia('(max-width: 1080px)').matches;
+    }
+
+    function openNoticeDrawer() {
+      if (!isMobileNoticeDrawerMode()) return;
+      noticeSidebar.classList.add('visible');
+      noticeDrawerBackdrop.classList.add('visible');
+    }
+
+    function closeNoticeDrawer() {
+      noticeSidebar.classList.remove('visible');
+      noticeDrawerBackdrop.classList.remove('visible');
+    }
+
+    function syncNoticeDrawerMode() {
+      if (!isMobileNoticeDrawerMode()) {
+        closeNoticeDrawer();
+      }
+    }
+
+    function dedupeNotices(notices) {
+      const map = new Map();
+      (notices || []).forEach((notice) => {
+        const id = Number(notice?.id);
+        if (!Number.isFinite(id)) return;
+        const prev = map.get(id);
+        if (!prev || Number(notice?.createdAtMs || 0) > Number(prev?.createdAtMs || 0)) {
+          map.set(id, notice);
+        }
+      });
+      return Array.from(map.values()).sort((a, b) => Number(b?.createdAtMs || 0) - Number(a?.createdAtMs || 0));
+    }
+
+    function renderNoticeHistory(notices) {
+      const items = Array.isArray(notices) ? notices : [];
+      noticeHistoryList.innerHTML = items.map((notice) => {
+        const teacher = escapeHTML(notice?.teacherName || '선생님');
+        const text = escapeHTML(notice?.text || '');
+        const target = escapeHTML(notice?.targetLabel || '');
+        const created = formatNoticeTime(notice?.createdAt || notice?.createdAtMs || Date.now());
+        return `
+          <article class="notice-history-item">
+            <div class="notice-history-meta">
+              <span>${teacher}</span>
+              <span>${created}</span>
+            </div>
+            <div class="notice-history-text">${text}</div>
+            <div class="notice-history-target">${target}</div>
+          </article>
+        `;
+      }).join('');
+      noticeHistoryEmpty.style.display = items.length ? 'none' : '';
+    }
+
+    async function loadNoticeHistory(grade) {
+      const requestToken = ++noticeHistoryRequestToken;
+      try {
+        const requests = Array.from({ length: 6 }, (_, index) => {
+          const section = index + 1;
+          return fetch(`/api/classes/notices?grade=${grade}&section=${section}&mode=all`, {
+            cache: 'no-store',
+          })
+            .then((response) => response.ok ? response.json() : null)
+            .catch(() => null);
+        });
+        const payloads = await Promise.all(requests);
+        if (requestToken !== noticeHistoryRequestToken) return;
+        const notices = dedupeNotices(payloads.flatMap((payload) => Array.isArray(payload?.notices) ? payload.notices : []));
+        renderNoticeHistory(notices);
+      } catch (error) {
+        if (requestToken !== noticeHistoryRequestToken) return;
+        console.warn('notice history load failed', error);
+      }
     }
 
     function setActiveGrade(grade) {
@@ -1809,6 +2055,8 @@
         }
         noticeText.value = '';
         noticeFeedback.textContent = '공지 등록 완료!';
+        loadNoticeHistory(currentGrade);
+        closeNoticeDrawer();
       } catch (error) {
         noticeFeedback.textContent = error?.message || '공지 전송에 실패했습니다.';
       } finally {
@@ -1929,6 +2177,9 @@
     });
 
     noticeSendBtn.addEventListener('click', sendTeacherNotice);
+    openNoticeDrawerBtn.addEventListener('click', openNoticeDrawer);
+    closeNoticeDrawerBtn.addEventListener('click', closeNoticeDrawer);
+    noticeDrawerBackdrop.addEventListener('click', closeNoticeDrawer);
 
     studentSearchInput.addEventListener('input', (event) => {
       handleStudentSearch(event.target.value);
@@ -1997,6 +2248,7 @@
         setActiveGrade(grade);
         connectToGradeWebSockets(grade);
         await loadClassState(grade);
+        loadNoticeHistory(grade);
       });
     });
 
@@ -2017,6 +2269,7 @@
     });
 
     setInterval(() => scheduleGradeReload(currentGrade, 0), 60000);
+    window.addEventListener('resize', syncNoticeDrawerMode);
 
     (function startHeartbeat() {
       const HEARTBEAT_MS = 3 * 60 * 60 * 1000;
@@ -2032,7 +2285,9 @@
     ensureTeacherNameOnboarding();
     setActiveGrade(currentGrade);
     loadClassState(currentGrade);
+    loadNoticeHistory(currentGrade);
     connectToGradeWebSockets(currentGrade);
+    syncNoticeDrawerMode();
   </script>
 </body>
 </html>
