@@ -360,6 +360,15 @@
       }
     }
 
+    function getErrorMessage(payload, fallback) {
+      if (!payload) return fallback;
+      if (typeof payload === 'string') return payload;
+      if (typeof payload?.error === 'string') return payload.error;
+      if (payload?.error && typeof payload.error.message === 'string') return payload.error.message;
+      if (typeof payload?.message === 'string') return payload.message;
+      return fallback;
+    }
+
     acceptBtn.addEventListener('click', async () => {
       errorBox.textContent = '';
       acceptBtn.disabled = true;
@@ -372,7 +381,7 @@
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) {
-          throw new Error(data.error || '동의 저장에 실패했습니다');
+          throw new Error(getErrorMessage(data, '동의 저장에 실패했습니다'));
         }
         const target = data.redirect || '/user.html';
         window.location.replace(target);

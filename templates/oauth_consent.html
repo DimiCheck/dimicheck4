@@ -35,6 +35,9 @@
       <input type="hidden" name="state" value="{{ state or '' }}" />
       <input type="hidden" name="response_type" value="code" />
       <input type="hidden" name="scope" value="{{ scope_param }}" />
+      {% if csrf_token %}
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      {% endif %}
       {% if code_challenge %}
       <input type="hidden" name="code_challenge" value="{{ code_challenge }}" />
       <input type="hidden" name="code_challenge_method" value="{{ code_challenge_method }}" />

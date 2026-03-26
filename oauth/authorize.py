@@ -85,6 +85,7 @@ def register_authorize_routes(bp):
                 code_challenge=code_challenge,
                 code_challenge_method=code_challenge_method,
                 scope_param=request.args.get("scope", ""),
+                csrf_token=session.get("csrf_token"),
             )
 
         if request.form.get("decision") != "approve":
