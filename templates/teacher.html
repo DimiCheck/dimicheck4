@@ -1137,7 +1137,7 @@
       return LABELS[category] || '이동';
     }
 
-    function buildCardChips(magnets, grade, section, view = 'away') {
+    function buildCardChipItems(magnets, grade, section, view = 'away') {
       const items = [];
 
       Object.entries(magnets || {}).forEach(([numStr, data]) => {
@@ -1147,29 +1147,28 @@
         const isPresentNormal = category === 'section';
         const isPresentSpecial = PRESENT_SPECIAL_TAGS.has(category);
         const isAway = AWAY_TAGS.has(category);
-        const label = escapeHTML(getLabelForData(data));
-        const chipBase = `data-number="${num}" data-grade="${grade}" data-section="${section}" data-status="${category}"`;
+        const label = getLabelForData(data);
 
         if (view === 'total') {
           if (isPresentNormal) {
-            items.push({ num, html: `<button class="chip chip-present" type="button" ${chipBase}>${num}번 ${escapeHTML(LABELS.section)}</button>` });
+            items.push({ key: String(num), num, className: 'chip chip-present', text: `${num}번 ${LABELS.section}`, grade, section, status: category });
           } else if (isPresentSpecial) {
-            items.push({ num, html: `<button class="chip chip-present-soft" type="button" ${chipBase}>${num}번 ${label}</button>` });
+            items.push({ key: String(num), num, className: 'chip chip-present-soft', text: `${num}번 ${label}`, grade, section, status: category });
           } else if (isAway) {
-            items.push({ num, html: `<button class="chip chip-away" type="button" ${chipBase}>${num}번 ${label}</button>` });
+            items.push({ key: String(num), num, className: 'chip chip-away', text: `${num}번 ${label}`, grade, section, status: category });
           }
           return;
         }
 
         if (view === 'away' && isAway) {
-          items.push({ num, html: `<button class="chip chip-away" type="button" ${chipBase}>${num}번 ${label}</button>` });
+          items.push({ key: String(num), num, className: 'chip chip-away', text: `${num}번 ${label}`, grade, section, status: category });
         }
 
         if (view === 'present' && (isPresentNormal || isPresentSpecial)) {
           if (isPresentNormal) {
-            items.push({ num, html: `<button class="chip chip-present" type="button" ${chipBase}>${num}번 ${escapeHTML(LABELS.section)}</button>` });
+            items.push({ key: String(num), num, className: 'chip chip-present', text: `${num}번 ${LABELS.section}`, grade, section, status: category });
           } else {
-            items.push({ num, html: `<button class="chip chip-present-soft" type="button" ${chipBase}>${num}번 ${label}</button>` });
+            items.push({ key: String(num), num, className: 'chip chip-present-soft', text: `${num}번 ${label}`, grade, section, status: category });
           }
         }
       });
@@ -1178,7 +1177,87 @@
         items.sort((a, b) => a.num - b.num);
       }
 
-      return items.map((item) => item.html).join('');
+      return items;
+    }
+
+    function reconcileChipList(chipList, items, emptyMessage) {
+      const existingChips = new Map(
+        Array.from(chipList.querySelectorAll('.chip')).map((chip) => [chip.dataset.chipKey, chip])
+      );
+      const emptyNode = chipList.querySelector('.chip-empty');
+
+      if (!items.length) {
+        existingChips.forEach((chip) => chip.remove());
+        const targetEmpty = emptyNode || document.createElement('div');
+        targetEmpty.className = 'chip-empty';
+        if (targetEmpty.textContent !== emptyMessage) {
+          targetEmpty.textContent = emptyMessage;
+        }
+        if (!targetEmpty.isConnected) {
+          chipList.appendChild(targetEmpty);
+        }
+        return;
+      }
+
+      if (emptyNode) {
+        emptyNode.remove();
+      }
+
+      items.forEach((item, index) => {
+        let chip = existingChips.get(item.key);
+        if (!chip) {
+          chip = document.createElement('button');
+          chip.type = 'button';
+          chip.dataset.chipKey = item.key;
+        }
+
+        if (chip.className !== item.className) {
+          chip.className = item.className;
+        }
+        chip.dataset.number = String(item.num);
+        chip.dataset.grade = String(item.grade);
+        chip.dataset.section = String(item.section);
+        chip.dataset.status = String(item.status);
+        if (chip.textContent !== item.text) {
+          chip.textContent = item.text;
+        }
+
+        const currentChild = chipList.children[index];
+        if (currentChild !== chip) {
+          chipList.insertBefore(chip, currentChild || null);
+        }
+        existingChips.delete(item.key);
+      });
+
+      existingChips.forEach((chip) => chip.remove());
+    }
+
+    function reconcileSummaryBadges(items) {
+      const existingBadges = new Map(
+        Array.from(summaryBadges.querySelectorAll('.summary-badge')).map((badge) => [badge.dataset.badgeKey, badge])
+      );
+
+      items.forEach((item, index) => {
+        let badge = existingBadges.get(item.key);
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.dataset.badgeKey = item.key;
+        }
+        if (badge.className !== item.className) {
+          badge.className = item.className;
+        }
+        if (badge.textContent !== item.text) {
+          badge.textContent = item.text;
+        }
+
+        const currentChild = summaryBadges.children[index];
+        if (currentChild !== badge) {
+          summaryBadges.insertBefore(badge, currentChild || null);
+        }
+        existingBadges.delete(item.key);
+      });
+
+      existingBadges.forEach((badge) => badge.remove());
     }
 
     function renderClassCard(card, grade, section, snapshot) {
@@ -1214,12 +1293,12 @@
       }
 
       const chipList = card.querySelector('.chip-list');
-      const html = buildCardChips(magnets, grade, section, view);
-      if (!html) {
-        chipList.innerHTML = `<div class="chip-empty">${total === 0 ? 'DIMICHECK 등록 학생이 아직 없어요.' : '이 보기에는 표시할 학생이 없어요.'}</div>`;
-        return;
-      }
-      chipList.innerHTML = html;
+      const items = buildCardChipItems(magnets, grade, section, view);
+      reconcileChipList(
+        chipList,
+        items,
+        total === 0 ? 'DIMICHECK 등록 학생이 아직 없어요.' : '이 보기에는 표시할 학생이 없어요.'
+      );
     }
 
     function countGradeCategories(sections) {
@@ -1269,15 +1348,19 @@
 
       summaryHeadline.textContent = buildSummarySentence(counts);
 
-      summaryBadges.innerHTML = SUMMARY_ORDER
+      const badgeItems = SUMMARY_ORDER
         .filter((category) => (counts[category] || 0) > 0)
         .map((category) => {
           const tone = getToneForCategory(category);
           const toneClass = tone === 'away' ? 'is-away' : tone === 'special' ? 'is-special' : 'is-present';
           const label = category === 'etc' ? '기타' : LABELS[category];
-          return `<span class="summary-badge ${toneClass}">${escapeHTML(label)} ${counts[category]}명</span>`;
-        })
-        .join('');
+          return {
+            key: category,
+            className: `summary-badge ${toneClass}`,
+            text: `${label} ${counts[category]}명`,
+          };
+        });
+      reconcileSummaryBadges(badgeItems);
 
       totalEl.textContent = String(totals.total);
       presentEl.textContent = String(totals.present);
