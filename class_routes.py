@@ -172,6 +172,7 @@ _NOTICE_FRESH_SECONDS = 10
 _NOTICE_DOT_SECONDS = 10 * 60
 _NOTICE_BURST_WINDOW = timedelta(minutes=10)
 _MARQUEE_MAX_AGE = timedelta(minutes=30)
+_NOTICE_POPUP_MARKER = "__popup__"
 
 
 def _ensure_notice_tables() -> bool:
@@ -227,6 +228,21 @@ def _parse_notice_target_classes(raw_targets: str | None) -> list[str]:
         seen.add(key)
         normalized.append(key)
     return normalized
+
+
+def _notice_has_popup_flag(notice: TeacherNotice) -> bool:
+    try:
+        parsed = json.loads(notice.target_classes or "[]")
+    except json.JSONDecodeError:
+        return False
+    return isinstance(parsed, list) and _NOTICE_POPUP_MARKER in parsed
+
+
+def _notice_target_payload(target_all: bool, target_classes: list[str], popup: bool) -> str:
+    payload = list(target_classes or [])
+    if popup and _NOTICE_POPUP_MARKER not in payload:
+        payload.append(_NOTICE_POPUP_MARKER)
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def _normalize_notice_targets(payload: dict) -> tuple[bool, list[str]]:
@@ -408,6 +424,7 @@ def _serialize_notice(notice: TeacherNotice, *, now_utc: datetime | None = None)
         "id": notice.id,
         "teacherName": notice.teacher_name,
         "text": notice.text,
+        "popup": _notice_has_popup_flag(notice),
         "createdAt": created_at.isoformat(),
         "createdAtMs": int(created_at.timestamp() * 1000),
         "ageSeconds": age_seconds,
@@ -417,6 +434,33 @@ def _serialize_notice(notice: TeacherNotice, *, now_utc: datetime | None = None)
         "targetClasses": targets,
         "targetLabel": target_labels,
     }
+
+
+def _emit_teacher_notice(notice: TeacherNotice) -> None:
+    socketio = current_app.extensions.get("socketio") if current_app else None
+    if not socketio:
+        return
+
+    payload = _serialize_notice(notice)
+    targets = _parse_notice_target_classes(notice.target_classes)
+    namespaces: list[str] = []
+
+    if notice.target_all or not targets:
+        namespaces = [f"/ws/classes/{grade}/{section}" for grade in range(1, 4) for section in range(1, 7)]
+    else:
+        for key in targets:
+            parts = key.split("-")
+            if len(parts) != 2:
+                continue
+            try:
+                grade = int(parts[0])
+                section = int(parts[1])
+            except ValueError:
+                continue
+            namespaces.append(f"/ws/classes/{grade}/{section}")
+
+    for namespace in namespaces:
+        socketio.emit("notice_created", payload, namespace=namespace)
 
 
 def _load_targeted_notices(grade: int, section: int, *, limit: int = 100) -> list[TeacherNotice]:
@@ -467,15 +511,18 @@ def create_teacher_notice():
         text = text[:500]
 
     target_all, target_classes = _normalize_notice_targets(payload)
+    popup = bool(payload.get("popup") or payload.get("highlight") or payload.get("displayPopup"))
 
     notice = TeacherNotice(
         teacher_name=teacher_name,
         text=text,
         target_all=target_all,
-        target_classes=json.dumps(target_classes, ensure_ascii=False),
+        target_classes=_notice_target_payload(target_all, target_classes, popup),
     )
     db.session.add(notice)
     db.session.commit()
+
+    _emit_teacher_notice(notice)
 
     return jsonify({"ok": True, "notice": _serialize_notice(notice)}), 201
 

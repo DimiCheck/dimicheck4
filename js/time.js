@@ -896,6 +896,91 @@ async function createMagnetsFromServer(grade, section) {
 
 let boardNoticesCache = [];
 let boardNoticeRenderKey = '';
+const BOARD_NOTICE_POPUP_MS = 5000;
+let boardNoticePopupTimer = null;
+let boardNoticePopupAnimation = null;
+
+function getBoardPopupSeenStorageKey() {
+  return `dimicheck:boardPopupNotice:${grade}-${section}`;
+}
+
+function hasSeenBoardPopup(noticeId) {
+  if (!noticeId) return false;
+  try {
+    return localStorage.getItem(getBoardPopupSeenStorageKey()) === String(noticeId);
+  } catch (_) {
+    return false;
+  }
+}
+
+function markBoardPopupSeen(noticeId) {
+  if (!noticeId) return;
+  try {
+    localStorage.setItem(getBoardPopupSeenStorageKey(), String(noticeId));
+  } catch (_) {
+    // ignore
+  }
+}
+
+function hideBoardNoticePopup() {
+  const overlay = document.getElementById('boardNoticePopup');
+  const bar = document.getElementById('boardNoticePopupBar');
+  if (!overlay || overlay.hidden) return;
+  overlay.hidden = true;
+  if (boardNoticePopupTimer) {
+    clearTimeout(boardNoticePopupTimer);
+    boardNoticePopupTimer = null;
+  }
+  if (boardNoticePopupAnimation && typeof boardNoticePopupAnimation.cancel === 'function') {
+    boardNoticePopupAnimation.cancel();
+  }
+  boardNoticePopupAnimation = null;
+  if (bar) {
+    bar.style.transform = 'scaleX(1)';
+  }
+}
+
+function showBoardNoticePopup(notice) {
+  if (!notice?.popup || !notice?.id || hasSeenBoardPopup(notice.id)) {
+    return;
+  }
+
+  const overlay = document.getElementById('boardNoticePopup');
+  const teacherEl = document.getElementById('boardNoticePopupTeacher');
+  const textEl = document.getElementById('boardNoticePopupText');
+  const bar = document.getElementById('boardNoticePopupBar');
+  if (!overlay || !teacherEl || !textEl || !bar) return;
+
+  markBoardPopupSeen(notice.id);
+  hideBoardNoticePopup();
+
+  teacherEl.textContent = String(notice.teacherName || '선생님');
+  textEl.textContent = String(notice.text || '');
+  overlay.hidden = false;
+  bar.style.transform = 'scaleX(1)';
+
+  boardNoticePopupAnimation = bar.animate(
+    [{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }],
+    { duration: BOARD_NOTICE_POPUP_MS, easing: 'linear', fill: 'forwards' }
+  );
+
+  boardNoticePopupTimer = window.setTimeout(() => {
+    hideBoardNoticePopup();
+  }, BOARD_NOTICE_POPUP_MS);
+}
+
+function mergeBoardNoticeCache(incoming) {
+  const list = Array.isArray(incoming) ? incoming : [];
+  const map = new Map();
+  [...list, ...boardNoticesCache].forEach((notice) => {
+    const id = Number(notice?.id || 0);
+    if (!id || map.has(id)) return;
+    map.set(id, notice);
+  });
+  boardNoticesCache = Array.from(map.values())
+    .sort((a, b) => Number(b?.createdAtMs || 0) - Number(a?.createdAtMs || 0))
+    .slice(0, 120);
+}
 
 function formatBoardNoticeTime(createdAtMs) {
   if (!createdAtMs) return '';
@@ -975,6 +1060,10 @@ async function loadBoardNotices() {
     const payload = await response.json();
     boardNoticesCache = Array.isArray(payload?.notices) ? payload.notices : [];
     renderBoardNotices(boardNoticesCache);
+    const popupNotice = boardNoticesCache.find((notice) => notice?.popup && !hasSeenBoardPopup(notice.id));
+    if (popupNotice) {
+      showBoardNoticePopup(popupNotice);
+    }
   } catch (error) {
     console.warn('[board notice] load failed', error);
   }
@@ -988,6 +1077,7 @@ async function initBoard() {
   updateAttendance();
   updateEtcReasonPanel();
   updateClock();
+  document.getElementById('boardNoticePopup')?.addEventListener('click', hideBoardNoticePopup);
   setInterval(updateClock, 1000);
   setInterval(() => renderBoardNotices(boardNoticesCache), 1000);
 }
@@ -1057,6 +1147,12 @@ function connectBoardRealtime() {
       console.warn('[board realtime] apply failed, falling back to loadState', err);
       loadState(grade, section, { ignoreOffline: true, forceSync: true });
     }
+  });
+
+  boardSocket.on('notice_created', (notice) => {
+    mergeBoardNoticeCache([notice]);
+    renderBoardNotices(boardNoticesCache);
+    showBoardNoticePopup(notice);
   });
 }
 

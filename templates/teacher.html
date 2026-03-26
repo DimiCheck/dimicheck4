@@ -1077,7 +1077,7 @@
     <form id="teacherNameForm" class="onboarding-card">
       <h2>어떻게 불러드릴까요?</h2>
       <p>처음 한 번만 이름을 저장하면, 이 기기에서는 공지 작성 시 선생님 이름이 자동으로 입력돼요.</p>
-      <input id="teacherNameInput" class="text-input" type="text" maxlength="80" placeholder="예: 김민지" autocomplete="name" />
+      <input id="teacherNameInput" class="text-input" type="text" maxlength="80" placeholder="예: 홍길동" autocomplete="name" />
       <div class="onboarding-actions" style="margin-top:16px;">
         <button class="solid-btn" type="submit">저장하고 시작하기</button>
         <span id="teacherNameHelper" class="helper"></span>
@@ -1180,6 +1180,10 @@
           <input id="noticeAllTargets" type="checkbox" checked />
           전체(모든 반)
         </label>
+        <label class="notice-target-toggle">
+          <input id="noticePopup" type="checkbox" />
+          중앙 팝업으로 띄우기
+        </label>
       </div>
       <textarea id="noticeText" class="notice-textarea" placeholder="공지 내용을 입력하세요 (최대 500자)" maxlength="500"></textarea>
       <div id="noticeTargetsWrap" class="notice-targets-wrap">
@@ -1272,6 +1276,7 @@
     const noticeTeacherName = document.getElementById('noticeTeacherName');
     const noticeText = document.getElementById('noticeText');
     const noticeAllTargets = document.getElementById('noticeAllTargets');
+    const noticePopup = document.getElementById('noticePopup');
     const noticeTargetsWrap = document.getElementById('noticeTargetsWrap');
     const noticeTargetGroups = document.getElementById('noticeTargetGroups');
     const noticeTargetContainer = document.getElementById('noticeTargets');
@@ -2203,6 +2208,7 @@
     async function sendTeacherNotice() {
       const teacherName = (noticeTeacherName.value || getStoredTeacherName() || '').trim();
       const text = (noticeText.value || '').trim();
+      const popup = Boolean(noticePopup?.checked);
 
       if (!teacherName) {
         noticeFeedback.textContent = '선생님 이름을 먼저 입력해주세요.';
@@ -2242,6 +2248,7 @@
             teacherName,
             text,
             targetClasses: targets,
+            popup,
           }),
         });
         const parsed = await response.json().catch(() => ({}));
@@ -2249,6 +2256,7 @@
           throw new Error(parsed?.error || '공지 전송에 실패했습니다.');
         }
         noticeText.value = '';
+        if (noticePopup) noticePopup.checked = false;
         noticeFeedback.textContent = '공지 등록 완료!';
         if (!noticeView.hidden || noticeView.classList.contains('visible')) {
           loadNoticeHistory(currentGrade);
