@@ -112,6 +112,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-direction: column;
+      gap: 12px;
     }
 
     .search-header-bar {
@@ -149,7 +151,7 @@
       padding: 28px;
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      gap: 20px;
     }
 
     .hero-top {
@@ -160,27 +162,10 @@
       flex-wrap: wrap;
     }
 
-    .eyebrow {
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: rgba(118, 88, 61, 0.68);
-      margin-bottom: 10px;
-    }
-
     .hero-title {
       font-size: clamp(28px, 4vw, 40px);
       line-height: 1.12;
       letter-spacing: -0.03em;
-      margin-bottom: 10px;
-    }
-
-    .hero-subtitle {
-      color: var(--muted);
-      font-size: 15px;
-      line-height: 1.6;
-      max-width: 720px;
     }
 
     .hero-actions {
@@ -263,15 +248,6 @@
     .classes-heading h2 {
       font-size: 22px;
       letter-spacing: -0.02em;
-      margin-bottom: 8px;
-    }
-
-    .notice-panel-title p,
-    .section-heading p,
-    .classes-heading p {
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.55;
     }
 
     .notice-form {
@@ -442,10 +418,11 @@
       justify-content: space-between;
       gap: 18px;
       flex-wrap: wrap;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
     .search-result {
+      width: min(760px, 100%);
       min-height: 106px;
       border-radius: 20px;
       border: 1px dashed rgba(124, 96, 69, 0.18);
@@ -772,10 +749,6 @@
       width: min(560px, 100%);
     }
 
-    .onboarding-card .eyebrow {
-      margin-bottom: 12px;
-    }
-
     .helper {
       color: var(--muted);
       font-size: 13px;
@@ -837,7 +810,6 @@
 
   <div id="teacherNameOverlay" class="onboarding" aria-modal="true" role="dialog">
     <form id="teacherNameForm" class="onboarding-card">
-      <div class="eyebrow">Teacher setup</div>
       <h2>어떻게 불러드릴까요?</h2>
       <p>처음 한 번만 이름을 저장하면, 이 기기에서는 공지 작성 시 선생님 이름이 자동으로 입력돼요.</p>
       <input id="teacherNameInput" class="text-input" type="text" maxlength="80" placeholder="예: 김민지" autocomplete="name" />
@@ -853,14 +825,13 @@
       <div class="search-header-bar">
         <input id="studentSearchInput" class="search-input" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="학번 입력 (예: 1330)" />
       </div>
+      <div id="studentSearchResult" class="search-result">학번을 입력하면 현재 위치와 상태가 바로 나타나요.</div>
     </section>
 
     <section class="hero-card">
       <div class="hero-top">
         <div>
-          <div class="eyebrow">Teacher dashboard</div>
           <h1 id="greetingTitle" class="hero-title">선생님, 좋은 하루예요.</h1>
-          <p id="greetingSubtitle" class="hero-subtitle">이름을 저장해두면 공지 작성에 자동으로 적용되고, 아래에서 학년별 현황을 빠르게 관리할 수 있어요.</p>
         </div>
         <div class="hero-actions">
           <div class="grade-switch" id="gradeButtons">
@@ -874,9 +845,7 @@
 
       <div class="notice-layout">
         <div class="notice-panel-title">
-          <div class="eyebrow">Notice</div>
           <h2>교사 공지 등록</h2>
-          <p>이름은 자동 입력되고, 필요한 반만 빠르게 선택해서 공지를 보낼 수 있어요.</p>
         </div>
         <div class="notice-form">
           <div class="notice-row">
@@ -902,9 +871,7 @@
     <section class="summary-card">
       <div class="section-heading-row">
         <div class="section-heading">
-          <div class="eyebrow">Live summary</div>
           <h2><span id="gradeLabel">1</span>학년 요약</h2>
-          <p>선택한 학년의 지금 흐름을 한 문장으로 빠르게 파악할 수 있어요.</p>
         </div>
         <div class="update-time" id="updateTime">마지막 업데이트: --:--</div>
       </div>
@@ -926,15 +893,12 @@
 
       <p id="summaryHeadline" class="summary-headline">현재 요약 데이터를 불러오는 중이에요.</p>
       <div id="summaryBadges" class="summary-badges"></div>
-      <div id="studentSearchResult" class="search-result" style="margin-top:16px;">학번을 입력하면 현재 위치와 상태가 바로 나타나요.</div>
     </section>
 
     <section class="classes-section">
       <div class="classes-heading-row">
         <div class="classes-heading">
-          <div class="eyebrow">Per class</div>
           <h2>반별 현황</h2>
-          <p>카드 안의 <strong>총원 / 결원 / 현원</strong>을 눌러 보고 싶은 학생 목록을 바로 바꿀 수 있어요.</p>
         </div>
       </div>
       <div id="classGrid" class="class-grid"></div>
@@ -1020,7 +984,6 @@
     const teacherNameInput = document.getElementById('teacherNameInput');
     const teacherNameHelper = document.getElementById('teacherNameHelper');
     const greetingTitle = document.getElementById('greetingTitle');
-    const greetingSubtitle = document.getElementById('greetingSubtitle');
     const editTeacherNameBtn = document.getElementById('editTeacherNameBtn');
     const modal = document.getElementById('statusModal');
     const modalTitle = document.getElementById('modalTitle');
@@ -1063,9 +1026,6 @@
       const normalized = String(name || '').trim();
       const suffix = normalized ? `${normalized} 선생님` : '선생님';
       greetingTitle.textContent = `${suffix}, 좋은 하루예요.`;
-      greetingSubtitle.textContent = normalized
-        ? `${normalized} 선생님 이름이 공지에 자동 입력되고 있어요.`
-        : '이름을 저장해두면 공지 작성에 자동으로 적용되고, 아래에서 학년별 현황을 빠르게 관리할 수 있어요.';
       if (document.activeElement !== noticeTeacherName || !noticeTeacherName.value.trim()) {
         noticeTeacherName.value = normalized;
       }
