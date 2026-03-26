@@ -114,6 +114,8 @@
       justify-content: center;
       flex-direction: column;
       gap: 12px;
+      position: relative;
+      z-index: 10;
     }
 
     .search-header-bar {
@@ -433,6 +435,20 @@
       justify-content: center;
       gap: 10px;
       color: var(--muted);
+    }
+
+    .search-result-overlay {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      box-shadow: 0 20px 44px rgba(120, 84, 53, 0.18);
+      display: none;
+    }
+
+    .search-result-overlay.visible {
+      display: flex;
     }
 
     .search-result[data-tone="present"] {
@@ -825,7 +841,7 @@
       <div class="search-header-bar">
         <input id="studentSearchInput" class="search-input" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="학번 입력 (예: 1330)" />
       </div>
-      <div id="studentSearchResult" class="search-result">학번을 입력하면 현재 위치와 상태가 바로 나타나요.</div>
+      <div id="studentSearchResult" class="search-result search-result-overlay"></div>
     </section>
 
     <section class="hero-card">
@@ -1261,6 +1277,98 @@
       return gradeStateCache.get(Number(grade))?.sections || null;
     }
 
+    function buildSectionSnapshot(section, magnets, updatedAt = null) {
+      const safeMagnets = (magnets && typeof magnets === 'object') ? magnets : {};
+      const total = Object.keys(safeMagnets).length;
+      let absence = 0;
+
+      Object.values(safeMagnets).forEach((data) => {
+        const category = getNormalizedCategory(data);
+        const isPresentNormal = category === 'section';
+        const isPresentSpecial = PRESENT_SPECIAL_TAGS.has(category);
+        if (!isPresentNormal && !isPresentSpecial) {
+          absence += 1;
+        }
+      });
+
+      return {
+        section: Number(section),
+        magnets: safeMagnets,
+        total,
+        absence,
+        present: total - absence,
+        updatedAt,
+      };
+    }
+
+    function upsertGradeSectionCache(grade, snapshot) {
+      const normalizedGrade = Number(grade);
+      const normalizedSection = Number(snapshot?.section);
+      if (!Number.isFinite(normalizedGrade) || !Number.isFinite(normalizedSection)) return;
+
+      const existingSections = Array.isArray(getCachedGradeState(normalizedGrade))
+        ? [...getCachedGradeState(normalizedGrade)]
+        : [];
+      const nextSnapshot = { ...snapshot, section: normalizedSection };
+      const index = existingSections.findIndex((item) => Number(item.section) === normalizedSection);
+
+      if (index >= 0) {
+        existingSections[index] = nextSnapshot;
+      } else {
+        existingSections.push(nextSnapshot);
+      }
+
+      existingSections.sort((a, b) => Number(a.section) - Number(b.section));
+      rememberGradeState(normalizedGrade, existingSections);
+    }
+
+    function getSnapshotSectionsForCurrentGrade() {
+      return Array.from({ length: 6 }, (_, index) => getSectionSnapshot(index + 1));
+    }
+
+    function getSectionRenderSignature(snapshot) {
+      return JSON.stringify({
+        section: Number(snapshot?.section) || 0,
+        magnets: snapshot?.magnets || {},
+        total: Number(snapshot?.total) || 0,
+        absence: Number(snapshot?.absence) || 0,
+        present: Number(snapshot?.present) || 0,
+      });
+    }
+
+    function renderCurrentGradeSummary(updatedAt = null) {
+      const sections = getSnapshotSectionsForCurrentGrade();
+      const totals = sections.reduce((acc, snapshot) => {
+        acc.total += Number(snapshot?.total) || 0;
+        acc.absence += Number(snapshot?.absence) || 0;
+        acc.present += Number(snapshot?.present) || 0;
+        return acc;
+      }, { total: 0, absence: 0, present: 0 });
+
+      renderSummary(currentGrade, sections, totals);
+      updateTime.textContent = `마지막 업데이트: ${formatTime(updatedAt || new Date())}`;
+      refreshSearchIfNeeded();
+    }
+
+    function applyIncrementalSectionUpdate(grade, snapshot) {
+      const normalizedGrade = Number(grade);
+      const normalizedSection = Number(snapshot?.section);
+      if (!Number.isFinite(normalizedGrade) || !Number.isFinite(normalizedSection)) return;
+
+      upsertGradeSectionCache(normalizedGrade, snapshot);
+
+      if (normalizedGrade !== Number(currentGrade)) {
+        return;
+      }
+
+      gradeStateSnapshot.set(normalizedSection, snapshot);
+      const card = document.querySelector(`.class-card[data-section="${normalizedSection}"]`);
+      if (card) {
+        renderClassCard(card, normalizedGrade, normalizedSection, snapshot);
+      }
+      renderCurrentGradeSummary(snapshot.updatedAt || new Date());
+    }
+
     async function fetchGradeStateOnce(grade, options = {}) {
       const response = await fetch(`/api/classes/grade-state?grade=${grade}`, {
         cache: 'no-store',
@@ -1285,22 +1393,13 @@
     function renderGradeState(grade, sections) {
       gradeStateSnapshot = new Map((sections || []).map((snapshot) => [Number(snapshot.section), snapshot]));
 
-      let total = 0;
-      let absence = 0;
-      let present = 0;
-
       document.querySelectorAll('#classGrid .class-card').forEach((card, index) => {
         const section = index + 1;
         const snapshot = getSectionSnapshot(section);
-        total += Number(snapshot.total) || 0;
-        absence += Number(snapshot.absence) || 0;
-        present += Number(snapshot.present) || 0;
         renderClassCard(card, grade, section, snapshot);
       });
 
-      renderSummary(grade, sections, { total, absence, present });
-      updateTime.textContent = `마지막 업데이트: ${formatTime(new Date())}`;
-      refreshSearchIfNeeded();
+      renderCurrentGradeSummary(new Date());
     }
 
     async function loadClassState(grade) {
@@ -1313,6 +1412,25 @@
       try {
         const sections = await fetchGradeStateOnce(grade, { signal: gradeStateAbortController.signal });
         if (requestToken !== gradeStateRequestToken) return;
+
+        if (Number(grade) === Number(currentGrade) && gradeStateSnapshot.size) {
+          const previousSnapshot = new Map(gradeStateSnapshot);
+          gradeStateSnapshot = new Map((sections || []).map((snapshot) => [Number(snapshot.section), snapshot]));
+
+          document.querySelectorAll('#classGrid .class-card').forEach((card, index) => {
+            const section = index + 1;
+            const nextSnapshot = getSectionSnapshot(section);
+            const prevSnapshot = previousSnapshot.get(section) || EMPTY_SNAPSHOT;
+            if (getSectionRenderSignature(prevSnapshot) === getSectionRenderSignature(nextSnapshot)) {
+              return;
+            }
+            renderClassCard(card, grade, section, nextSnapshot);
+          });
+
+          renderCurrentGradeSummary(new Date());
+          return;
+        }
+
         renderGradeState(grade, sections);
       } catch (error) {
         if (error?.name === 'AbortError') return;
@@ -1349,6 +1467,22 @@
       studentSearchResult.innerHTML = `<div class="search-result-meta">${escapeHTML(message)}</div>`;
     }
 
+    function showSearchOverlay() {
+      studentSearchResult.classList.add('visible');
+    }
+
+    function hideSearchOverlay() {
+      studentSearchResult.classList.remove('visible');
+    }
+
+    function syncSearchOverlayVisibility() {
+      if (document.activeElement === studentSearchInput && studentSearchInput.value.trim()) {
+        showSearchOverlay();
+        return;
+      }
+      hideSearchOverlay();
+    }
+
     function renderSearchResult(parsed, data) {
       const category = getNormalizedCategory(data);
       const tone = getToneForCategory(category);
@@ -1377,15 +1511,17 @@
       studentSearchInput.value = parsed.digits || '';
 
       if (parsed.kind === 'empty') {
-        renderSearchMessage('학번을 입력하면 현재 위치와 상태가 바로 나타나요.');
+        hideSearchOverlay();
         return;
       }
       if (parsed.kind === 'partial') {
         renderSearchMessage('학번을 끝까지 입력하면 바로 상태를 보여드릴게요.');
+        syncSearchOverlayVisibility();
         return;
       }
       if (parsed.kind === 'invalid') {
         renderSearchMessage('학번 형식을 다시 확인해주세요. 예: 1330 → 1학년 3반 30번');
+        syncSearchOverlayVisibility();
         return;
       }
 
@@ -1404,14 +1540,17 @@
             <strong>${parsed.grade}학년 ${parsed.section}반 ${parsed.number}번</strong>
             <div class="search-result-meta">아직 DIMICHECK에 등록되지 않았거나 상태 데이터가 없어요.</div>
           `;
+          syncSearchOverlayVisibility();
           return;
         }
 
         renderSearchResult(parsed, data);
+        syncSearchOverlayVisibility();
       } catch (error) {
         if (requestToken !== searchRequestToken) return;
         console.warn('student search failed', error);
         renderSearchMessage('학생 상태를 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
+        syncSearchOverlayVisibility();
       }
     }
 
@@ -1583,11 +1722,14 @@
         if (!response.ok) {
           throw new Error(await response.text());
         }
+        const parsed = await response.json().catch(() => ({}));
         skipRealtimeReloadUntil = Date.now() + 1500;
-        gradeStateCache.delete(Number(grade));
-        if (Number(grade) === Number(currentGrade)) {
-          scheduleGradeReload(grade, 0);
-        }
+        const nextSnapshot = buildSectionSnapshot(
+          section,
+          parsed?.magnets || {},
+          new Date().toISOString(),
+        );
+        applyIncrementalSectionUpdate(grade, nextSnapshot);
         refreshSearchIfNeeded();
       } catch (error) {
         alert(`저장 실패: ${error.message}`);
@@ -1630,7 +1772,12 @@
         socket.on('state_updated', (data) => {
           if (Number(data.grade) !== Number(currentGrade)) return;
           if (Date.now() < skipRealtimeReloadUntil) return;
-          scheduleGradeReload(currentGrade, 120);
+          const nextSnapshot = buildSectionSnapshot(
+            data.section,
+            data?.magnets || {},
+            data?.updatedAt || new Date().toISOString(),
+          );
+          applyIncrementalSectionUpdate(data.grade, nextSnapshot);
         });
 
         socket.on('connect_error', (error) => {
@@ -1678,6 +1825,20 @@
 
     studentSearchInput.addEventListener('input', (event) => {
       handleStudentSearch(event.target.value);
+    });
+
+    studentSearchInput.addEventListener('focus', () => {
+      syncSearchOverlayVisibility();
+    });
+
+    studentSearchInput.addEventListener('blur', () => {
+      window.setTimeout(() => {
+        hideSearchOverlay();
+      }, 0);
+    });
+
+    studentSearchResult.addEventListener('mousedown', (event) => {
+      event.preventDefault();
     });
 
     studentSearchResult.addEventListener('click', async (event) => {
