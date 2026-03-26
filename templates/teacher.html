@@ -110,11 +110,50 @@
 
     .page-layout {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 360px;
+      grid-template-columns: 220px minmax(0, 1fr);
       gap: 18px;
       align-items: start;
     }
 
+    .nav-sidebar {
+      border-radius: var(--radius-xl);
+      background: rgba(255,255,255,0.72);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: sticky;
+      top: 24px;
+    }
+
+    .nav-item {
+      appearance: none;
+      border: 1px solid transparent;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.62);
+      padding: 14px 16px;
+      text-align: left;
+      font: inherit;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease;
+    }
+
+    .nav-item:hover {
+      transform: translateY(-1px);
+    }
+
+    .nav-item.active {
+      background: linear-gradient(135deg, #f4c8ae, #efdbb3 60%, #eeb38b);
+      border-color: rgba(211, 133, 85, 0.24);
+      color: #5b3a24;
+      box-shadow: 0 10px 22px rgba(228, 160, 116, 0.18);
+    }
+
+    .main-stage,
     .content-column {
       display: flex;
       flex-direction: column;
@@ -148,7 +187,7 @@
     .summary-card,
     .classes-section,
     .class-card,
-    .notice-sidebar,
+    .notice-page,
     .modal-card,
     .onboarding-card {
       background: var(--surface);
@@ -278,26 +317,23 @@
       gap: 12px;
     }
 
-    .notice-sidebar {
+    .notice-page {
       border-radius: var(--radius-xl);
       padding: 22px;
-      position: sticky;
-      top: 24px;
       display: flex;
       flex-direction: column;
       gap: 18px;
-      max-height: calc(100vh - 48px);
-      overflow: auto;
+      min-width: 0;
     }
 
-    .notice-sidebar-header {
+    .notice-page-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
     }
 
-    .notice-sidebar-header h2,
+    .notice-page-header h2,
     .notice-history h3 {
       font-size: 20px;
       letter-spacing: -0.02em;
@@ -882,11 +918,15 @@
         grid-template-columns: 1fr;
       }
 
+      .nav-sidebar {
+        display: none;
+      }
+
       .mobile-notice-btn {
         display: inline-flex;
       }
 
-      .notice-sidebar {
+      .notice-page {
         position: fixed;
         top: 0;
         right: 0;
@@ -898,9 +938,10 @@
         transform: translateX(100%);
         transition: transform .24s ease;
         background: rgba(255,255,255,0.98);
+        overflow: auto;
       }
 
-      .notice-sidebar.visible {
+      .notice-page.visible {
         transform: translateX(0);
       }
 
@@ -985,92 +1026,99 @@
     </section>
 
     <div class="page-layout">
-      <div class="content-column">
-        <section class="hero-card">
-          <div class="hero-top">
-            <div>
-              <h1 id="greetingTitle" class="hero-title">선생님, 좋은 하루예요.</h1>
-            </div>
-            <div class="hero-actions">
-              <div class="grade-switch" id="gradeButtons">
-                <button class="grade-btn active" data-grade="1" type="button">1학년</button>
-                <button class="grade-btn" data-grade="2" type="button">2학년</button>
-                <button class="grade-btn" data-grade="3" type="button">3학년</button>
+      <aside class="nav-sidebar" aria-label="페이지 이동">
+        <button class="nav-item active" data-view="dashboard" type="button">전체 현황</button>
+        <button class="nav-item" data-view="notices" type="button">공지사항</button>
+      </aside>
+
+      <div class="main-stage">
+        <section id="dashboardView" class="content-view content-column">
+          <section class="hero-card">
+            <div class="hero-top">
+              <div>
+                <h1 id="greetingTitle" class="hero-title">선생님, 좋은 하루예요.</h1>
               </div>
-              <button id="openNoticeDrawerBtn" class="ghost-btn mobile-notice-btn" type="button">공지</button>
-              <button id="editTeacherNameBtn" class="ghost-btn" type="button">이름 수정</button>
+              <div class="hero-actions">
+                <div class="grade-switch" id="gradeButtons">
+                  <button class="grade-btn active" data-grade="1" type="button">1학년</button>
+                  <button class="grade-btn" data-grade="2" type="button">2학년</button>
+                  <button class="grade-btn" data-grade="3" type="button">3학년</button>
+                </div>
+                <button id="openNoticeDrawerBtn" class="ghost-btn mobile-notice-btn" type="button">공지</button>
+                <button id="editTeacherNameBtn" class="ghost-btn" type="button">이름 수정</button>
+              </div>
             </div>
-          </div>
+          </section>
+
+          <section class="summary-card">
+            <div class="section-heading-row">
+              <div class="section-heading">
+                <h2><span id="gradeLabel">1</span>학년 요약</h2>
+              </div>
+              <div class="update-time" id="updateTime">마지막 업데이트: --:--</div>
+            </div>
+
+            <div class="summary-grid">
+              <div class="summary-stat" data-tone="total">
+                <span>총원</span>
+                <strong id="grade-total">0</strong>
+              </div>
+              <div class="summary-stat" data-tone="present">
+                <span>현원</span>
+                <strong id="grade-present">0</strong>
+              </div>
+              <div class="summary-stat" data-tone="away">
+                <span>결원</span>
+                <strong id="grade-absence">0</strong>
+              </div>
+            </div>
+
+            <p id="summaryHeadline" class="summary-headline">현재 요약 데이터를 불러오는 중이에요.</p>
+            <div id="summaryBadges" class="summary-badges"></div>
+          </section>
+
+          <section class="classes-section">
+            <div class="classes-heading-row">
+              <div class="classes-heading">
+                <h2>반별 현황</h2>
+              </div>
+            </div>
+            <div id="classGrid" class="class-grid"></div>
+          </section>
         </section>
 
-        <section class="summary-card">
-          <div class="section-heading-row">
-            <div class="section-heading">
-              <h2><span id="gradeLabel">1</span>학년 요약</h2>
-            </div>
-            <div class="update-time" id="updateTime">마지막 업데이트: --:--</div>
+        <section id="noticeView" class="notice-page" hidden aria-label="공지사항">
+          <div class="notice-page-header">
+            <h2>공지사항</h2>
+            <button id="closeNoticeDrawerBtn" class="ghost-btn drawer-close-btn" type="button">닫기</button>
           </div>
 
-          <div class="summary-grid">
-            <div class="summary-stat" data-tone="total">
-              <span>총원</span>
-              <strong id="grade-total">0</strong>
+          <div class="notice-form">
+            <div class="notice-row">
+              <input id="noticeTeacherName" class="notice-input" type="text" placeholder="선생님 이름" maxlength="80" />
+              <label class="notice-target-toggle">
+                <input id="noticeAllTargets" type="checkbox" checked />
+                전체(모든 반)
+              </label>
             </div>
-            <div class="summary-stat" data-tone="present">
-              <span>현원</span>
-              <strong id="grade-present">0</strong>
+            <textarea id="noticeText" class="notice-textarea" placeholder="공지 내용을 입력하세요 (최대 500자)" maxlength="500"></textarea>
+            <div id="noticeTargetsWrap" class="notice-targets-wrap">
+              <div class="target-group-row" id="noticeTargetGroups"></div>
+              <div class="target-chip-grid" id="noticeTargets"></div>
             </div>
-            <div class="summary-stat" data-tone="away">
-              <span>결원</span>
-              <strong id="grade-absence">0</strong>
+            <div class="notice-row">
+              <button id="noticeSendBtn" class="notice-send" type="button">공지 보내기</button>
+              <span id="noticeFeedback" class="notice-feedback"></span>
             </div>
           </div>
 
-          <p id="summaryHeadline" class="summary-headline">현재 요약 데이터를 불러오는 중이에요.</p>
-          <div id="summaryBadges" class="summary-badges"></div>
-        </section>
-
-        <section class="classes-section">
-          <div class="classes-heading-row">
-            <div class="classes-heading">
-              <h2>반별 현황</h2>
-            </div>
-          </div>
-          <div id="classGrid" class="class-grid"></div>
+          <section class="notice-history">
+            <h3>공지 히스토리</h3>
+            <div id="noticeHistoryList" class="notice-history-list"></div>
+            <div id="noticeHistoryEmpty" class="notice-history-empty">아직 공지가 없습니다.</div>
+          </section>
         </section>
       </div>
-
-      <aside id="noticeSidebar" class="notice-sidebar" aria-label="공지">
-        <div class="notice-sidebar-header">
-          <h2>공지</h2>
-          <button id="closeNoticeDrawerBtn" class="ghost-btn drawer-close-btn" type="button">닫기</button>
-        </div>
-
-        <div class="notice-form">
-          <div class="notice-row">
-            <input id="noticeTeacherName" class="notice-input" type="text" placeholder="선생님 이름" maxlength="80" />
-            <label class="notice-target-toggle">
-              <input id="noticeAllTargets" type="checkbox" checked />
-              전체(모든 반)
-            </label>
-          </div>
-          <textarea id="noticeText" class="notice-textarea" placeholder="공지 내용을 입력하세요 (최대 500자)" maxlength="500"></textarea>
-          <div id="noticeTargetsWrap" class="notice-targets-wrap">
-            <div class="target-group-row" id="noticeTargetGroups"></div>
-            <div class="target-chip-grid" id="noticeTargets"></div>
-          </div>
-          <div class="notice-row">
-            <button id="noticeSendBtn" class="notice-send" type="button">공지 보내기</button>
-            <span id="noticeFeedback" class="notice-feedback"></span>
-          </div>
-        </div>
-
-        <section class="notice-history">
-          <h3>공지 히스토리</h3>
-          <div id="noticeHistoryList" class="notice-history-list"></div>
-          <div id="noticeHistoryEmpty" class="notice-history-empty">아직 공지가 없습니다.</div>
-        </section>
-      </aside>
     </div>
   </main>
   <div id="noticeDrawerBackdrop" class="drawer-backdrop"></div>
@@ -1132,6 +1180,9 @@
     let lastSummaryRenderSignature = '';
 
     const gradeButtons = Array.from(document.querySelectorAll('.grade-btn'));
+    const navItems = Array.from(document.querySelectorAll('.nav-item'));
+    const dashboardView = document.getElementById('dashboardView');
+    const noticeView = document.getElementById('noticeView');
     const classGrid = document.getElementById('classGrid');
     const gradeLabel = document.getElementById('gradeLabel');
     const updateTime = document.getElementById('updateTime');
@@ -1150,7 +1201,6 @@
     const noticeTargetContainer = document.getElementById('noticeTargets');
     const noticeSendBtn = document.getElementById('noticeSendBtn');
     const noticeFeedback = document.getElementById('noticeFeedback');
-    const noticeSidebar = document.getElementById('noticeSidebar');
     const openNoticeDrawerBtn = document.getElementById('openNoticeDrawerBtn');
     const closeNoticeDrawerBtn = document.getElementById('closeNoticeDrawerBtn');
     const noticeDrawerBackdrop = document.getElementById('noticeDrawerBackdrop');
@@ -1167,6 +1217,7 @@
     const etcBoxModal = document.getElementById('etcBoxModal');
     const etcReasonModal = document.getElementById('etcReasonModal');
     let noticeHistoryRequestToken = 0;
+    let connectedSocketCount = 0;
 
     function escapeHTML(value) {
       return String(value ?? '')
@@ -1275,19 +1326,47 @@
       return window.matchMedia('(max-width: 1080px)').matches;
     }
 
+    function setDesktopView(view) {
+      const normalized = view === 'notices' ? 'notices' : 'dashboard';
+      dashboardView.hidden = normalized !== 'dashboard';
+      noticeView.hidden = normalized !== 'notices';
+      navItems.forEach((item) => {
+        item.classList.toggle('active', item.dataset.view === normalized);
+      });
+      if (normalized === 'notices') {
+        loadNoticeHistory(currentGrade);
+      }
+    }
+
     function openNoticeDrawer() {
       if (!isMobileNoticeDrawerMode()) return;
-      noticeSidebar.classList.add('visible');
+      noticeView.hidden = false;
+      noticeView.classList.add('visible');
       noticeDrawerBackdrop.classList.add('visible');
+      loadNoticeHistory(currentGrade);
     }
 
     function closeNoticeDrawer() {
-      noticeSidebar.classList.remove('visible');
+      noticeView.classList.remove('visible');
       noticeDrawerBackdrop.classList.remove('visible');
+      if (isMobileNoticeDrawerMode()) {
+        noticeView.hidden = true;
+      }
     }
 
     function syncNoticeDrawerMode() {
-      if (!isMobileNoticeDrawerMode()) {
+      if (isMobileNoticeDrawerMode()) {
+        dashboardView.hidden = false;
+        noticeView.hidden = true;
+        navItems.forEach((item) => item.classList.toggle('active', item.dataset.view === 'dashboard'));
+        return;
+      }
+
+      noticeView.classList.remove('visible');
+      noticeDrawerBackdrop.classList.remove('visible');
+      if (noticeView.hidden) {
+        setDesktopView('dashboard');
+      } else {
         closeNoticeDrawer();
       }
     }
@@ -2055,8 +2134,12 @@
         }
         noticeText.value = '';
         noticeFeedback.textContent = '공지 등록 완료!';
-        loadNoticeHistory(currentGrade);
-        closeNoticeDrawer();
+        if (!noticeView.hidden || noticeView.classList.contains('visible')) {
+          loadNoticeHistory(currentGrade);
+        }
+        if (isMobileNoticeDrawerMode()) {
+          closeNoticeDrawer();
+        }
       } catch (error) {
         noticeFeedback.textContent = error?.message || '공지 전송에 실패했습니다.';
       } finally {
@@ -2113,6 +2196,7 @@
         }
       });
       Object.keys(sockets).forEach((key) => delete sockets[key]);
+      connectedSocketCount = 0;
 
       for (let section = 1; section <= 6; section += 1) {
         const namespace = `/ws/classes/${grade}/${section}`;
@@ -2122,6 +2206,14 @@
           reconnectionDelay: 1000,
           reconnectionDelayMax: 5000,
           reconnectionAttempts: Infinity,
+        });
+
+        socket.on('connect', () => {
+          connectedSocketCount += 1;
+        });
+
+        socket.on('disconnect', () => {
+          connectedSocketCount = Math.max(0, connectedSocketCount - 1);
         });
 
         socket.on('state_updated', (data) => {
@@ -2180,6 +2272,12 @@
     openNoticeDrawerBtn.addEventListener('click', openNoticeDrawer);
     closeNoticeDrawerBtn.addEventListener('click', closeNoticeDrawer);
     noticeDrawerBackdrop.addEventListener('click', closeNoticeDrawer);
+    navItems.forEach((item) => {
+      item.addEventListener('click', () => {
+        if (isMobileNoticeDrawerMode()) return;
+        setDesktopView(item.dataset.view);
+      });
+    });
 
     studentSearchInput.addEventListener('input', (event) => {
       handleStudentSearch(event.target.value);
@@ -2248,7 +2346,9 @@
         setActiveGrade(grade);
         connectToGradeWebSockets(grade);
         await loadClassState(grade);
-        loadNoticeHistory(grade);
+        if (!noticeView.hidden || noticeView.classList.contains('visible')) {
+          loadNoticeHistory(grade);
+        }
       });
     });
 
@@ -2268,7 +2368,10 @@
       renderClassCard(card, currentGrade, section, getSectionSnapshot(section));
     });
 
-    setInterval(() => scheduleGradeReload(currentGrade, 0), 60000);
+    setInterval(() => {
+      if (connectedSocketCount > 0) return;
+      scheduleGradeReload(currentGrade, 0);
+    }, 60000);
     window.addEventListener('resize', syncNoticeDrawerMode);
 
     (function startHeartbeat() {
@@ -2284,8 +2387,8 @@
     createClassCards();
     ensureTeacherNameOnboarding();
     setActiveGrade(currentGrade);
+    setDesktopView('dashboard');
     loadClassState(currentGrade);
-    loadNoticeHistory(currentGrade);
     connectToGradeWebSockets(currentGrade);
     syncNoticeDrawerMode();
   </script>
