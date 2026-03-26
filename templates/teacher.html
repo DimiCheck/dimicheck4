@@ -428,13 +428,14 @@
       min-height: 106px;
       border-radius: 20px;
       border: 1px dashed rgba(124, 96, 69, 0.18);
-      background: rgba(255,255,255,0.46);
+      background: rgba(255,255,255,0.97);
       padding: 18px;
       display: flex;
       flex-direction: column;
       justify-content: center;
       gap: 10px;
       color: var(--muted);
+      backdrop-filter: none;
     }
 
     .search-result-overlay {
@@ -975,6 +976,7 @@
     let highlightedChipTimer = null;
     let targetInfo = null;
     const sockets = {};
+    let lastSummaryRenderSignature = '';
 
     const gradeButtons = Array.from(document.querySelectorAll('.grade-btn'));
     const classGrid = document.getElementById('classGrid');
@@ -1185,6 +1187,12 @@
       const total = Number(snapshot?.total) || 0;
       const absence = Number(snapshot?.absence) || 0;
       const present = Number(snapshot?.present) || 0;
+      const renderSignature = `${Number(grade) || 0}:${view}:${getSectionRenderSignature(snapshot)}`;
+
+      if (card.dataset.renderSignature === renderSignature) {
+        return;
+      }
+      card.dataset.renderSignature = renderSignature;
 
       card.querySelectorAll('.class-inline-stat').forEach((button) => {
         const buttonView = button.dataset.view;
@@ -1249,6 +1257,16 @@
 
     function renderSummary(grade, sections, totals) {
       const counts = countGradeCategories(sections);
+      const summarySignature = JSON.stringify({
+        grade: Number(grade) || 0,
+        counts,
+        totals,
+      });
+      if (lastSummaryRenderSignature === summarySignature) {
+        return;
+      }
+      lastSummaryRenderSignature = summarySignature;
+
       summaryHeadline.textContent = buildSummarySentence(counts);
 
       summaryBadges.innerHTML = SUMMARY_ORDER
@@ -1354,6 +1372,12 @@
       const normalizedGrade = Number(grade);
       const normalizedSection = Number(snapshot?.section);
       if (!Number.isFinite(normalizedGrade) || !Number.isFinite(normalizedSection)) return;
+      const previousSnapshot = normalizedGrade === Number(currentGrade)
+        ? gradeStateSnapshot.get(normalizedSection)
+        : null;
+      if (previousSnapshot && getSectionRenderSignature(previousSnapshot) === getSectionRenderSignature(snapshot)) {
+        return;
+      }
 
       upsertGradeSectionCache(normalizedGrade, snapshot);
 
