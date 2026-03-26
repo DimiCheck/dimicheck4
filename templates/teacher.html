@@ -13,6 +13,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#f8efe5"/>
+  <script>window.__csrfToken = {{ csrf_token|tojson }};</script>
+  <script defer src="/js/pwa.js"></script>
   <meta name="application-name" content="DIMI Check"/>
   <meta name="mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -342,6 +344,10 @@
       flex-direction: column;
       gap: 18px;
       min-width: 0;
+    }
+
+    .mobile-drawer-notice {
+      display: none;
     }
 
     .notice-page-header {
@@ -964,6 +970,10 @@
         overflow: auto;
       }
 
+      .mobile-drawer-notice {
+        display: flex;
+      }
+
       .notice-page.visible {
         transform: translateX(0);
       }
@@ -1119,41 +1129,40 @@
             <div id="classGrid" class="class-grid"></div>
           </section>
         </section>
-
-        <section id="noticeView" class="notice-page" hidden aria-label="공지사항">
-          <div class="notice-page-header">
-            <h2>공지사항</h2>
-            <button id="closeNoticeDrawerBtn" class="ghost-btn drawer-close-btn" type="button">닫기</button>
-          </div>
-
-          <div class="notice-form">
-            <div class="notice-row">
-              <input id="noticeTeacherName" class="notice-input" type="text" placeholder="선생님 이름" maxlength="80" />
-              <label class="notice-target-toggle">
-                <input id="noticeAllTargets" type="checkbox" checked />
-                전체(모든 반)
-              </label>
-            </div>
-            <textarea id="noticeText" class="notice-textarea" placeholder="공지 내용을 입력하세요 (최대 500자)" maxlength="500"></textarea>
-            <div id="noticeTargetsWrap" class="notice-targets-wrap">
-              <div class="target-group-row" id="noticeTargetGroups"></div>
-              <div class="target-chip-grid" id="noticeTargets"></div>
-            </div>
-            <div class="notice-row">
-              <button id="noticeSendBtn" class="notice-send" type="button">공지 보내기</button>
-              <span id="noticeFeedback" class="notice-feedback"></span>
-            </div>
-          </div>
-
-          <section class="notice-history">
-            <h3>공지 히스토리</h3>
-            <div id="noticeHistoryList" class="notice-history-list"></div>
-            <div id="noticeHistoryEmpty" class="notice-history-empty">아직 공지가 없습니다.</div>
-          </section>
-        </section>
       </div>
     </div>
   </main>
+  <section id="noticeView" class="notice-page mobile-drawer-notice" hidden aria-label="공지사항">
+    <div class="notice-page-header">
+      <h2>공지사항</h2>
+      <button id="closeNoticeDrawerBtn" class="ghost-btn drawer-close-btn" type="button">닫기</button>
+    </div>
+
+    <div class="notice-form">
+      <div class="notice-row">
+        <input id="noticeTeacherName" class="notice-input" type="text" placeholder="선생님 이름" maxlength="80" />
+        <label class="notice-target-toggle">
+          <input id="noticeAllTargets" type="checkbox" checked />
+          전체(모든 반)
+        </label>
+      </div>
+      <textarea id="noticeText" class="notice-textarea" placeholder="공지 내용을 입력하세요 (최대 500자)" maxlength="500"></textarea>
+      <div id="noticeTargetsWrap" class="notice-targets-wrap">
+        <div class="target-group-row" id="noticeTargetGroups"></div>
+        <div class="target-chip-grid" id="noticeTargets"></div>
+      </div>
+      <div class="notice-row">
+        <button id="noticeSendBtn" class="notice-send" type="button">공지 보내기</button>
+        <span id="noticeFeedback" class="notice-feedback"></span>
+      </div>
+    </div>
+
+    <section class="notice-history">
+      <h3>공지 히스토리</h3>
+      <div id="noticeHistoryList" class="notice-history-list"></div>
+      <div id="noticeHistoryEmpty" class="notice-history-empty">아직 공지가 없습니다.</div>
+    </section>
+  </section>
   <div id="noticeDrawerBackdrop" class="drawer-backdrop"></div>
 
   <div id="statusModal" class="modal" aria-modal="true" role="dialog">

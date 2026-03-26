@@ -711,7 +711,7 @@ def _teacher_session_valid() -> bool:
 @app.route("/teacher", methods=["GET", "POST"])
 def teacher_dashboard():
     if _teacher_session_valid():
-        return render_template("teacher.html")
+        return render_template("teacher.html", csrf_token=session.get("csrf_token"))
 
     error = None
     guard_key = pin_guard_key("teacher")
@@ -762,14 +762,14 @@ def teacher_dashboard():
 def teacher_notices_page():
     if not _teacher_session_valid():
         return redirect(url_for("teacher_dashboard"))
-    return render_template("teacher_notices.html")
+    return render_template("teacher_notices.html", csrf_token=session.get("csrf_token"))
 
 
 @app.get("/teacher/wallpapers")
 def teacher_wallpapers_page():
     if not _teacher_session_valid():
         return redirect(url_for("teacher_dashboard"))
-    return render_template("teacher_wallpapers.html")
+    return render_template("teacher_wallpapers.html", csrf_token=session.get("csrf_token"))
 
 
 @app.get("/teacher.html")
