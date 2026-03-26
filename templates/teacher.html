@@ -619,21 +619,21 @@
     .search-result[data-tone="present"] {
       border-style: solid;
       border-color: rgba(79, 143, 112, 0.24);
-      background: rgba(240, 248, 242, 0.84);
+      background: rgb(240, 248, 242);
       color: #416a55;
     }
 
     .search-result[data-tone="special"] {
       border-style: solid;
       border-color: rgba(109, 158, 201, 0.24);
-      background: rgba(240, 247, 252, 0.84);
+      background: rgb(240, 247, 252);
       color: #476889;
     }
 
     .search-result[data-tone="away"] {
       border-style: solid;
       border-color: rgba(201, 107, 98, 0.24);
-      background: rgba(253, 241, 239, 0.84);
+      background: rgb(253, 241, 239);
       color: #8e534e;
     }
 
@@ -1007,9 +1007,26 @@
         padding: 20px;
       }
 
-      .summary-grid,
       .status-options {
         grid-template-columns: 1fr;
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .summary-stat {
+        padding: 12px 10px;
+      }
+
+      .summary-stat span {
+        font-size: 11px;
+        margin-bottom: 6px;
+      }
+
+      .summary-stat strong {
+        font-size: 20px;
       }
 
       .hero-actions,
@@ -1610,6 +1627,9 @@
       const total = Number(snapshot?.total) || 0;
       const absence = Number(snapshot?.absence) || 0;
       const present = Number(snapshot?.present) || 0;
+      const classroom = Object.values(magnets).reduce((count, data) => {
+        return count + (getNormalizedCategory(data) === 'section' ? 1 : 0);
+      }, 0);
       const renderSignature = `${Number(grade) || 0}:${view}:${getSectionRenderSignature(snapshot)}`;
 
       if (card.dataset.renderSignature === renderSignature) {
@@ -1624,7 +1644,7 @@
         if (!valueEl) return;
         if (buttonView === 'total') valueEl.textContent = String(total);
         if (buttonView === 'away') valueEl.textContent = String(absence);
-        if (buttonView === 'present') valueEl.textContent = String(present);
+        if (buttonView === 'present') valueEl.textContent = `${present} (교실 ${classroom})`;
       });
 
       const subtitle = card.querySelector('.class-subtitle');
