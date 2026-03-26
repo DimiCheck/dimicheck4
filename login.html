@@ -318,6 +318,25 @@
       overflow: hidden;
     }
 
+    .btn[disabled] {
+      cursor: not-allowed;
+      opacity: .72;
+    }
+
+    .btn.loading {
+      pointer-events: none;
+    }
+
+    .btn.loading::after {
+      content: '';
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.42);
+      border-top-color: #fff;
+      animation: spin .8s linear infinite;
+    }
+
     .btn::before {
       content: '';
       position: absolute;
@@ -365,6 +384,10 @@
       50% {
         box-shadow: 0 2px 0 rgba(0, 0, 0, .05), 0 0 30px rgba(208, 79, 255, .5);
       }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
 
     .footer {
@@ -529,11 +552,61 @@
   </p>
 
   <script>
+    const LOGIN_LOCK_KEY = 'dimicheck:login-in-flight';
+    const LOGIN_LOCK_MS = 30 * 1000;
     const loginBtn = document.getElementById('loginButton');
     const loginText = document.getElementById('loginButtonText');
     const rememberInput = document.getElementById('rememberMe');
     const legacySignup = document.getElementById('legacySignup');
+
+    function readLoginLock() {
+      try {
+        const raw = sessionStorage.getItem(LOGIN_LOCK_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const startedAt = Number(parsed?.startedAt || 0);
+        if (!Number.isFinite(startedAt) || Date.now() - startedAt > LOGIN_LOCK_MS) {
+          sessionStorage.removeItem(LOGIN_LOCK_KEY);
+          return null;
+        }
+        return parsed;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function writeLoginLock() {
+      try {
+        sessionStorage.setItem(LOGIN_LOCK_KEY, JSON.stringify({ startedAt: Date.now() }));
+      } catch (_) {}
+    }
+
+    function clearLoginLock() {
+      try {
+        sessionStorage.removeItem(LOGIN_LOCK_KEY);
+      } catch (_) {}
+    }
+
+    function setLoginLoading(loading) {
+      if (!loginBtn || !loginText) return;
+      loginBtn.disabled = loading;
+      loginBtn.classList.toggle('loading', loading);
+      if (rememberInput) rememberInput.disabled = loading;
+      loginText.textContent = loading ? '로그인 진행 중...' : '로그인';
+    }
+
+    if (readLoginLock()) {
+      setLoginLoading(true);
+      window.setTimeout(() => {
+        clearLoginLock();
+        setLoginLoading(false);
+      }, LOGIN_LOCK_MS);
+    }
+
     loginBtn?.addEventListener('click', () => {
+      if (readLoginLock()) return;
+      writeLoginLock();
+      setLoginLoading(true);
       const remember = rememberInput?.checked ? 1 : 0;
       location.href = `/auth/login?remember=${remember}`;
     });
@@ -549,6 +622,12 @@
         }
       })
       .catch(() => {});
+
+    window.addEventListener('pageshow', () => {
+      if (!readLoginLock()) {
+        setLoginLoading(false);
+      }
+    });
   </script>
 </body>
 
