@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>이용약관 동의</title>
+  <script defer src="/js/pwa.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -373,6 +374,9 @@
       errorBox.textContent = '';
       acceptBtn.disabled = true;
       try {
+        if (typeof window.getCsrfToken === 'function') {
+          await window.getCsrfToken();
+        }
         const res = await fetch('/auth/terms-consent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
