@@ -256,6 +256,36 @@ def _finalize_login(user: User, remember: bool) -> Response:
     return response
 
 
+def _restart_login_after_invalid_state() -> Response:
+    app_redirect = session.get("app_login_redirect")
+    if app_redirect:
+        remember_requested = session.get("app_login_remember", True)
+        return redirect(
+            url_for(
+                "auth.app_login",
+                redirect_uri=app_redirect,
+                remember="1" if remember_requested else "0",
+            )
+        )
+
+    next_url = session.get("post_login_redirect")
+    remember_requested = bool(session.get("remember_me_requested", True))
+    if next_url:
+        return redirect(
+            url_for(
+                "auth.login",
+                next=next_url,
+                remember="1" if remember_requested else "0",
+            )
+        )
+    return redirect(
+        url_for(
+            "auth.login",
+            remember="1" if remember_requested else "0",
+        )
+    )
+
+
 @blueprint.get("/app-login")
 def app_login() -> Response:
     remember = str(request.args.get("remember", "1")).lower() not in {"0", "false", "off"}
@@ -300,7 +330,7 @@ def callback() -> Response:
     state = request.args.get("state")
     expected_state = session.pop("google_oauth_state", None)
     if not state or state != expected_state:
-        return jsonify({"error": {"code": "invalid_state", "message": "state mismatch"}}), 400
+        return _restart_login_after_invalid_state()
     code = request.args.get("code")
     if not code:
         return jsonify({"error": {"code": "invalid_request", "message": "code missing"}}), 400
