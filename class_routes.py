@@ -164,6 +164,10 @@ def _teacher_only() -> bool:
     return is_teacher_session_active()
 
 
+def _teacher_or_board_only(grade: int | None, section: int | None) -> bool:
+    return is_teacher_session_active() or is_board_session_active(grade, section)
+
+
 _NOTICE_FRESH_SECONDS = 10
 _NOTICE_DOT_SECONDS = 10 * 60
 _NOTICE_BURST_WINDOW = timedelta(minutes=10)
@@ -260,6 +264,38 @@ def _normalize_notice_targets(payload: dict) -> tuple[bool, list[str]]:
     return False, targets
 
 
+def _normalize_wallpaper_payload(raw_wallpaper: object) -> dict[str, str] | None:
+    if isinstance(raw_wallpaper, str):
+        url = raw_wallpaper.strip()
+        if not url:
+          return None
+        return {
+            "id": "",
+            "name": "",
+            "url": url,
+            "updatedAt": datetime.now(timezone.utc).isoformat(),
+        }
+
+    if not isinstance(raw_wallpaper, dict):
+        return None
+
+    url = str(raw_wallpaper.get("url") or "").strip()
+    if not url:
+        return None
+
+    updated_at = _parse_payload_datetime(
+        raw_wallpaper.get("updatedAt")
+        or raw_wallpaper.get("updated_at")
+    )
+
+    return {
+        "id": str(raw_wallpaper.get("id") or "").strip()[:80],
+        "name": str(raw_wallpaper.get("name") or "").strip()[:80],
+        "url": url,
+        "updatedAt": (updated_at or datetime.now(timezone.utc)).isoformat(),
+    }
+
+
 _PRESENT_SPECIAL_TAGS = {"toilet", "hallway"}
 
 
@@ -268,7 +304,7 @@ def _filtered_magnets_for_class(
     grade: int,
     section: int,
     class_config: dict | None = None,
-) -> tuple[dict[str, dict[str, object]], dict | None]:
+) -> tuple[dict[str, dict[str, object]], dict | None, dict | None]:
     allowed_numbers = _allowed_class_numbers(class_config)
     data = _load_state_payload(state)
     magnets = data.get("magnets", {})
@@ -280,7 +316,7 @@ def _filtered_magnets_for_class(
         if allowed_numbers is not None and int(normalized_key) not in allowed_numbers:
             continue
         filtered_magnets[normalized_key] = value
-    return filtered_magnets, data.get("marquee")
+    return filtered_magnets, data.get("marquee"), data.get("wallpaper")
 
 
 def _serialize_grade_state_section(
@@ -289,7 +325,7 @@ def _serialize_grade_state_section(
     state: ClassState | None,
     class_config: dict | None,
 ) -> dict[str, object]:
-    magnets, marquee = _filtered_magnets_for_class(state, grade, section, class_config)
+    magnets, marquee, wallpaper = _filtered_magnets_for_class(state, grade, section, class_config)
     total = len(magnets)
     absence = 0
     for magnet_data in magnets.values():
@@ -303,6 +339,7 @@ def _serialize_grade_state_section(
         "section": section,
         "magnets": magnets,
         "marquee": marquee,
+        "wallpaper": wallpaper,
         "total": total,
         "absence": absence,
         "present": total - absence,
@@ -619,6 +656,7 @@ def save_state():
     memberships = _normalize_channel_memberships(state_payload.get("channelMemberships"), channels, grade, section)
     owners = _normalize_channel_owners(state_payload.get("channelOwners"), channels)
     marquee = state_payload.get("marquee")
+    wallpaper = state_payload.get("wallpaper")
 
     # ✅ 기존 + 새로운 데이터 병합
     # Preserve special fields (reaction, thought, etc.) when updating magnet position
@@ -638,6 +676,7 @@ def save_state():
         "channelMemberships": memberships,
         "channelOwners": owners,
         "marquee": marquee,
+        "wallpaper": wallpaper,
     }
 
     if not state:
@@ -748,6 +787,7 @@ def _load_state_payload(state: ClassState | None) -> dict[str, dict[str, object]
             "channelMemberships": {DEFAULT_CHAT_CHANNEL: []},
             "channelOwners": {DEFAULT_CHAT_CHANNEL: []},
             "marquee": None,
+            "wallpaper": None,
         }
 
     try:
@@ -759,6 +799,7 @@ def _load_state_payload(state: ClassState | None) -> dict[str, dict[str, object]
             "channelMemberships": {DEFAULT_CHAT_CHANNEL: []},
             "channelOwners": {DEFAULT_CHAT_CHANNEL: []},
             "marquee": None,
+            "wallpaper": None,
         }
 
     if not isinstance(raw, dict):
@@ -768,6 +809,7 @@ def _load_state_payload(state: ClassState | None) -> dict[str, dict[str, object]
             "channelMemberships": {DEFAULT_CHAT_CHANNEL: []},
             "channelOwners": {DEFAULT_CHAT_CHANNEL: []},
             "marquee": None,
+            "wallpaper": None,
         }
 
     raw_magnets = raw.get("magnets")
@@ -813,12 +855,15 @@ def _load_state_payload(state: ClassState | None) -> dict[str, dict[str, object]
     else:
         marquee = None
 
+    wallpaper = _normalize_wallpaper_payload(raw.get("wallpaper"))
+
     return {
         "magnets": magnets,
         "channels": channels,
         "channelMemberships": memberships,
         "channelOwners": owners,
         "marquee": marquee,
+        "wallpaper": wallpaper,
     }
 
 
@@ -972,14 +1017,14 @@ def load_class_state():
 
     state = ClassState.query.filter_by(grade=grade, section=section).first()
     if not state:
-        return jsonify({"magnets": {}, "marquee": None})
+        return jsonify({"magnets": {}, "marquee": None, "wallpaper": None})
 
     try:
         class_config = load_class_config().get((grade, section))
-        magnets, marquee = _filtered_magnets_for_class(state, grade, section, class_config)
-        return jsonify({"magnets": magnets, "marquee": marquee})
+        magnets, marquee, wallpaper = _filtered_magnets_for_class(state, grade, section, class_config)
+        return jsonify({"magnets": magnets, "marquee": marquee, "wallpaper": wallpaper})
     except json.JSONDecodeError:
-        return jsonify({"magnets": {}, "marquee": None})
+        return jsonify({"magnets": {}, "marquee": None, "wallpaper": None})
 
 
 @blueprint.get("/grade-state")
@@ -1005,6 +1050,66 @@ def load_grade_state():
         for section in range(1, 7)
     ]
     return jsonify({"grade": grade, "sections": sections})
+
+
+@blueprint.get("/wallpaper")
+def get_class_wallpaper():
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+    if grade is None or section is None:
+        return jsonify({"error": "missing grade/section"}), 400
+    if not _is_authorized(grade, section):
+        return jsonify({"error": "forbidden"}), 403
+
+    state = ClassState.query.filter_by(grade=grade, section=section).first()
+    payload = _load_state_payload(state)
+    return jsonify({
+        "grade": grade,
+        "section": section,
+        "wallpaper": payload.get("wallpaper"),
+    })
+
+
+@blueprint.post("/wallpaper")
+def set_class_wallpaper():
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+    if grade is None or section is None:
+        return jsonify({"error": "missing grade/section"}), 400
+    if not _teacher_or_board_only(grade, section):
+        return jsonify({"error": "forbidden"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    wallpaper = _normalize_wallpaper_payload(payload.get("wallpaper") or payload)
+    if wallpaper is None:
+        return jsonify({"error": "invalid wallpaper"}), 400
+
+    state = ClassState.query.filter_by(grade=grade, section=section).first()
+    if not state:
+        state = ClassState(
+            grade=grade,
+            section=section,
+            data=json.dumps(
+                {
+                    "magnets": {},
+                    "channels": [DEFAULT_CHAT_CHANNEL],
+                    "channelMemberships": {DEFAULT_CHAT_CHANNEL: [{"grade": grade, "section": section}]},
+                    "channelOwners": {DEFAULT_CHAT_CHANNEL: []},
+                    "marquee": None,
+                    "wallpaper": None,
+                },
+                ensure_ascii=False,
+            ),
+        )
+        db.session.add(state)
+
+    state_payload = _load_state_payload(state)
+    state_payload["wallpaper"] = wallpaper
+    state.data = json.dumps(state_payload, ensure_ascii=False)
+    db.session.commit()
+
+    _emit_class_state_update(grade, section, state)
+    return jsonify({"ok": True, "wallpaper": wallpaper})
 
 
 @blueprint.post("/marquee")

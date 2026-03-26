@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f8efe5"/>
+  <title>DimiCheck 배경화면</title>
+  <style>
+    :root {
+      --surface: rgba(255, 255, 255, 0.78);
+      --surface-strong: rgba(255,255,255,0.94);
+      --border: rgba(110, 83, 56, 0.12);
+      --text: #3f3024;
+      --muted: #7f6956;
+      --accent: #db8753;
+      --shadow: 0 24px 60px rgba(153, 115, 76, 0.14);
+      --radius-xl: 28px;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      font-family: "Pretendard", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 18%, rgba(255, 214, 170, 0.75), transparent 26%),
+        radial-gradient(circle at 82% 14%, rgba(249, 195, 176, 0.55), transparent 25%),
+        radial-gradient(circle at 74% 72%, rgba(245, 214, 138, 0.42), transparent 28%),
+        radial-gradient(circle at 18% 82%, rgba(230, 181, 165, 0.36), transparent 22%),
+        linear-gradient(180deg, #fffaf5 0%, #fff4eb 48%, #fff8f2 100%);
+      padding: 32px 24px 48px;
+    }
+    .shell { width: 100%; max-width: none; display: flex; flex-direction: column; gap: 18px; }
+    .page-layout { display: block; }
+    .nav-sidebar, .hero-card, .wallpaper-page, .onboarding-card, .wallpaper-modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius-xl);
+    }
+    .nav-sidebar { width: 196px; padding: 24px 14px; display: flex; flex-direction: column; gap: 10px; position: fixed; left: 0; top: 0; bottom: 0; z-index: 30; border-left: none; border-radius: 0 24px 24px 0; }
+    .nav-item { display: flex; align-items: center; gap: 12px; text-decoration: none; border-radius: 18px; padding: 14px 16px; font-weight: 700; color: var(--muted); background: rgba(255,255,255,0.62); border: 1px solid transparent; }
+    .nav-item.active { background: linear-gradient(135deg, #f4c8ae, #efdbb3 60%, #eeb38b); color: #5b3a24; border-color: rgba(211, 133, 85, 0.24); }
+    .nav-icon { width: 18px; height: 18px; flex: 0 0 18px; opacity: 0.88; }
+    .nav-label { flex: 1; }
+    .content-column { display: flex; flex-direction: column; gap: 18px; min-width: 0; margin-left: 190px; }
+    .hero-card, .wallpaper-page { padding: 24px 26px; }
+    .hero-top { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+    .hero-title { font-size: clamp(28px, 4vw, 40px); letter-spacing: -0.03em; }
+    .hero-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .grade-switch { display: inline-flex; gap: 8px; padding: 6px; border-radius: 999px; background: rgba(255,255,255,0.68); border: 1px solid rgba(124, 96, 69, 0.1); }
+    .grade-btn, .ghost-btn, .solid-btn, .apply-btn, .choose-btn, .nav-mobile-link, .modal-close-btn {
+      appearance: none; border: none; font: inherit; cursor: pointer; transition: transform .18s ease;
+    }
+    .grade-btn { border-radius: 999px; padding: 10px 16px; background: transparent; color: var(--muted); font-weight: 600; }
+    .grade-btn.active { background: linear-gradient(135deg, #f4c8ae, #efdbb3 60%, #eeb38b); color: #5b3a24; box-shadow: 0 10px 22px rgba(228, 160, 116, 0.28); }
+    .ghost-btn, .nav-mobile-link, .modal-close-btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; padding: 11px 16px; border-radius: 999px; background: rgba(255,255,255,0.6); border: 1px solid rgba(124, 96, 69, 0.12); color: var(--text); font-weight: 600; }
+    .wallpaper-page-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+    .wallpaper-page-header h2 { font-size: 22px; letter-spacing: -0.02em; }
+    .wallpaper-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .wallpaper-class-card { border-radius: 22px; border: 1px solid rgba(124,96,69,0.1); background: rgba(255,255,255,0.74); padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+    .wallpaper-class-top { display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .wallpaper-class-title { font-size: 22px; letter-spacing: -0.03em; }
+    .wallpaper-class-meta { color: var(--muted); font-size: 13px; }
+    .wallpaper-preview { width: 100%; aspect-ratio: 16 / 9; border-radius: 18px; background: #1d1d1d center/cover no-repeat; border: 1px solid rgba(124,96,69,0.1); overflow: hidden; }
+    .wallpaper-preview::after { content: ""; display: block; width: 100%; height: 100%; background: linear-gradient(180deg, transparent 35%, rgba(0,0,0,0.24)); }
+    .wallpaper-name { font-size: 14px; color: var(--text); }
+    .choose-btn, .apply-btn, .solid-btn { padding: 12px 18px; border-radius: 999px; background: linear-gradient(135deg, #da8852, #f0c38c); color: #fffaf7; font-weight: 700; box-shadow: 0 12px 24px rgba(218,136,82,0.24); }
+    .page-feedback { color: var(--muted); font-size: 14px; min-height: 20px; }
+    .onboarding { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(255,247,240,0.76); backdrop-filter: blur(10px); z-index: 60; }
+    .onboarding.visible { display: flex; }
+    .onboarding-card { width: min(560px, 100%); padding: 28px; background: var(--surface-strong); }
+    .text-input { width: 100%; border-radius: 16px; border: 1px solid rgba(124, 96, 69, 0.14); background: rgba(255,255,255,0.86); color: var(--text); padding: 14px 16px; font-size: 15px; outline: none; }
+    .helper { color: var(--muted); font-size: 14px; min-height: 20px; }
+    .modal-backdrop { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(85,59,37,0.18); backdrop-filter: blur(6px); z-index: 70; }
+    .modal-backdrop.visible { display: flex; }
+    .wallpaper-modal-card { width: min(960px, 100%); max-height: min(84vh, 900px); overflow: auto; padding: 24px; background: var(--surface-strong); }
+    .wallpaper-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+    .wallpaper-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .wallpaper-option { border-radius: 18px; border: 1px solid rgba(124,96,69,0.1); background: rgba(255,255,255,0.76); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .wallpaper-option.selected { border-color: rgba(211,133,85,0.42); box-shadow: 0 12px 24px rgba(228,160,116,0.16); }
+    .wallpaper-option-thumb { width: 100%; aspect-ratio: 16 / 9; border-radius: 14px; background: #1d1d1d center/cover no-repeat; }
+    .wallpaper-option-name { font-size: 14px; color: var(--text); }
+    .mobile-topbar { display: none; }
+    @media (max-width: 1080px) {
+      .page-layout { grid-template-columns: 1fr; }
+      .nav-sidebar { display: none; }
+      .mobile-topbar { display: flex; justify-content: flex-end; }
+      .wallpaper-grid, .wallpaper-options { grid-template-columns: 1fr; }
+      .content-column { margin-left: 0; }
+    }
+    @media (max-width: 840px) {
+      body { padding: 22px 14px 36px; }
+      .hero-card, .wallpaper-page, .onboarding-card, .wallpaper-modal-card { padding: 20px; }
+      .hero-actions { align-items: stretch; }
+      .grade-switch { width: 100%; justify-content: space-between; }
+      .grade-btn { flex: 1; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <div id="teacherNameOverlay" class="onboarding" aria-modal="true" role="dialog">
+    <form id="teacherNameForm" class="onboarding-card">
+      <h2>어떻게 불러드릴까요?</h2>
+      <p>처음 한 번만 이름을 저장하면, 이 기기에서는 공지 작성 시 선생님 이름이 자동으로 입력돼요.</p>
+      <input id="teacherNameInput" class="text-input" type="text" maxlength="80" placeholder="예: 김민지" autocomplete="name" />
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:16px;">
+        <button class="solid-btn" type="submit">저장하고 시작하기</button>
+        <span id="teacherNameHelper" class="helper"></span>
+      </div>
+    </form>
+  </div>
+
+  <div id="wallpaperPickerModal" class="modal-backdrop" aria-modal="true" role="dialog">
+    <div class="wallpaper-modal-card">
+      <div class="wallpaper-modal-header">
+        <div>
+          <h2 id="wallpaperModalTitle">배경화면 선택</h2>
+        </div>
+        <button id="wallpaperModalClose" class="modal-close-btn" type="button">닫기</button>
+      </div>
+      <div id="wallpaperOptions" class="wallpaper-options"></div>
+    </div>
+  </div>
+
+  <main class="shell">
+    <div class="mobile-topbar">
+      <a class="nav-mobile-link" href="/teacher">전체 현황으로</a>
+    </div>
+    <div class="page-layout">
+      <aside class="nav-sidebar" aria-label="페이지 이동">
+        <a class="nav-item" href="/teacher">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5 12 5l8 7.5V20a1 1 0 0 1-1 1h-4.5v-5.5h-5V21H5a1 1 0 0 1-1-1v-7.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          <span class="nav-label">전체 현황</span>
+        </a>
+        <a class="nav-item" href="/teacher/notices">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 7.5A2.5 2.5 0 0 1 8.5 5H18a1 1 0 0 1 1 1v9.5A2.5 2.5 0 0 1 16.5 18H9l-4 2.5V8.5A1 1 0 0 1 6 7.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 9h6M9 12h6M9 15h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span class="nav-label">공지사항</span>
+        </a>
+        <a class="nav-item active" href="/teacher/wallpapers">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 6.5A1.5 1.5 0 0 1 6.5 5h11A1.5 1.5 0 0 1 19 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 17.5v-11Z" stroke="currentColor" stroke-width="1.8"/><path d="m7.5 16 3.2-3.2a1 1 0 0 1 1.4 0l1.4 1.4a1 1 0 0 0 1.4 0l1.6-1.6a1 1 0 0 1 1.4 0L19 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="9" r="1.25" fill="currentColor"/></svg>
+          <span class="nav-label">배경화면</span>
+        </a>
+      </aside>
+
+      <div class="content-column">
+        <section class="hero-card">
+          <div class="hero-top">
+            <div>
+              <h1 id="greetingTitle" class="hero-title">선생님, 좋은 하루예요.</h1>
+            </div>
+            <div class="hero-actions">
+              <div class="grade-switch" id="gradeButtons">
+                <button class="grade-btn active" data-grade="1" type="button">1학년</button>
+                <button class="grade-btn" data-grade="2" type="button">2학년</button>
+                <button class="grade-btn" data-grade="3" type="button">3학년</button>
+              </div>
+              <button id="editTeacherNameBtn" class="ghost-btn" type="button">이름 수정</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="wallpaper-page">
+          <div class="wallpaper-page-header">
+            <h2><span id="gradeLabel">1</span>학년 배경화면</h2>
+            <span id="pageFeedback" class="page-feedback"></span>
+          </div>
+          <div id="classWallpaperGrid" class="wallpaper-grid"></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const TEACHER_NAME_KEY = 'dimicheck:teacher-display-name';
+    const FALLBACK_WALLPAPERS = [{ id: 'just-black-2024', name: '단색 검정', url: 'src/wallpaper-black.svg' }];
+    let currentGrade = 1;
+    let wallpaperCatalog = [...FALLBACK_WALLPAPERS];
+    let gradeSections = [];
+    let wallpaperTarget = null;
+
+    const gradeButtons = Array.from(document.querySelectorAll('.grade-btn'));
+    const gradeLabel = document.getElementById('gradeLabel');
+    const greetingTitle = document.getElementById('greetingTitle');
+    const classWallpaperGrid = document.getElementById('classWallpaperGrid');
+    const pageFeedback = document.getElementById('pageFeedback');
+    const wallpaperPickerModal = document.getElementById('wallpaperPickerModal');
+    const wallpaperModalTitle = document.getElementById('wallpaperModalTitle');
+    const wallpaperModalClose = document.getElementById('wallpaperModalClose');
+    const wallpaperOptions = document.getElementById('wallpaperOptions');
+    const teacherNameOverlay = document.getElementById('teacherNameOverlay');
+    const teacherNameForm = document.getElementById('teacherNameForm');
+    const teacherNameInput = document.getElementById('teacherNameInput');
+    const teacherNameHelper = document.getElementById('teacherNameHelper');
+    const editTeacherNameBtn = document.getElementById('editTeacherNameBtn');
+
+    function getStoredTeacherName() {
+      try { return (localStorage.getItem(TEACHER_NAME_KEY) || '').trim(); }
+      catch (_) { return ''; }
+    }
+
+    function setStoredTeacherName(name) {
+      const normalized = String(name || '').trim().slice(0, 80);
+      try {
+        if (normalized) localStorage.setItem(TEACHER_NAME_KEY, normalized);
+        else localStorage.removeItem(TEACHER_NAME_KEY);
+      } catch (_) {}
+      applyTeacherName(normalized);
+      return normalized;
+    }
+
+    function applyTeacherName(name) {
+      const normalized = String(name || '').trim();
+      greetingTitle.textContent = `${normalized ? `${normalized} 선생님` : '선생님'}, 좋은 하루예요.`;
+      teacherNameInput.value = normalized;
+    }
+
+    function openTeacherNameOverlay(prefill = '') {
+      teacherNameOverlay.classList.add('visible');
+      teacherNameHelper.textContent = '';
+      teacherNameInput.value = prefill;
+      requestAnimationFrame(() => teacherNameInput.focus());
+    }
+
+    function closeTeacherNameOverlay() {
+      teacherNameOverlay.classList.remove('visible');
+      teacherNameHelper.textContent = '';
+    }
+
+    function ensureTeacherNameOnboarding() {
+      const stored = getStoredTeacherName();
+      applyTeacherName(stored);
+      if (!stored) openTeacherNameOverlay('');
+    }
+
+    async function loadWallpaperCatalog() {
+      try {
+        const res = await fetch('/wallpaper.json', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`wallpaper load failed: ${res.status}`);
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (Array.isArray(data?.wallpapers) ? data.wallpapers : []);
+        if (list.length) return list.filter((item) => item && item.url);
+      } catch (error) {
+        console.warn('wallpaper catalog load failed', error);
+      }
+      return [...FALLBACK_WALLPAPERS];
+    }
+
+    async function loadGradeWallpapers(grade) {
+      const res = await fetch(`/api/classes/grade-state?grade=${grade}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`grade state load failed: ${res.status}`);
+      const data = await res.json();
+      gradeSections = Array.isArray(data?.sections) ? data.sections : [];
+    }
+
+    function getWallpaperPreview(sectionState) {
+      return sectionState?.wallpaper?.url || FALLBACK_WALLPAPERS[0].url;
+    }
+
+    function getWallpaperName(sectionState) {
+      return sectionState?.wallpaper?.name || '단색 검정';
+    }
+
+    function renderClassWallpapers() {
+      classWallpaperGrid.innerHTML = gradeSections.map((sectionState) => {
+        const section = Number(sectionState?.section || 0);
+        return `
+          <article class="wallpaper-class-card">
+            <div class="wallpaper-class-top">
+              <div>
+                <div class="wallpaper-class-title">${currentGrade}-${section}반</div>
+                <div class="wallpaper-class-meta">현재 적용된 배경화면</div>
+              </div>
+              <button class="choose-btn" type="button" data-section="${section}">배경 선택</button>
+            </div>
+            <div class="wallpaper-preview" style="background-image:url('${getWallpaperPreview(sectionState)}')"></div>
+            <div class="wallpaper-name">${getWallpaperName(sectionState)}</div>
+          </article>
+        `;
+      }).join('');
+    }
+
+    function openWallpaperModal(section) {
+      wallpaperTarget = Number(section);
+      wallpaperModalTitle.textContent = `${currentGrade}-${section}반 배경화면 선택`;
+      renderWallpaperOptions();
+      wallpaperPickerModal.classList.add('visible');
+    }
+
+    function closeWallpaperModal() {
+      wallpaperPickerModal.classList.remove('visible');
+      wallpaperTarget = null;
+    }
+
+    function renderWallpaperOptions() {
+      const current = gradeSections.find((item) => Number(item.section) === Number(wallpaperTarget));
+      const currentId = current?.wallpaper?.id || current?.wallpaper?.url || '';
+      wallpaperOptions.innerHTML = wallpaperCatalog.map((item) => {
+        const identity = item.id || item.url;
+        return `
+          <article class="wallpaper-option${identity === currentId ? ' selected' : ''}">
+            <div class="wallpaper-option-thumb" style="background-image:url('${item.url}')"></div>
+            <div class="wallpaper-option-name">${item.name || '이름 없음'}</div>
+            <button class="apply-btn" type="button" data-wallpaper-id="${identity}">적용</button>
+          </article>
+        `;
+      }).join('');
+    }
+
+    async function applyWallpaperToClass(entry) {
+      if (!wallpaperTarget || !entry?.url) return;
+      pageFeedback.textContent = `${currentGrade}-${wallpaperTarget}반 배경 적용 중...`;
+      const res = await fetch(`/api/classes/wallpaper?grade=${currentGrade}&section=${wallpaperTarget}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wallpaper: { id: entry.id || '', name: entry.name || '', url: entry.url } }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || '배경 저장에 실패했습니다.');
+      const index = gradeSections.findIndex((item) => Number(item.section) === Number(wallpaperTarget));
+      if (index >= 0) {
+        gradeSections[index] = { ...gradeSections[index], wallpaper: data?.wallpaper || entry };
+      }
+      renderClassWallpapers();
+      pageFeedback.textContent = `${currentGrade}-${wallpaperTarget}반 배경 적용 완료`;
+      closeWallpaperModal();
+    }
+
+    async function loadPage(grade) {
+      currentGrade = grade;
+      gradeLabel.textContent = String(grade);
+      gradeButtons.forEach((button) => button.classList.toggle('active', Number(button.dataset.grade) === grade));
+      pageFeedback.textContent = '불러오는 중...';
+      await loadGradeWallpapers(grade);
+      renderClassWallpapers();
+      pageFeedback.textContent = '';
+    }
+
+    teacherNameForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const name = teacherNameInput.value.trim();
+      if (!name) {
+        teacherNameHelper.textContent = '이름을 입력해주세요.';
+        teacherNameInput.focus();
+        return;
+      }
+      setStoredTeacherName(name);
+      closeTeacherNameOverlay();
+    });
+
+    editTeacherNameBtn.addEventListener('click', () => openTeacherNameOverlay(getStoredTeacherName()));
+    gradeButtons.forEach((button) => {
+      button.addEventListener('click', async () => {
+        const grade = Number(button.dataset.grade);
+        if (grade === currentGrade) return;
+        await loadPage(grade);
+      });
+    });
+    classWallpaperGrid.addEventListener('click', (event) => {
+      const btn = event.target.closest('.choose-btn');
+      if (!btn) return;
+      openWallpaperModal(btn.dataset.section);
+    });
+    wallpaperOptions.addEventListener('click', async (event) => {
+      const btn = event.target.closest('.apply-btn');
+      if (!btn) return;
+      const entry = wallpaperCatalog.find((item) => String(item.id || item.url) === String(btn.dataset.wallpaperId));
+      if (!entry) return;
+      try {
+        await applyWallpaperToClass(entry);
+      } catch (error) {
+        pageFeedback.textContent = error?.message || '배경 저장에 실패했습니다.';
+      }
+    });
+    wallpaperModalClose.addEventListener('click', closeWallpaperModal);
+    wallpaperPickerModal.addEventListener('click', (event) => { if (event.target === wallpaperPickerModal) closeWallpaperModal(); });
+
+    (async function init() {
+      wallpaperCatalog = await loadWallpaperCatalog();
+      ensureTeacherNameOnboarding();
+      await loadPage(currentGrade);
+    })();
+  </script>
+</body>
+</html>

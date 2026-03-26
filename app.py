@@ -758,6 +758,20 @@ def teacher_dashboard():
     )
 
 
+@app.get("/teacher/notices")
+def teacher_notices_page():
+    if not _teacher_session_valid():
+        return redirect(url_for("teacher_dashboard"))
+    return render_template("teacher_notices.html")
+
+
+@app.get("/teacher/wallpapers")
+def teacher_wallpapers_page():
+    if not _teacher_session_valid():
+        return redirect(url_for("teacher_dashboard"))
+    return render_template("teacher_wallpapers.html")
+
+
 @app.get("/teacher.html")
 def teacher_legacy_redirect():
     return redirect(url_for("teacher_dashboard"))

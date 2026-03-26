@@ -1,5 +1,4 @@
 (function () {
-  const STORAGE_KEY = 'dimicheck.wallpaper.selection';
   const FALLBACK_WALLPAPERS = [
     {
       id: 'just-black-2024',
@@ -17,6 +16,8 @@
 
   let wallpapers = [...FALLBACK_WALLPAPERS];
   let selectedId = null;
+  const boardContext = getBoardContext();
+  const STORAGE_KEY = boardContext ? `dimicheck.wallpaper.selection.${boardContext.grade}-${boardContext.section}` : 'dimicheck.wallpaper.selection';
 
   const savedSelection = loadSavedSelection();
   if (savedSelection?.url) {
@@ -34,6 +35,16 @@
   function applyWallpaper(url) {
     if (!url) return;
     document.documentElement.style.setProperty('--wallpaper-url', `url('${url}')`);
+  }
+
+  function applyWallpaperEntry(entry, options = {}) {
+    if (!entry?.url) return;
+    selectedId = entry.id || entry.url;
+    applyWallpaper(entry.url);
+    if (!options.skipPersist) {
+      persistSelection(entry);
+    }
+    renderGrid();
   }
 
   function persistSelection(entry) {
@@ -64,6 +75,18 @@
     modal.hidden = true;
   }
 
+  function getBoardContext() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const grade = Number(params.get('grade'));
+      const section = Number(params.get('section'));
+      if (Number.isFinite(grade) && Number.isFinite(section)) {
+        return { grade, section };
+      }
+    } catch (_) {}
+    return null;
+  }
+
   async function loadWallpapers() {
     try {
       const res = await fetch('wallpaper.json', { cache: 'no-store' });
@@ -79,12 +102,52 @@
     return [...FALLBACK_WALLPAPERS];
   }
 
-  function selectWallpaper(entry) {
+  async function loadCurrentWallpaper() {
+    if (!boardContext) return null;
+    try {
+      const res = await fetch(`/api/classes/wallpaper?grade=${boardContext.grade}&section=${boardContext.section}`, {
+        cache: 'no-store',
+      });
+      if (!res.ok) throw new Error(`wallpaper state load failed: ${res.status}`);
+      const data = await res.json();
+      return data?.wallpaper?.url ? data.wallpaper : null;
+    } catch (err) {
+      console.warn('[wallpaper] 현재 배경을 불러오지 못했습니다.', err);
+      return null;
+    }
+  }
+
+  async function persistWallpaper(entry) {
+    if (!boardContext || !entry?.url) {
+      persistSelection(entry);
+      return true;
+    }
+    try {
+      const res = await fetch(`/api/classes/wallpaper?grade=${boardContext.grade}&section=${boardContext.section}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          wallpaper: {
+            id: entry.id || '',
+            name: entry.name || '',
+            url: entry.url,
+          }
+        }),
+      });
+      if (!res.ok) throw new Error(`wallpaper save failed: ${res.status}`);
+      persistSelection(entry);
+      return true;
+    } catch (err) {
+      console.warn('[wallpaper] 배경 저장에 실패했습니다.', err);
+      persistSelection(entry);
+      return false;
+    }
+  }
+
+  async function selectWallpaper(entry) {
     if (!entry || !entry.url) return;
-    selectedId = entry.id || entry.url;
-    applyWallpaper(entry.url);
-    persistSelection(entry);
-    renderGrid();
+    applyWallpaperEntry(entry, { skipPersist: true });
+    await persistWallpaper(entry);
   }
 
   function getDefaultWallpaper(list) {
@@ -131,10 +194,10 @@
       applyBtn.textContent = identity === selectedId ? '적용됨' : '적용';
       applyBtn.disabled = identity === selectedId;
 
-      card.addEventListener('click', () => selectWallpaper(item));
+      card.addEventListener('click', () => { void selectWallpaper(item); });
       applyBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        selectWallpaper(item);
+        void selectWallpaper(item);
       });
 
       meta.append(name, applyBtn);
@@ -147,14 +210,14 @@
     const loaded = await loadWallpapers();
     if (loaded.length) wallpapers = loaded;
 
-    const saved = loadSavedSelection();
+    const saved = await loadCurrentWallpaper() || loadSavedSelection();
     const hasSaved = saved && wallpapers.some(w => (w.id || w.url) === (saved.id || saved.url));
     let renderedViaSelect = false;
     if (hasSaved) {
       selectedId = saved.id || saved.url;
       applyWallpaper(saved.url);
     } else if (wallpapers[0]) {
-      selectWallpaper(getDefaultWallpaper(wallpapers));
+      await selectWallpaper(getDefaultWallpaper(wallpapers));
       renderedViaSelect = true;
     } else if (saved?.url) {
       applyWallpaper(saved.url);
@@ -183,4 +246,9 @@
       }
     });
   }
+
+  window.applyBoardWallpaperEntry = function applyBoardWallpaperEntry(entry) {
+    if (!entry?.url) return;
+    applyWallpaperEntry(entry);
+  };
 })();

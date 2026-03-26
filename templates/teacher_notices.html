@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f8efe5"/>
+  <title>DimiCheck 공지사항</title>
+  <style>
+    :root {
+      --surface: rgba(255, 255, 255, 0.78);
+      --surface-strong: rgba(255,255,255,0.94);
+      --border: rgba(110, 83, 56, 0.12);
+      --text: #3f3024;
+      --muted: #7f6956;
+      --accent: #db8753;
+      --shadow: 0 24px 60px rgba(153, 115, 76, 0.14);
+      --radius-xl: 28px;
+      --radius-lg: 22px;
+      --radius-md: 16px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      font-family: "Pretendard", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 18%, rgba(255, 214, 170, 0.75), transparent 26%),
+        radial-gradient(circle at 82% 14%, rgba(249, 195, 176, 0.55), transparent 25%),
+        radial-gradient(circle at 74% 72%, rgba(245, 214, 138, 0.42), transparent 28%),
+        radial-gradient(circle at 18% 82%, rgba(230, 181, 165, 0.36), transparent 22%),
+        linear-gradient(180deg, #fffaf5 0%, #fff4eb 48%, #fff8f2 100%);
+      padding: 32px 24px 48px;
+    }
+    .shell { width: 100%; max-width: none; display: flex; flex-direction: column; gap: 18px; }
+    .page-layout { display: block; }
+    .nav-sidebar, .hero-card, .notice-page, .onboarding-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius-xl);
+    }
+    .nav-sidebar {
+      width: 196px;
+      padding: 24px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      z-index: 30;
+      border-left: none;
+      border-radius: 0 24px 24px 0;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      border-radius: 18px;
+      padding: 14px 16px;
+      font-weight: 700;
+      color: var(--muted);
+      background: rgba(255,255,255,0.62);
+      border: 1px solid transparent;
+    }
+    .nav-item.active {
+      background: linear-gradient(135deg, #f4c8ae, #efdbb3 60%, #eeb38b);
+      color: #5b3a24;
+      border-color: rgba(211, 133, 85, 0.24);
+    }
+    .nav-icon { width: 18px; height: 18px; flex: 0 0 18px; opacity: 0.88; }
+    .nav-label { flex: 1; }
+    .content-column { display: flex; flex-direction: column; gap: 18px; min-width: 0; margin-left: 190px; }
+    .hero-card, .notice-page { padding: 24px 26px; }
+    .hero-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .hero-title { font-size: clamp(28px, 4vw, 40px); letter-spacing: -0.03em; }
+    .hero-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .grade-switch {
+      display: inline-flex; gap: 8px; padding: 6px; border-radius: 999px;
+      background: rgba(255,255,255,0.68); border: 1px solid rgba(124, 96, 69, 0.1);
+    }
+    .grade-btn, .ghost-btn, .solid-btn, .notice-send, .nav-mobile-link {
+      appearance: none; border: none; font: inherit; cursor: pointer; transition: transform .18s ease;
+    }
+    .grade-btn {
+      border-radius: 999px; padding: 10px 16px; background: transparent; color: var(--muted); font-weight: 600;
+    }
+    .grade-btn.active {
+      background: linear-gradient(135deg, #f4c8ae, #efdbb3 60%, #eeb38b); color: #5b3a24;
+      box-shadow: 0 10px 22px rgba(228, 160, 116, 0.28);
+    }
+    .ghost-btn, .nav-mobile-link {
+      display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
+      padding: 11px 16px; border-radius: 999px; background: rgba(255,255,255,0.6);
+      border: 1px solid rgba(124, 96, 69, 0.12); color: var(--text); font-weight: 600;
+    }
+    .notice-page-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+    .notice-page-header h2, .notice-history h3 { font-size: 22px; letter-spacing: -0.02em; }
+    .notice-form, .notice-history { display: flex; flex-direction: column; gap: 12px; }
+    .notice-input, .notice-textarea, .text-input {
+      width: 100%; border-radius: 16px; border: 1px solid rgba(124, 96, 69, 0.14);
+      background: rgba(255,255,255,0.86); color: var(--text); padding: 14px 16px; font-size: 15px; outline: none;
+    }
+    .notice-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .notice-input { max-width: 220px; }
+    .notice-textarea { min-height: 120px; resize: vertical; line-height: 1.55; }
+    .notice-target-toggle {
+      display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 999px;
+      background: rgba(255,255,255,0.7); border: 1px solid rgba(124,96,69,0.1); font-size: 14px;
+    }
+    .notice-targets-wrap {
+      display: none; flex-direction: column; gap: 10px; padding: 14px; border-radius: 18px;
+      background: rgba(255,255,255,0.6); border: 1px solid rgba(124,96,69,0.08);
+    }
+    .notice-targets-wrap.visible { display: flex; }
+    .target-group-row, .target-chip-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+    .target-chip, .target-group-chip {
+      display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 999px;
+      background: rgba(255,255,255,0.72); border: 1px solid rgba(124,96,69,0.12); color: var(--muted); cursor: pointer;
+      user-select: none; font-size: 14px;
+    }
+    .target-chip.active, .target-group-chip.active {
+      color: #6a3e25; background: rgba(243,202,167,0.62); border-color: rgba(211,133,85,0.42);
+    }
+    .notice-send, .solid-btn {
+      padding: 12px 18px; border-radius: 999px; background: linear-gradient(135deg, #da8852, #f0c38c);
+      color: #fffaf7; font-weight: 700; box-shadow: 0 12px 24px rgba(218,136,82,0.24);
+    }
+    .notice-feedback, .helper { color: var(--muted); font-size: 14px; min-height: 20px; }
+    .notice-history-list { display: flex; flex-direction: column; gap: 10px; }
+    .notice-history-item {
+      border-radius: 18px; border: 1px solid rgba(124,96,69,0.1); background: rgba(255,255,255,0.82);
+      padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .notice-history-meta { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 12px; flex-wrap: wrap; }
+    .notice-history-text { font-size: 14px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+    .notice-history-target, .notice-history-empty { font-size: 13px; color: var(--muted); }
+    .notice-history-empty {
+      border-radius: 18px; border: 1px dashed rgba(124,96,69,0.18); background: rgba(255,255,255,0.56); padding: 16px;
+    }
+    .onboarding {
+      position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 20px;
+      background: rgba(255,247,240,0.76); backdrop-filter: blur(10px); z-index: 60;
+    }
+    .onboarding.visible { display: flex; }
+    .onboarding-card { width: min(560px, 100%); padding: 28px; background: var(--surface-strong); }
+    .mobile-topbar { display: none; }
+    @media (max-width: 1080px) {
+      .page-layout { grid-template-columns: 1fr; }
+      .nav-sidebar { display: none; }
+      .mobile-topbar { display: flex; justify-content: flex-end; }
+      .content-column { margin-left: 0; }
+    }
+    @media (max-width: 840px) {
+      body { padding: 22px 14px 36px; }
+      .hero-card, .notice-page, .onboarding-card { padding: 20px; }
+      .hero-actions { align-items: stretch; }
+      .grade-switch { width: 100%; justify-content: space-between; }
+      .grade-btn { flex: 1; text-align: center; }
+      .notice-input { max-width: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="teacherNameOverlay" class="onboarding" aria-modal="true" role="dialog">
+    <form id="teacherNameForm" class="onboarding-card">
+      <h2>어떻게 불러드릴까요?</h2>
+      <p>처음 한 번만 이름을 저장하면, 이 기기에서는 공지 작성 시 선생님 이름이 자동으로 입력돼요.</p>
+      <input id="teacherNameInput" class="text-input" type="text" maxlength="80" placeholder="예: 김민지" autocomplete="name" />
+      <div class="notice-row" style="margin-top:16px;">
+        <button class="solid-btn" type="submit">저장하고 시작하기</button>
+        <span id="teacherNameHelper" class="helper"></span>
+      </div>
+    </form>
+  </div>
+
+  <main class="shell">
+    <div class="mobile-topbar">
+      <a class="nav-mobile-link" href="/teacher">전체 현황으로</a>
+    </div>
+    <div class="page-layout">
+      <aside class="nav-sidebar" aria-label="페이지 이동">
+        <a class="nav-item" href="/teacher">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5 12 5l8 7.5V20a1 1 0 0 1-1 1h-4.5v-5.5h-5V21H5a1 1 0 0 1-1-1v-7.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          <span class="nav-label">전체 현황</span>
+        </a>
+        <a class="nav-item active" href="/teacher/notices">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 7.5A2.5 2.5 0 0 1 8.5 5H18a1 1 0 0 1 1 1v9.5A2.5 2.5 0 0 1 16.5 18H9l-4 2.5V8.5A1 1 0 0 1 6 7.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 9h6M9 12h6M9 15h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span class="nav-label">공지사항</span>
+        </a>
+        <a class="nav-item" href="/teacher/wallpapers">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 6.5A1.5 1.5 0 0 1 6.5 5h11A1.5 1.5 0 0 1 19 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 17.5v-11Z" stroke="currentColor" stroke-width="1.8"/><path d="m7.5 16 3.2-3.2a1 1 0 0 1 1.4 0l1.4 1.4a1 1 0 0 0 1.4 0l1.6-1.6a1 1 0 0 1 1.4 0L19 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="9" r="1.25" fill="currentColor"/></svg>
+          <span class="nav-label">배경화면</span>
+        </a>
+      </aside>
+
+      <div class="content-column">
+        <section class="hero-card">
+          <div class="hero-top">
+            <div>
+              <h1 id="greetingTitle" class="hero-title">선생님, 좋은 하루예요.</h1>
+            </div>
+            <div class="hero-actions">
+              <div class="grade-switch" id="gradeButtons">
+                <button class="grade-btn active" data-grade="1" type="button">1학년</button>
+                <button class="grade-btn" data-grade="2" type="button">2학년</button>
+                <button class="grade-btn" data-grade="3" type="button">3학년</button>
+              </div>
+              <button id="editTeacherNameBtn" class="ghost-btn" type="button">이름 수정</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="notice-page" aria-label="공지사항">
+          <div class="notice-page-header">
+            <h2>공지사항</h2>
+          </div>
+
+          <div class="notice-form">
+            <div class="notice-row">
+              <input id="noticeTeacherName" class="notice-input" type="text" placeholder="선생님 이름" maxlength="80" />
+              <label class="notice-target-toggle">
+                <input id="noticeAllTargets" type="checkbox" checked />
+                전체(모든 반)
+              </label>
+            </div>
+            <textarea id="noticeText" class="notice-textarea" placeholder="공지 내용을 입력하세요 (최대 500자)" maxlength="500"></textarea>
+            <div id="noticeTargetsWrap" class="notice-targets-wrap">
+              <div class="target-group-row" id="noticeTargetGroups"></div>
+              <div class="target-chip-grid" id="noticeTargets"></div>
+            </div>
+            <div class="notice-row">
+              <button id="noticeSendBtn" class="notice-send" type="button">공지 보내기</button>
+              <span id="noticeFeedback" class="notice-feedback"></span>
+            </div>
+          </div>
+
+          <section class="notice-history">
+            <h3>공지 히스토리</h3>
+            <div id="noticeHistoryList" class="notice-history-list"></div>
+            <div id="noticeHistoryEmpty" class="notice-history-empty">아직 공지가 없습니다.</div>
+          </section>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const TEACHER_NAME_KEY = 'dimicheck:teacher-display-name';
+    let currentGrade = 1;
+    let noticeHistoryRequestToken = 0;
+
+    const gradeButtons = Array.from(document.querySelectorAll('.grade-btn'));
+    const noticeTeacherName = document.getElementById('noticeTeacherName');
+    const noticeText = document.getElementById('noticeText');
+    const noticeAllTargets = document.getElementById('noticeAllTargets');
+    const noticeTargetsWrap = document.getElementById('noticeTargetsWrap');
+    const noticeTargetGroups = document.getElementById('noticeTargetGroups');
+    const noticeTargetContainer = document.getElementById('noticeTargets');
+    const noticeSendBtn = document.getElementById('noticeSendBtn');
+    const noticeFeedback = document.getElementById('noticeFeedback');
+    const noticeHistoryList = document.getElementById('noticeHistoryList');
+    const noticeHistoryEmpty = document.getElementById('noticeHistoryEmpty');
+    const teacherNameOverlay = document.getElementById('teacherNameOverlay');
+    const teacherNameForm = document.getElementById('teacherNameForm');
+    const teacherNameInput = document.getElementById('teacherNameInput');
+    const teacherNameHelper = document.getElementById('teacherNameHelper');
+    const greetingTitle = document.getElementById('greetingTitle');
+    const editTeacherNameBtn = document.getElementById('editTeacherNameBtn');
+
+    function escapeHTML(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function getStoredTeacherName() {
+      try { return (localStorage.getItem(TEACHER_NAME_KEY) || '').trim(); }
+      catch (_) { return ''; }
+    }
+
+    function setStoredTeacherName(name) {
+      const normalized = String(name || '').trim().slice(0, 80);
+      try {
+        if (normalized) localStorage.setItem(TEACHER_NAME_KEY, normalized);
+        else localStorage.removeItem(TEACHER_NAME_KEY);
+      } catch (_) {}
+      applyTeacherName(normalized);
+      return normalized;
+    }
+
+    function applyTeacherName(name) {
+      const normalized = String(name || '').trim();
+      greetingTitle.textContent = `${normalized ? `${normalized} 선생님` : '선생님'}, 좋은 하루예요.`;
+      if (document.activeElement !== noticeTeacherName || !noticeTeacherName.value.trim()) {
+        noticeTeacherName.value = normalized;
+      }
+      teacherNameInput.value = normalized;
+    }
+
+    function openTeacherNameOverlay(prefill = '') {
+      teacherNameOverlay.classList.add('visible');
+      teacherNameHelper.textContent = '';
+      teacherNameInput.value = prefill;
+      requestAnimationFrame(() => teacherNameInput.focus());
+    }
+
+    function closeTeacherNameOverlay() {
+      teacherNameOverlay.classList.remove('visible');
+      teacherNameHelper.textContent = '';
+    }
+
+    function ensureTeacherNameOnboarding() {
+      const stored = getStoredTeacherName();
+      applyTeacherName(stored);
+      if (!stored) openTeacherNameOverlay('');
+    }
+
+    function setChipState(chip, checked) {
+      const input = chip.querySelector('input');
+      if (input) input.checked = checked;
+      chip.classList.toggle('active', checked);
+    }
+
+    function syncTargetGroupState(grade) {
+      const classChips = Array.from(noticeTargetContainer.querySelectorAll(`.target-chip[data-grade="${grade}"]`));
+      const groupChip = noticeTargetGroups.querySelector(`.target-group-chip[data-grade="${grade}"]`);
+      if (!groupChip || !classChips.length) return;
+      const checked = classChips.every((chip) => chip.querySelector('input')?.checked);
+      setChipState(groupChip, checked);
+    }
+
+    function setGradeTargets(grade, checked) {
+      noticeTargetContainer.querySelectorAll(`.target-chip[data-grade="${grade}"]`).forEach((chip) => setChipState(chip, checked));
+      syncTargetGroupState(grade);
+    }
+
+    function initNoticeTargetSelector() {
+      const groupMarkup = [1, 2, 3].map((grade) => `
+        <label class="target-group-chip active" data-grade="${grade}">
+          <input type="checkbox" checked />
+          ${grade}학년 전체
+        </label>
+      `).join('');
+      const classMarkup = Array.from({ length: 18 }, (_, index) => {
+        const grade = Math.floor(index / 6) + 1;
+        const section = (index % 6) + 1;
+        return `
+          <label class="target-chip active" data-grade="${grade}" data-section="${section}">
+            <input type="checkbox" checked />
+            ${grade}-${section}
+          </label>
+        `;
+      }).join('');
+      noticeTargetGroups.innerHTML = groupMarkup;
+      noticeTargetContainer.innerHTML = classMarkup;
+      noticeTargetGroups.querySelectorAll('.target-group-chip').forEach((chip) => {
+        chip.addEventListener('click', (event) => {
+          event.preventDefault();
+          const nextChecked = !(chip.querySelector('input')?.checked);
+          setChipState(chip, nextChecked);
+          setGradeTargets(Number(chip.dataset.grade), nextChecked);
+        });
+      });
+      noticeTargetContainer.querySelectorAll('.target-chip').forEach((chip) => {
+        chip.addEventListener('click', (event) => {
+          event.preventDefault();
+          const nextChecked = !(chip.querySelector('input')?.checked);
+          setChipState(chip, nextChecked);
+          syncTargetGroupState(Number(chip.dataset.grade));
+        });
+      });
+    }
+
+    noticeAllTargets.addEventListener('change', () => {
+      const enabled = !noticeAllTargets.checked;
+      noticeTargetsWrap.classList.toggle('visible', enabled);
+      if (!enabled) {
+        noticeTargetContainer.querySelectorAll('.target-chip').forEach((chip) => setChipState(chip, true));
+        noticeTargetGroups.querySelectorAll('.target-group-chip').forEach((chip) => setChipState(chip, true));
+      }
+    });
+
+    function dedupeNotices(notices) {
+      const map = new Map();
+      (notices || []).forEach((notice) => {
+        const id = Number(notice?.id);
+        if (!Number.isFinite(id)) return;
+        const prev = map.get(id);
+        if (!prev || Number(notice?.createdAtMs || 0) > Number(prev?.createdAtMs || 0)) {
+          map.set(id, notice);
+        }
+      });
+      return Array.from(map.values()).sort((a, b) => Number(b?.createdAtMs || 0) - Number(a?.createdAtMs || 0));
+    }
+
+    function formatNoticeTime(dateLike) {
+      const date = dateLike instanceof Date ? dateLike : new Date(dateLike);
+      if (Number.isNaN(date.getTime())) return '--:--';
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      const h = String(date.getHours()).padStart(2, '0');
+      const m = String(date.getMinutes()).padStart(2, '0');
+      return `${month}/${day} ${h}:${m}`;
+    }
+
+    function renderNoticeHistory(notices) {
+      const items = Array.isArray(notices) ? notices : [];
+      noticeHistoryList.innerHTML = items.map((notice) => {
+        const teacher = escapeHTML(notice?.teacherName || '선생님');
+        const text = escapeHTML(notice?.text || '');
+        const target = escapeHTML(notice?.targetLabel || '');
+        const created = formatNoticeTime(notice?.createdAt || notice?.createdAtMs || Date.now());
+        return `
+          <article class="notice-history-item">
+            <div class="notice-history-meta">
+              <span>${teacher}</span>
+              <span>${created}</span>
+            </div>
+            <div class="notice-history-text">${text}</div>
+            <div class="notice-history-target">${target}</div>
+          </article>
+        `;
+      }).join('');
+      noticeHistoryEmpty.style.display = items.length ? 'none' : '';
+    }
+
+    async function loadNoticeHistory(grade) {
+      const requestToken = ++noticeHistoryRequestToken;
+      try {
+        const requests = Array.from({ length: 6 }, (_, index) => {
+          const section = index + 1;
+          return fetch(`/api/classes/notices?grade=${grade}&section=${section}&mode=all`, { cache: 'no-store' })
+            .then((response) => response.ok ? response.json() : null)
+            .catch(() => null);
+        });
+        const payloads = await Promise.all(requests);
+        if (requestToken !== noticeHistoryRequestToken) return;
+        const notices = dedupeNotices(payloads.flatMap((payload) => Array.isArray(payload?.notices) ? payload.notices : []));
+        renderNoticeHistory(notices);
+      } catch (error) {
+        if (requestToken !== noticeHistoryRequestToken) return;
+        console.warn('notice history load failed', error);
+      }
+    }
+
+    async function sendTeacherNotice() {
+      const teacherName = (noticeTeacherName.value || getStoredTeacherName() || '').trim();
+      const text = (noticeText.value || '').trim();
+      if (!teacherName) { noticeFeedback.textContent = '선생님 이름을 먼저 입력해주세요.'; openTeacherNameOverlay(''); return; }
+      if (!text) { noticeFeedback.textContent = '공지 내용을 입력해주세요.'; return; }
+      const targets = [];
+      if (!noticeAllTargets.checked) {
+        noticeTargetContainer.querySelectorAll('.target-chip').forEach((chip) => {
+          if (chip.querySelector('input')?.checked) {
+            targets.push({ grade: Number(chip.dataset.grade), section: Number(chip.dataset.section) });
+          }
+        });
+        if (!targets.length) { noticeFeedback.textContent = '대상 반을 하나 이상 선택해주세요.'; return; }
+      }
+      noticeSendBtn.disabled = true;
+      noticeFeedback.textContent = '공지 전송 중...';
+      setStoredTeacherName(teacherName);
+      try {
+        const response = await fetch('/api/classes/notices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ teacherName, text, targetClasses: targets }),
+        });
+        const parsed = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(parsed?.error || '공지 전송에 실패했습니다.');
+        noticeText.value = '';
+        noticeFeedback.textContent = '공지 등록 완료!';
+        loadNoticeHistory(currentGrade);
+      } catch (error) {
+        noticeFeedback.textContent = error?.message || '공지 전송에 실패했습니다.';
+      } finally {
+        noticeSendBtn.disabled = false;
+      }
+    }
+
+    function setActiveGrade(grade) {
+      currentGrade = grade;
+      gradeButtons.forEach((button) => button.classList.toggle('active', Number(button.dataset.grade) === grade));
+      loadNoticeHistory(grade);
+    }
+
+    teacherNameForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const name = teacherNameInput.value.trim();
+      if (!name) {
+        teacherNameHelper.textContent = '이름을 입력해주세요.';
+        teacherNameInput.focus();
+        return;
+      }
+      setStoredTeacherName(name);
+      noticeFeedback.textContent = '';
+      closeTeacherNameOverlay();
+    });
+
+    editTeacherNameBtn.addEventListener('click', () => openTeacherNameOverlay(getStoredTeacherName()));
+    noticeTeacherName.addEventListener('change', () => {
+      const value = noticeTeacherName.value.trim();
+      if (value) setStoredTeacherName(value);
+    });
+    noticeTeacherName.addEventListener('blur', () => {
+      const value = noticeTeacherName.value.trim();
+      if (value) setStoredTeacherName(value);
+      else noticeTeacherName.value = getStoredTeacherName();
+    });
+    noticeSendBtn.addEventListener('click', sendTeacherNotice);
+    gradeButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const grade = Number(button.dataset.grade);
+        if (grade === currentGrade) return;
+        setActiveGrade(grade);
+      });
+    });
+
+    initNoticeTargetSelector();
+    ensureTeacherNameOnboarding();
+    setActiveGrade(currentGrade);
+  </script>
+</body>
+</html>

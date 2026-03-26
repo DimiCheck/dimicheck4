@@ -1035,6 +1035,9 @@ function connectBoardRealtime() {
       return;
     }
     try {
+      if (payload?.wallpaper && typeof window.applyBoardWallpaperEntry === 'function') {
+        window.applyBoardWallpaperEntry(payload.wallpaper);
+      }
       const currentLocalState = ensureLocalBoardState(grade, section);
       const parsed = {
         magnets: payload?.magnets || {},

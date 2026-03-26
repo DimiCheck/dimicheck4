@@ -101,34 +101,39 @@
     }
 
     .shell {
-      width: min(1320px, 100%);
-      margin: 0 auto;
+      width: 100%;
+      max-width: none;
       display: flex;
       flex-direction: column;
       gap: 18px;
     }
 
     .page-layout {
-      display: grid;
-      grid-template-columns: 220px minmax(0, 1fr);
-      gap: 18px;
-      align-items: start;
+      display: block;
     }
 
     .nav-sidebar {
-      border-radius: var(--radius-xl);
+      width: 196px;
       background: rgba(255,255,255,0.72);
       border: 1px solid var(--border);
+      border-left: none;
+      border-radius: 0 24px 24px 0;
       box-shadow: var(--shadow);
-      padding: 14px;
+      padding: 24px 14px;
       display: flex;
       flex-direction: column;
       gap: 10px;
-      position: sticky;
-      top: 24px;
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      z-index: 30;
     }
 
     .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
       appearance: none;
       border: 1px solid transparent;
       border-radius: 18px;
@@ -139,6 +144,7 @@
       font-weight: 700;
       color: var(--muted);
       cursor: pointer;
+      text-decoration: none;
       transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease;
     }
 
@@ -153,12 +159,24 @@
       box-shadow: 0 10px 22px rgba(228, 160, 116, 0.18);
     }
 
+    .nav-icon {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
+      opacity: 0.88;
+    }
+
+    .nav-label {
+      flex: 1;
+    }
+
     .main-stage,
     .content-column {
       display: flex;
       flex-direction: column;
       gap: 18px;
       min-width: 0;
+      margin-left: 190px;
     }
 
     .search-header {
@@ -922,6 +940,11 @@
         display: none;
       }
 
+      .main-stage,
+      .content-column {
+        margin-left: 0;
+      }
+
       .mobile-notice-btn {
         display: inline-flex;
       }
@@ -1027,8 +1050,18 @@
 
     <div class="page-layout">
       <aside class="nav-sidebar" aria-label="페이지 이동">
-        <button class="nav-item active" data-view="dashboard" type="button">전체 현황</button>
-        <button class="nav-item" data-view="notices" type="button">공지사항</button>
+        <a class="nav-item active" href="/teacher">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5 12 5l8 7.5V20a1 1 0 0 1-1 1h-4.5v-5.5h-5V21H5a1 1 0 0 1-1-1v-7.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          <span class="nav-label">전체 현황</span>
+        </a>
+        <a class="nav-item" href="/teacher/notices">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 7.5A2.5 2.5 0 0 1 8.5 5H18a1 1 0 0 1 1 1v9.5A2.5 2.5 0 0 1 16.5 18H9l-4 2.5V8.5A1 1 0 0 1 6 7.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 9h6M9 12h6M9 15h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span class="nav-label">공지사항</span>
+        </a>
+        <a class="nav-item" href="/teacher/wallpapers">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 6.5A1.5 1.5 0 0 1 6.5 5h11A1.5 1.5 0 0 1 19 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 17.5v-11Z" stroke="currentColor" stroke-width="1.8"/><path d="m7.5 16 3.2-3.2a1 1 0 0 1 1.4 0l1.4 1.4a1 1 0 0 0 1.4 0l1.6-1.6a1 1 0 0 1 1.4 0L19 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="9" r="1.25" fill="currentColor"/></svg>
+          <span class="nav-label">배경화면</span>
+        </a>
       </aside>
 
       <div class="main-stage">
@@ -1178,10 +1211,9 @@
     let targetInfo = null;
     const sockets = {};
     let lastSummaryRenderSignature = '';
+    let lastSearchRenderSignature = '';
 
     const gradeButtons = Array.from(document.querySelectorAll('.grade-btn'));
-    const navItems = Array.from(document.querySelectorAll('.nav-item'));
-    const dashboardView = document.getElementById('dashboardView');
     const noticeView = document.getElementById('noticeView');
     const classGrid = document.getElementById('classGrid');
     const gradeLabel = document.getElementById('gradeLabel');
@@ -1326,18 +1358,6 @@
       return window.matchMedia('(max-width: 1080px)').matches;
     }
 
-    function setDesktopView(view) {
-      const normalized = view === 'notices' ? 'notices' : 'dashboard';
-      dashboardView.hidden = normalized !== 'dashboard';
-      noticeView.hidden = normalized !== 'notices';
-      navItems.forEach((item) => {
-        item.classList.toggle('active', item.dataset.view === normalized);
-      });
-      if (normalized === 'notices') {
-        loadNoticeHistory(currentGrade);
-      }
-    }
-
     function openNoticeDrawer() {
       if (!isMobileNoticeDrawerMode()) return;
       noticeView.hidden = false;
@@ -1355,19 +1375,9 @@
     }
 
     function syncNoticeDrawerMode() {
-      if (isMobileNoticeDrawerMode()) {
-        dashboardView.hidden = false;
-        noticeView.hidden = true;
-        navItems.forEach((item) => item.classList.toggle('active', item.dataset.view === 'dashboard'));
-        return;
-      }
-
-      noticeView.classList.remove('visible');
-      noticeDrawerBackdrop.classList.remove('visible');
-      if (noticeView.hidden) {
-        setDesktopView('dashboard');
-      } else {
+      if (!isMobileNoticeDrawerMode()) {
         closeNoticeDrawer();
+        noticeView.hidden = true;
       }
     }
 
@@ -1653,7 +1663,7 @@
       if (away > 0) segments.push(`${away}명이 결원 상태`);
 
       if (segments.length === 1) {
-        return `${segments[0]} 모두 안정적으로 수업 흐름 안에 있어요.`;
+        return `${segments[0]} 모두 자리에서 자습 중이에요.`;
       }
 
       return `${segments[0]}, ${segments.slice(1).join(', ')}예요.`;
@@ -1667,7 +1677,7 @@
         totals,
       });
       if (lastSummaryRenderSignature === summarySignature) {
-        return;
+        return false;
       }
       lastSummaryRenderSignature = summarySignature;
 
@@ -1690,6 +1700,7 @@
       totalEl.textContent = String(totals.total);
       presentEl.textContent = String(totals.present);
       absenceEl.textContent = String(totals.absence);
+      return true;
     }
 
     function rememberGradeState(grade, sections) {
@@ -1762,7 +1773,7 @@
       });
     }
 
-    function renderCurrentGradeSummary(updatedAt = null) {
+    function renderCurrentGradeSummary(updatedAt = null, options = {}) {
       const sections = getSnapshotSectionsForCurrentGrade();
       const totals = sections.reduce((acc, snapshot) => {
         acc.total += Number(snapshot?.total) || 0;
@@ -1771,9 +1782,11 @@
         return acc;
       }, { total: 0, absence: 0, present: 0 });
 
-      renderSummary(currentGrade, sections, totals);
-      updateTime.textContent = `마지막 업데이트: ${formatTime(updatedAt || new Date())}`;
-      refreshSearchIfNeeded();
+      const didRender = renderSummary(currentGrade, sections, totals);
+      if (didRender || options.forceTimestamp) {
+        updateTime.textContent = `마지막 업데이트: ${formatTime(updatedAt || new Date())}`;
+      }
+      return didRender;
     }
 
     function applyIncrementalSectionUpdate(grade, snapshot) {
@@ -1799,6 +1812,7 @@
         renderClassCard(card, normalizedGrade, normalizedSection, snapshot);
       }
       renderCurrentGradeSummary(snapshot.updatedAt || new Date());
+      refreshSearchIfNeeded({ changedGrade: normalizedGrade, changedSection: normalizedSection });
     }
 
     async function fetchGradeStateOnce(grade, options = {}) {
@@ -1815,9 +1829,29 @@
       return sections;
     }
 
-    function refreshSearchIfNeeded() {
+    function refreshSearchIfNeeded(options = {}) {
       const value = studentSearchInput.value.trim();
-      if (value) {
+      if (!value) {
+        lastSearchRenderSignature = '';
+        hideSearchOverlay();
+        return;
+      }
+
+      if (options.force) {
+        handleStudentSearch(value);
+        return;
+      }
+
+      const parsed = parseStudentCode(value);
+      if (parsed.kind !== 'ready') {
+        handleStudentSearch(value);
+        return;
+      }
+
+      if (
+        Number(parsed.grade) === Number(options.changedGrade) &&
+        Number(parsed.section) === Number(options.changedSection)
+      ) {
         handleStudentSearch(value);
       }
     }
@@ -1831,7 +1865,7 @@
         renderClassCard(card, grade, section, snapshot);
       });
 
-      renderCurrentGradeSummary(new Date());
+      renderCurrentGradeSummary(new Date(), { forceTimestamp: true });
     }
 
     async function loadClassState(grade) {
@@ -1849,6 +1883,7 @@
           const previousSnapshot = new Map(gradeStateSnapshot);
           gradeStateSnapshot = new Map((sections || []).map((snapshot) => [Number(snapshot.section), snapshot]));
 
+          const changedSections = [];
           document.querySelectorAll('#classGrid .class-card').forEach((card, index) => {
             const section = index + 1;
             const nextSnapshot = getSectionSnapshot(section);
@@ -1856,14 +1891,19 @@
             if (getSectionRenderSignature(prevSnapshot) === getSectionRenderSignature(nextSnapshot)) {
               return;
             }
+            changedSections.push(section);
             renderClassCard(card, grade, section, nextSnapshot);
           });
 
-          renderCurrentGradeSummary(new Date());
+          renderCurrentGradeSummary(new Date(), { forceTimestamp: changedSections.length > 0 });
+          changedSections.forEach((section) => {
+            refreshSearchIfNeeded({ changedGrade: Number(grade), changedSection: section });
+          });
           return;
         }
 
         renderGradeState(grade, sections);
+        refreshSearchIfNeeded({ force: true });
       } catch (error) {
         if (error?.name === 'AbortError') return;
         console.warn('loadClassState failed', error);
@@ -1895,6 +1935,11 @@
     }
 
     function renderSearchMessage(message, tone = '') {
+      const signature = JSON.stringify({ type: 'message', tone, message });
+      if (lastSearchRenderSignature === signature) {
+        return;
+      }
+      lastSearchRenderSignature = signature;
       studentSearchResult.dataset.tone = tone;
       studentSearchResult.innerHTML = `<div class="search-result-meta">${escapeHTML(message)}</div>`;
     }
@@ -1927,6 +1972,20 @@
       const jumpButton = parsed.grade !== currentGrade
         ? `<button class="jump-btn" type="button" data-action="jump-grade" data-grade="${parsed.grade}" data-section="${parsed.section}" data-number="${parsed.number}">이 학년 보기</button>`
         : `<button class="jump-btn" type="button" data-action="focus-student" data-grade="${parsed.grade}" data-section="${parsed.section}" data-number="${parsed.number}">해당 반에서 보기</button>`;
+      const signature = JSON.stringify({
+        type: 'result',
+        grade: parsed.grade,
+        section: parsed.section,
+        number: parsed.number,
+        tone,
+        label,
+        currentGrade,
+      });
+
+      if (lastSearchRenderSignature === signature) {
+        return;
+      }
+      lastSearchRenderSignature = signature;
 
       studentSearchResult.dataset.tone = tone;
       studentSearchResult.innerHTML = `
@@ -1943,6 +2002,7 @@
       studentSearchInput.value = parsed.digits || '';
 
       if (parsed.kind === 'empty') {
+        lastSearchRenderSignature = '';
         hideSearchOverlay();
         return;
       }
@@ -1967,11 +2027,20 @@
         const snapshot = sections.find((item) => Number(item.section) === parsed.section) || EMPTY_SNAPSHOT;
         const data = snapshot?.magnets?.[String(parsed.number)] || snapshot?.magnets?.[parsed.number];
         if (!data) {
-          studentSearchResult.dataset.tone = '';
-          studentSearchResult.innerHTML = `
-            <strong>${parsed.grade}학년 ${parsed.section}반 ${parsed.number}번</strong>
-            <div class="search-result-meta">아직 DIMICHECK에 등록되지 않았거나 상태 데이터가 없어요.</div>
-          `;
+          const missingSignature = JSON.stringify({
+            type: 'missing',
+            grade: parsed.grade,
+            section: parsed.section,
+            number: parsed.number,
+          });
+          if (lastSearchRenderSignature !== missingSignature) {
+            lastSearchRenderSignature = missingSignature;
+            studentSearchResult.dataset.tone = '';
+            studentSearchResult.innerHTML = `
+              <strong>${parsed.grade}학년 ${parsed.section}반 ${parsed.number}번</strong>
+              <div class="search-result-meta">아직 DIMICHECK에 등록되지 않았거나 상태 데이터가 없어요.</div>
+            `;
+          }
           syncSearchOverlayVisibility();
           return;
         }
@@ -2168,7 +2237,6 @@
           new Date().toISOString(),
         );
         applyIncrementalSectionUpdate(grade, nextSnapshot);
-        refreshSearchIfNeeded();
       } catch (error) {
         alert(`저장 실패: ${error.message}`);
       }
@@ -2272,12 +2340,6 @@
     openNoticeDrawerBtn.addEventListener('click', openNoticeDrawer);
     closeNoticeDrawerBtn.addEventListener('click', closeNoticeDrawer);
     noticeDrawerBackdrop.addEventListener('click', closeNoticeDrawer);
-    navItems.forEach((item) => {
-      item.addEventListener('click', () => {
-        if (isMobileNoticeDrawerMode()) return;
-        setDesktopView(item.dataset.view);
-      });
-    });
 
     studentSearchInput.addEventListener('input', (event) => {
       handleStudentSearch(event.target.value);
@@ -2349,6 +2411,7 @@
         if (!noticeView.hidden || noticeView.classList.contains('visible')) {
           loadNoticeHistory(grade);
         }
+        refreshSearchIfNeeded({ force: true });
       });
     });
 
@@ -2387,7 +2450,6 @@
     createClassCards();
     ensureTeacherNameOnboarding();
     setActiveGrade(currentGrade);
-    setDesktopView('dashboard');
     loadClassState(currentGrade);
     connectToGradeWebSockets(currentGrade);
     syncNoticeDrawerMode();

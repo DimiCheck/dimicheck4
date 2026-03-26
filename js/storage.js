@@ -946,6 +946,9 @@ async function loadState(grade, section, options = {}) {
     const res = await fetch(`/api/classes/state/load?grade=${grade}&section=${section}`, { cache: 'no-store' });
     if (!res.ok) throw new Error("로드 실패");
     const parsed = await res.json();
+    if (parsed?.wallpaper && typeof window.applyBoardWallpaperEntry === 'function') {
+      window.applyBoardWallpaperEntry(parsed.wallpaper);
+    }
     const latestLocalState = ensureLocalBoardState(grade, section);
     if (!forceSync && latestLocalState.dirty && latestLocalState.revision >= revisionAtRequest) {
       return;
