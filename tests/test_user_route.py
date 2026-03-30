@@ -139,3 +139,46 @@ def test_metrics_limit_is_isolated_by_client_ip(guarded_app):
 
     third = client.get("/metrics", headers={"X-Forwarded-For": "198.51.100.8"})
     assert third.status_code == 200
+
+
+def test_schoollife_timetable_route_refreshes_same_day_cache(monkeypatch):
+    app = _load_app(monkeypatch)
+    client = app.test_client()
+
+    import class_routes
+
+    now = datetime.now(timezone(timedelta(hours=9)))
+    key = (1, 1)
+    class_routes._SCHOOLLIFE_CACHE["timetable"][key] = {
+        "data": {
+            "lessons": [
+                {"period": 1, "subject": "캐시된 수업"},
+                {"period": 2, "subject": "캐시된 수업2"},
+            ],
+            "maxPeriod": 2,
+            "date": now.strftime("%Y-%m-%d"),
+        },
+        "timestamp": now,
+    }
+
+    def fake_fetch_timetable_from_api(grade, section):
+        assert (grade, section) == key
+        return ([
+            {"period": 1, "subject": "실시간 수업"},
+            {"period": 6, "subject": "실시간 6교시"},
+            {"period": 7, "subject": "실시간 7교시"},
+        ], 7)
+
+    monkeypatch.setattr(class_routes, "_fetch_timetable_from_api", fake_fetch_timetable_from_api)
+
+    response = client.get("/api/classes/schoollife/timetable?grade=1&section=1")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["lessons"] == [
+        {"period": 1, "subject": "실시간 수업"},
+        {"period": 6, "subject": "실시간 6교시"},
+        {"period": 7, "subject": "실시간 7교시"},
+    ]
+    assert payload["maxPeriod"] == 7
+    assert class_routes._SCHOOLLIFE_CACHE["timetable"][key]["data"] == payload
