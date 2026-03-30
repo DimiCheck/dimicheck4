@@ -245,6 +245,20 @@ document.addEventListener('DOMContentLoaded', () => {
     return r?.ITRT_CNTNT || r?.SUBJECT || r?.SUB_NM || '';
   }
 
+  function parsePeriodValue(value){
+    if (value === null || value === undefined) return null;
+    const match = String(value).match(/\d+/);
+    if (!match) return null;
+    const parsed = Number(match[0]);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  function inferMaxPeriod(data){
+    return (data || []).reduce((max, day) => {
+      return Math.max(max, ...((day || []).map((item) => parsePeriodValue(item?.PERIO ?? item?.PERIOD ?? item?.ITRT_CNTNTSEQ) || 0)));
+    }, 0);
+  }
+
   // 주간 데이터 유효성 검사 (래핑/비래핑 모두 허용)
   function isValidWeeklyData(candidate, expectedWeekStart){
     if (!candidate) return false;
@@ -272,7 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderTimetable(data){
     const days = ['월','화','수','목','금'];
-    const maxPeriod = 7;
+    const maxPeriod = Math.max(7, inferMaxPeriod(data));
 
     let html = '<table><thead><tr><th>교시</th>';
     for (const d of days) html += `<th>${d}</th>`;
@@ -283,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
       for (let di=0; di<5; di++){
         const dayData = data[di] || [];
         // 같은 교시에 다수 행(분반) -> 과목 중복 제거 후 줄바꿈
-        const rowList = dayData.filter(item => Number(item.PERIO) === period);
+        const rowList = dayData.filter(item => parsePeriodValue(item?.PERIO ?? item?.PERIOD ?? item?.ITRT_CNTNTSEQ) === period);
         const cell = rowList.length
           ? Array.from(new Set(rowList.map(normalizeSubject).filter(Boolean))).join('<br>')
           : '';

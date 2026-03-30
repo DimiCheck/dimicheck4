@@ -517,6 +517,29 @@
       box-shadow: 0 0 0 4px color-mix(in oklab, var(--text) 15%, transparent);
     }
 
+    button.danger {
+      border-radius: 14px;
+      border: 1px solid color-mix(in oklab, #ff6b6b 45%, transparent);
+      background: linear-gradient(135deg, #ff6b6b, #ff3b7a);
+      color: #fff;
+      padding: 12px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 15px 30px rgba(255, 59, 122, 0.2);
+    }
+
+    button.danger:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    button.danger:active:not(:disabled) {
+      transform: scale(0.96);
+      box-shadow: 0 0 0 4px rgba(255, 107, 107, 0.18);
+    }
+
     .toggle {
       display: flex;
       justify-content: space-between;
@@ -600,6 +623,35 @@
       align-items: center;
       flex-wrap: wrap;
       gap: 12px;
+    }
+
+    .danger-card {
+      border: 1px solid color-mix(in oklab, #ff6b6b 28%, var(--border));
+      background: linear-gradient(180deg, rgba(255, 107, 107, 0.08), rgba(255, 59, 122, 0.04));
+    }
+
+    .danger-card p,
+    .danger-card li {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .danger-card ul {
+      margin: 12px 0 0;
+      padding-left: 18px;
+    }
+
+    .danger-confirm {
+      margin-top: 16px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .danger-confirm label {
+      font-weight: 600;
+      color: var(--text);
+      margin: 0;
     }
 
     /* Bottom Navigation - Floating Rounded Style */
@@ -1020,6 +1072,23 @@
         <p style="margin:0;color:var(--muted);font-size:14px">다른 계정으로 접속하려면 로그아웃하세요.</p>
       </div>
       <button type="button" id="logoutBtn" class="ghost">로그아웃</button>
+    </section>
+
+    <section class="card danger-card fade-up">
+      <h3 class="section-title">회원 탈퇴</h3>
+      <p>탈퇴하면 이 계정에 연결된 주요 개인 데이터와 로그인 상태가 삭제되고, 같은 기기에서도 다시 로그인해야 합니다.</p>
+      <ul>
+        <li>내 프로필, 자동 로그인, API 키, 개인 설정 연동 정보가 함께 삭제됩니다.</li>
+        <li>내 닉네임/아바타, 급식 투표, 읽음/반응 같은 개인 기록도 정리됩니다.</li>
+        <li>되돌릴 수 없으니 정말 떠날 때만 진행하세요.</li>
+      </ul>
+      <div class="danger-confirm">
+        <label for="deleteConfirmInput">확인을 위해 아래 칸에 <strong>탈퇴</strong>를 입력하세요.</label>
+        <input type="text" id="deleteConfirmInput" class="text-field" maxlength="10" placeholder="탈퇴" autocomplete="off" />
+        <div class="button-row">
+          <button type="button" id="deleteAccountBtn" class="danger" disabled>회원 탈퇴</button>
+        </div>
+      </div>
     </section>
   </main>
 

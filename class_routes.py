@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 import os
+import re
 import requests
 
 from flask import Blueprint, current_app, jsonify, request, session
@@ -1634,20 +1635,60 @@ def _fetch_timetable_from_api(grade: int, section: int):
     res.raise_for_status()
     data = res.json()
     lessons = []
+    max_period = 0
     try:
         rows = data['hisTimetable'][1]['row']
-        for row in rows:
-            period = row.get('PERIO') or row.get('PERIOD') or row.get('ITRT_CNTNTSEQ')
-            subject = row.get('ITRT_CNTNT') or row.get('SUBJECT') or row.get('SUB_NM')
-            if not subject:
-                continue
-            lessons.append({
-                "period": period,
-                "subject": subject
-            })
+        lessons, max_period = _normalize_timetable_rows(rows)
     except Exception:
         pass
-    return lessons
+    return lessons, max_period
+
+
+def _normalize_timetable_period(value) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value if value > 0 else None
+    match = re.search(r"\d+", str(value))
+    if not match:
+        return None
+    try:
+        period = int(match.group())
+    except ValueError:
+        return None
+    return period if period > 0 else None
+
+
+def _normalize_timetable_rows(rows):
+    normalized = []
+    seen = set()
+
+    for row in rows or []:
+        subject = (
+            (row.get('ITRT_CNTNT') or row.get('SUBJECT') or row.get('SUB_NM') or '')
+            if isinstance(row, dict)
+            else ''
+        )
+        subject = str(subject).strip()
+        if not subject:
+            continue
+
+        raw_period = None
+        if isinstance(row, dict):
+            raw_period = row.get('PERIO') or row.get('PERIOD') or row.get('ITRT_CNTNTSEQ')
+        period = _normalize_timetable_period(raw_period)
+        dedupe_key = (period, subject)
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        normalized.append({
+            "period": period,
+            "subject": subject,
+        })
+
+    normalized.sort(key=lambda item: (item["period"] is None, item["period"] or 999, item["subject"]))
+    max_period = max((item["period"] or 0 for item in normalized), default=0)
+    return normalized, max_period
 
 
 @blueprint.get('/schoollife/weather')
@@ -1715,9 +1756,10 @@ def get_schoollife_timetable():
             return jsonify(cache_entry["data"])
 
         try:
-            lessons = _fetch_timetable_from_api(grade, section)
+            lessons, max_period = _fetch_timetable_from_api(grade, section)
             payload = {
                 "lessons": lessons,
+                "maxPeriod": max_period,
                 "date": datetime.now(_get_kst()).strftime('%Y-%m-%d')
             }
             if not lessons:

@@ -914,6 +914,7 @@
   const ATPT_OFCDC_SC_CODE='J10';     // 경기도교육청
   const SD_SCHUL_CODE='7530560';      // 한국디지털미디어고
   const API_KEY='da82433f0f3a4351bda4ca9a0f11fc7d'; // from etc.js sample
+  const DEFAULT_DAILY_PERIOD_COUNT = 7;
 
   function fmtYYYYMMDD(date){
     const y=date.getFullYear();
@@ -938,6 +939,21 @@
 
   function normalizeSubject(r){
     return r.ITRT_CNTNT || r.SUBJECT || r.SUB_NM || '';
+  }
+
+  function parsePeriodValue(value){
+    if (value === null || value === undefined) return null;
+    const match = String(value).match(/\d+/);
+    if (!match) return null;
+    const parsed = Number(match[0]);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  function inferMaxPeriod(items, fallback = 0){
+    return items.reduce((max, item) => {
+      const period = parsePeriodValue(item?.period ?? item?.PERIO ?? item?.PERIOD ?? item?.ITRT_CNTNTSEQ);
+      return period ? Math.max(max, period) : max;
+    }, fallback);
   }
 
   function fmtDateKR(dateStr) {
@@ -1027,7 +1043,49 @@
       return;
     }
 
-    lessons.forEach(item => {
+    const grouped = new Map();
+    const unnumbered = [];
+
+    lessons.forEach((item) => {
+      const periodNumber = parsePeriodValue(item?.period);
+      if (!periodNumber) {
+        unnumbered.push(item);
+        return;
+      }
+      const row = grouped.get(periodNumber) || [];
+      const subject = String(item?.subject || '').trim();
+      if (subject && !row.includes(subject)) {
+        row.push(subject);
+      }
+      grouped.set(periodNumber, row);
+    });
+
+    const displayMaxPeriod = Math.max(
+      DEFAULT_DAILY_PERIOD_COUNT,
+      inferMaxPeriod(lessons),
+      parsePeriodValue(payload?.maxPeriod) || 0,
+    );
+
+    for (let periodNumber = 1; periodNumber <= displayMaxPeriod; periodNumber += 1) {
+      const subjectList = grouped.get(periodNumber) || [];
+      const div = document.createElement('div');
+      div.className='row';
+      const bodyHtml = subjectList.length
+        ? `
+          <div class="subject">${subjectList.join(' · ')}</div>
+          <div class="sub"></div>
+        `
+        : `
+          <div class="subject">시간표 미등록</div>
+          <div class="sub">아직 등록되지 않았거나 불러오지 못했습니다.</div>
+        `;
+      div.innerHTML = `
+        <div class="period">${periodNumber}교시</div>
+        <div>${bodyHtml}</div>`;
+      list.appendChild(div);
+    }
+
+    unnumbered.forEach((item) => {
       const period = item.period ? `${item.period}교시` : '수업';
       const subject = item.subject || '미상';
       const teacher = item.teacher ? `(${item.teacher})` : '';
@@ -1050,7 +1108,7 @@
     ov.hidden=false; requestAnimationFrame(()=>ov.classList.add('visible'));
 
     const days=['월','화','수','목','금'];
-    const maxP=7;
+    const maxP = Math.max(DEFAULT_DAILY_PERIOD_COUNT, inferMaxPeriod((wrapped && wrapped.data || []).flat()));
 
     let html = '<table><thead><tr><th>교시</th>';
     for(const d of days) html += `<th>${d}</th>`;
