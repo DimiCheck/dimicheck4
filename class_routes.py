@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import os
 import re
 import requests
@@ -1482,12 +1482,12 @@ def class_config():
 # ----------------- Global caching for schoollife data -----------------
 _SCHOOLLIFE_CACHE = {
     "weather": {"data": None, "timestamp": None},
-    "meal": {"data": None, "timestamp": None},
+    "meal": {},
     "timetable": {},  # keyed by (grade, section)
 }
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-_MEAL_DISK_CACHE_PATH = os.path.join(_BASE_DIR, "instance", "schoollife_meal_cache.json")
+_MEAL_DISK_CACHE_DIR = os.path.join(_BASE_DIR, "instance")
 
 def _get_kst():
     """Get KST timezone (UTC+9)"""
@@ -1532,11 +1532,26 @@ def _fetch_weather_from_api():
     }
     return weather
 
-def _fetch_meal_from_api():
-    now_kst = datetime.now(_get_kst())
-    today = now_kst.strftime('%Y-%m-%d')
+def _normalize_meal_date(value: date | datetime | str | None = None) -> date:
+    if value is None:
+        return datetime.now(_get_kst()).date()
+    if isinstance(value, datetime):
+        return value.astimezone(_get_kst()).date() if value.tzinfo else value.date()
+    if isinstance(value, date):
+        return value
+    return datetime.strptime(str(value), "%Y-%m-%d").date()
+
+
+def _meal_disk_cache_path(date_text: str) -> str:
+    safe_date = re.sub(r"[^0-9-]", "", date_text) or "unknown"
+    return os.path.join(_MEAL_DISK_CACHE_DIR, f"schoollife_meal_cache_{safe_date}.json")
+
+
+def _fetch_meal_from_api(target_date: date | datetime | str | None = None):
+    meal_date = _normalize_meal_date(target_date)
+    date_text = meal_date.strftime('%Y-%m-%d')
     base_url = str(config.MEAL_API_BASE_URL or "https://api.xn--rh3b.net").rstrip("/")
-    url = f"{base_url}/{today}"
+    url = f"{base_url}/{date_text}"
 
     res = requests.get(
         url,
@@ -1567,7 +1582,7 @@ def _fetch_meal_from_api():
     dinner_items = normalize_meal_items(data.get("dinner") if isinstance(data, dict) else None)
 
     date_value = payload.get("date") if isinstance(payload, dict) else None
-    date_text = str(date_value).strip() if date_value else today
+    date_text = str(date_value).strip() if date_value else date_text
 
     return {
         "breakfast": "\n".join(breakfast_items) if breakfast_items else None,
@@ -1577,9 +1592,10 @@ def _fetch_meal_from_api():
     }
 
 
-def _read_meal_disk_cache():
+def _read_meal_disk_cache(date_text: str):
+    cache_path = _meal_disk_cache_path(date_text)
     try:
-        with open(_MEAL_DISK_CACHE_PATH, "r", encoding="utf-8") as f:
+        with open(cache_path, "r", encoding="utf-8") as f:
             payload = json.load(f)
         if not isinstance(payload, dict):
             return None
@@ -1593,9 +1609,10 @@ def _read_meal_disk_cache():
 
 
 def _write_meal_disk_cache(date_text: str, data: dict):
+    cache_path = _meal_disk_cache_path(date_text)
     try:
-        os.makedirs(os.path.dirname(_MEAL_DISK_CACHE_PATH), exist_ok=True)
-        temp_path = f"{_MEAL_DISK_CACHE_PATH}.tmp"
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        temp_path = f"{cache_path}.tmp"
         with open(temp_path, "w", encoding="utf-8") as f:
             json.dump(
                 {
@@ -1606,7 +1623,7 @@ def _write_meal_disk_cache(date_text: str, data: dict):
                 f,
                 ensure_ascii=False,
             )
-        os.replace(temp_path, _MEAL_DISK_CACHE_PATH)
+        os.replace(temp_path, cache_path)
     except OSError:
         # Non-fatal: memory cache still works.
         pass
@@ -1713,26 +1730,44 @@ def get_schoollife_weather():
 @blueprint.get('/schoollife/meal')
 def get_schoollife_meal():
     now = datetime.now(_get_kst())
-    today = now.strftime("%Y-%m-%d")
-    cache_entry = _SCHOOLLIFE_CACHE["meal"]
-    if cache_entry["data"] and _is_same_day(cache_entry["timestamp"], now):
+    date_arg = (request.args.get("date") or "").strip()
+    offset_arg = request.args.get("offset", default=0, type=int)
+
+    if date_arg:
+        try:
+            meal_date = _normalize_meal_date(date_arg)
+        except ValueError:
+            return jsonify({"error": "invalid_date"}), 400
+    else:
+        offset = offset_arg if offset_arg is not None else 0
+        if offset < 0 or offset > 7:
+            return jsonify({"error": "invalid_offset"}), 400
+        meal_date = now.date() + timedelta(days=offset)
+
+    target_date = meal_date.strftime("%Y-%m-%d")
+    cache_entry = _SCHOOLLIFE_CACHE["meal"].get(target_date)
+    if cache_entry and cache_entry.get("data") and _is_same_day(cache_entry.get("timestamp"), now):
         return jsonify(cache_entry["data"])
 
-    disk_cache = _read_meal_disk_cache()
-    if disk_cache and disk_cache.get("date") == today:
+    disk_cache = _read_meal_disk_cache(target_date)
+    if disk_cache and disk_cache.get("date") == target_date:
         data = disk_cache.get("data")
-        cache_entry["data"] = data
-        cache_entry["timestamp"] = now
+        _SCHOOLLIFE_CACHE["meal"][target_date] = {
+            "data": data,
+            "timestamp": now,
+        }
         return jsonify(data)
 
     try:
-        data = _fetch_meal_from_api()
-        cache_entry["data"] = data
-        cache_entry["timestamp"] = now
-        _write_meal_disk_cache(today, data)
+        data = _fetch_meal_from_api(target_date)
+        _SCHOOLLIFE_CACHE["meal"][target_date] = {
+            "data": data,
+            "timestamp": now,
+        }
+        _write_meal_disk_cache(target_date, data)
         return jsonify(data)
     except Exception as e:
-        if cache_entry["data"]:
+        if cache_entry and cache_entry.get("data"):
             return jsonify(cache_entry["data"])
         if disk_cache and isinstance(disk_cache.get("data"), dict):
             return jsonify(disk_cache.get("data"))

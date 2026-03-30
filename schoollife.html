@@ -255,6 +255,21 @@
 
     .meal-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
     @media (max-width:700px){ .meal-grid{grid-template-columns:1fr} }
+    .meal-head{align-items:flex-start; flex-wrap:wrap}
+    .meal-head-main{display:grid; gap:4px}
+    .meal-switcher{
+      display:flex; gap:6px; padding:4px;
+      border-radius:14px; background:color-mix(in oklab, var(--surface) 86%, transparent);
+      border:1px solid color-mix(in oklab, var(--text) 10%, transparent);
+    }
+    .meal-switcher button{
+      height:34px; padding:0 14px; border-radius:10px; font-size:13px;
+      background:transparent;
+    }
+    .meal-switcher button.active{
+      background:linear-gradient(135deg,var(--primary),var(--primary-2));
+      color:#fff; border-color:transparent;
+    }
     .meal-card{
       padding:14px; border-radius:16px; border:1px solid var(--border);
       background:var(--surface);
@@ -589,9 +604,15 @@
 
   <!-- 오른쪽: 오늘 급식 -->
   <section class="panel fade-up" style="--area:right" aria-labelledby="meal-h">
-    <div class="head">
-      <h2 id="meal-h">오늘 급식</h2>
-      <div class="sub" id="meal-sub"></div>
+    <div class="head meal-head">
+      <div class="meal-head-main">
+        <h2 id="meal-h">급식</h2>
+        <div class="sub" id="meal-sub"></div>
+      </div>
+      <div class="meal-switcher" role="group" aria-label="급식 날짜 선택">
+        <button id="mealTodayBtn" type="button" class="active" aria-pressed="true">오늘</button>
+        <button id="mealTomorrowBtn" type="button" aria-pressed="false">내일</button>
+      </div>
     </div>
     <div class="meal-grid" id="mealGrid">
       <div class="meal-card"><h3>아침</h3><div class="empty">불러오는 중…</div></div>
@@ -602,7 +623,7 @@
     <!-- 급식 투표 -->
     <div style="margin-top:16px; padding:14px; border-radius:14px; background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03)); border:1px solid color-mix(in oklab, var(--text) 10%, transparent);">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px;">
-        <div style="font-weight:600; font-size:14px;">오늘 급식 어때요?</div>
+        <div id="mealVoteTitle" style="font-weight:600; font-size:14px;">오늘 급식 어때요?</div>
         <div style="display:flex; gap:8px;">
           <button id="mealThumbsUp" class="vote-btn" style="font-size:24px; background:transparent; border:1px solid color-mix(in oklab, var(--text) 15%, transparent); border-radius:10px; padding:8px 12px; cursor:pointer; transition:all .2s;">👍</button>
           <button id="mealThumbsDown" class="vote-btn" style="font-size:24px; background:transparent; border:1px solid color-mix(in oklab, var(--text) 15%, transparent); border-radius:10px; padding:8px 12px; cursor:pointer; transition:all .2s;">👎</button>
@@ -1327,11 +1348,64 @@
 
   // -------- meal (based on etc.js example) --------
   function getTodayDateStringDash(){ return fmtYYYY_MM_DD(new Date()); }
+  let selectedMealOffset = 0;
+
+  function getSelectedMealLabel() {
+    return selectedMealOffset === 1 ? '내일' : '오늘';
+  }
+
+  function formatMealDateLabel(dateText) {
+    if (!dateText) return getSelectedMealLabel();
+    const parsed = new Date(`${dateText}T00:00:00+09:00`);
+    if (Number.isNaN(parsed.getTime())) return `${getSelectedMealLabel()} · ${dateText.replace(/-/g, '.')}`;
+    const human = parsed.toLocaleDateString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'short',
+    });
+    return `${getSelectedMealLabel()} · ${human}`;
+  }
+
+  function updateMealToggleButtons() {
+    const todayBtn = document.getElementById('mealTodayBtn');
+    const tomorrowBtn = document.getElementById('mealTomorrowBtn');
+    const isToday = selectedMealOffset === 0;
+    todayBtn?.classList.toggle('active', isToday);
+    tomorrowBtn?.classList.toggle('active', !isToday);
+    todayBtn?.setAttribute('aria-pressed', String(isToday));
+    tomorrowBtn?.setAttribute('aria-pressed', String(!isToday));
+  }
+
+  function updateMealVoteState() {
+    const isToday = selectedMealOffset === 0;
+    const statsEl = document.getElementById('mealVoteStats');
+    const voteTitle = document.getElementById('mealVoteTitle');
+    const thumbsUpBtn = document.getElementById('mealThumbsUp');
+    const thumbsDownBtn = document.getElementById('mealThumbsDown');
+
+    if (voteTitle) {
+      voteTitle.textContent = isToday ? '오늘 급식 어때요?' : '오늘 급식 투표';
+    }
+
+    [thumbsUpBtn, thumbsDownBtn].forEach((btn) => {
+      if (!btn) return;
+      btn.disabled = !isToday;
+      btn.classList.remove('selected');
+      btn.style.opacity = isToday ? '1' : '.45';
+      btn.style.cursor = isToday ? 'pointer' : 'not-allowed';
+    });
+
+    if (!isToday && statsEl) {
+      statsEl.textContent = '급식 투표는 오늘 급식만 참여할 수 있어요.';
+    }
+  }
+
   // Remove old external meal fetcher
   function renderMeal(data){
     const grid = document.getElementById('mealGrid');
     const sub = document.getElementById('meal-sub');
-    if (sub) sub.textContent = (data?.date || '').replace(/-/g,'.');
+    if (sub) sub.textContent = formatMealDateLabel(data?.date);
 
     const entries = [
       {title:'아침', text:data?.breakfast},
@@ -1356,7 +1430,7 @@
     console.error('[Schoollife] meal load failed:', message);
     const grid = document.getElementById('mealGrid');
     const sub = document.getElementById('meal-sub');
-    if (sub) sub.textContent = '급식 정보를 불러올 수 없습니다.';
+    if (sub) sub.textContent = `${getSelectedMealLabel()} 급식 정보를 불러올 수 없습니다.`;
     if (grid) {
       grid.innerHTML = '<div class="meal-card"><h3>알림</h3><div class="empty">급식 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div></div>';
     }
@@ -1378,7 +1452,7 @@
     try {
       const [weatherResult, mealResult, timetableResult] = await Promise.allSettled([
         fetchJson('/api/classes/schoollife/weather'),
-        fetchJson('/api/classes/schoollife/meal'),
+        fetchJson(`/api/classes/schoollife/meal?offset=${selectedMealOffset}`),
         fetchJson(`/api/classes/schoollife/timetable?grade=${g}&section=${c}`)
       ]);
 
@@ -1399,11 +1473,18 @@
       } else {
         showTimetableError(timetableResult.reason);
       }
+
+      if (selectedMealOffset === 0) {
+        await loadMealVoteStats();
+      } else {
+        updateMealVoteState();
+      }
     } catch(e) {
       console.error("loadTodayAll error:", e);
       showWeatherError(e);
       showMealError(e);
       showTimetableError(e);
+      updateMealVoteState();
     }
   }
 
@@ -1411,6 +1492,10 @@
 
   // -------- Meal Vote --------
   async function loadMealVoteStats(){
+    if (selectedMealOffset !== 0) {
+      updateMealVoteState();
+      return;
+    }
     const g = gradeSel.value, c = classSel.value;
     try {
       const res = await fetchJson(`/api/classes/schoollife/meal/stats?grade=${g}&section=${c}`);
@@ -1445,6 +1530,7 @@
   }
 
   async function voteMeal(isPositive){
+    if (selectedMealOffset !== 0) return;
     const g = gradeSel.value, c = classSel.value;
     try {
       await fetchJson(`/api/classes/schoollife/meal/vote?grade=${g}&section=${c}`, {
@@ -1461,6 +1547,20 @@
 
   document.getElementById('mealThumbsUp').addEventListener('click', () => voteMeal(true));
   document.getElementById('mealThumbsDown').addEventListener('click', () => voteMeal(false));
+  document.getElementById('mealTodayBtn').addEventListener('click', async () => {
+    if (selectedMealOffset === 0) return;
+    selectedMealOffset = 0;
+    updateMealToggleButtons();
+    updateMealVoteState();
+    await loadTodayAll();
+  });
+  document.getElementById('mealTomorrowBtn').addEventListener('click', async () => {
+    if (selectedMealOffset === 1) return;
+    selectedMealOffset = 1;
+    updateMealToggleButtons();
+    updateMealVoteState();
+    await loadTodayAll();
+  });
 
   // -------- Calendar --------
   let calendarEvents = [];
@@ -1757,13 +1857,14 @@
     // Load all data in parallel for better performance
     await Promise.all([
       loadTodayAll(),
-      loadMealVoteStats(),
       loadCalendarEvents(),
       loadLatestNotice()
     ]);
   }
 
   async function bootstrapSchoollifePage() {
+    updateMealToggleButtons();
+    updateMealVoteState();
     await hydrateClassSelection();
     await loadAllSchoollifeData();
     initCountdown();

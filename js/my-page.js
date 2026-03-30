@@ -51,8 +51,6 @@ class MyPageController {
     this.mcpClientId = document.getElementById('mcpClientId');
     this.mcpClientSecret = document.getElementById('mcpClientSecret');
     this.mcpCopyButtons = document.querySelectorAll('[data-copy-target]');
-    this.deleteConfirmInput = document.getElementById('deleteConfirmInput');
-    this.deleteAccountBtn = document.getElementById('deleteAccountBtn');
   }
 
   bindEvents() {
@@ -89,15 +87,6 @@ class MyPageController {
     this.logoutBtn?.addEventListener('click', () => {
       window.location.href = '/auth/logout';
     });
-
-    this.deleteConfirmInput?.addEventListener('input', () => {
-      const value = this.deleteConfirmInput.value.trim();
-      if (this.deleteAccountBtn) {
-        this.deleteAccountBtn.disabled = value !== '탈퇴';
-      }
-    });
-
-    this.deleteAccountBtn?.addEventListener('click', () => this.deleteAccount());
 
     this.mcpCreateBtn?.addEventListener('click', () => this.createMcpClient());
     this.mcpCopyButtons?.forEach((btn) => {
@@ -491,50 +480,6 @@ class MyPageController {
     if (!this.mcpStatus) return;
     this.mcpStatus.textContent = message;
     this.mcpStatus.style.color = isError ? '#ff8a8a' : 'var(--muted)';
-  }
-
-  async deleteAccount() {
-    const confirmation = this.deleteConfirmInput?.value?.trim() || '';
-    if (confirmation !== '탈퇴') {
-      this.showToast("'탈퇴'를 정확히 입력해주세요.");
-      return;
-    }
-
-    const confirmed = window.confirm(
-      '회원 탈퇴를 진행할까요?\n저장된 개인 데이터와 로그인 상태가 삭제되며 되돌릴 수 없습니다.'
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    if (this.deleteAccountBtn) {
-      this.deleteAccountBtn.disabled = true;
-      this.deleteAccountBtn.textContent = '탈퇴 처리 중...';
-    }
-
-    try {
-      const res = await fetch('/account/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ confirmation }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data?.message || data?.error || '회원 탈퇴에 실패했습니다.');
-      }
-
-      this.showToast('회원 탈퇴가 완료되었습니다.');
-      window.location.replace(data?.redirect || '/login.html?deleted=1');
-    } catch (error) {
-      console.error('[MyPage] Failed to delete account.', error);
-      this.showToast(error.message || '회원 탈퇴에 실패했습니다.');
-      if (this.deleteAccountBtn) {
-        this.deleteAccountBtn.disabled = false;
-        this.deleteAccountBtn.textContent = '회원 탈퇴';
-      }
-    }
   }
 }
 

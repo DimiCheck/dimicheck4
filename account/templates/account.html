@@ -12,24 +12,119 @@
 
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DIMI Check - 계정 관리</title>
+  <meta name="theme-color" content="#0b0f14" />
+  <meta name="application-name" content="DIMI Check" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <script>
+    (function () {
+      try {
+        const raw = localStorage.getItem('dimicheck:settings');
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed.theme === 'light' || parsed.theme === 'dark') {
+          document.documentElement.dataset.theme = parsed.theme;
+        } else {
+          delete document.documentElement.dataset.theme;
+        }
+      } catch (err) {
+        console.warn('[Theme] preload failed', err);
+      }
+    })();
+  </script>
+  <script defer src="/js/pwa.js"></script>
+  <script defer src="/js/preferences.js"></script>
+  <title>계정 관리 - DIMI Check</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/src/favicon/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/src/favicon/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/src/favicon/favicon-16x16.png" />
   <style>
     :root {
-      --bg: #070b12;
-      --bg-soft: #0f1624;
-      --card: rgba(255, 255, 255, 0.07);
-      --line: rgba(255, 255, 255, 0.13);
-      --text: #f2f6ff;
-      --muted: #a8b3cf;
-      --accent: #58d0ff;
-      --accent-2: #5cffb1;
-      --warn: #ffcf72;
-      --danger: #ff8f8f;
-      --shadow: 0 22px 48px rgba(0, 0, 0, 0.45);
-      --radius: 18px;
+      --bg: #0f1319;
+      --bg-2: #151a22;
+      --card: rgba(20, 25, 33, 0.94);
+      --card-2: rgba(25, 31, 41, 0.96);
+      --surface: rgba(29, 36, 47, 0.92);
+      --surface-soft: rgba(255, 255, 255, 0.05);
+      --text: #f3f6fb;
+      --muted: #bcc7d6;
+      --primary: #d04fff;
+      --primary-2: #ff6ad0;
+      --success: #46d39a;
+      --success-soft: rgba(70, 211, 154, 0.14);
+      --warn: #ffce6a;
+      --warn-soft: rgba(255, 206, 106, 0.14);
+      --danger: #ff6b6b;
+      --danger-2: #ff3b7a;
+      --danger-soft: rgba(255, 107, 107, 0.12);
+      --ring: 0 0 0 5px color-mix(in oklab, var(--primary) 22%, transparent);
+      --shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+      --border: rgba(255, 255, 255, 0.12);
+      --nav-bg: rgba(18, 23, 31, 0.94);
+      --radius: 20px;
+      --safe-bottom: 0px;
+    }
+
+    :root[data-theme='light'] {
+      --bg: #f6f8fb;
+      --bg-2: #eef2f8;
+      --card: rgba(255, 255, 255, 0.96);
+      --card-2: rgba(249, 251, 255, 0.98);
+      --surface: rgba(243, 247, 252, 0.96);
+      --surface-soft: rgba(15, 23, 42, 0.035);
+      --text: #0f172a;
+      --muted: #5b6475;
+      --shadow: 0 10px 24px rgba(57, 72, 103, 0.10);
+      --border: rgba(15, 23, 42, 0.10);
+      --nav-bg: rgba(255, 255, 255, 0.95);
+      --success-soft: rgba(40, 167, 123, 0.12);
+      --warn-soft: rgba(255, 179, 0, 0.12);
+      --danger-soft: rgba(255, 107, 107, 0.08);
+    }
+
+    :root[data-theme='dark'] {
+      --bg: #0f1319;
+      --bg-2: #151a22;
+      --card: rgba(20, 25, 33, 0.94);
+      --card-2: rgba(25, 31, 41, 0.96);
+      --surface: rgba(29, 36, 47, 0.92);
+      --surface-soft: rgba(255, 255, 255, 0.05);
+      --text: #f3f6fb;
+      --muted: #bcc7d6;
+      --shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+      --border: rgba(255, 255, 255, 0.12);
+      --nav-bg: rgba(18, 23, 31, 0.94);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme='dark']) {
+        --bg: #f6f8fb;
+        --bg-2: #eef2f8;
+        --card: rgba(255, 255, 255, 0.96);
+        --card-2: rgba(249, 251, 255, 0.98);
+        --surface: rgba(243, 247, 252, 0.96);
+        --surface-soft: rgba(15, 23, 42, 0.035);
+        --text: #0f172a;
+        --muted: #5b6475;
+        --shadow: 0 10px 24px rgba(57, 72, 103, 0.10);
+        --border: rgba(15, 23, 42, 0.10);
+        --nav-bg: rgba(255, 255, 255, 0.95);
+        --success-soft: rgba(40, 167, 123, 0.12);
+        --warn-soft: rgba(255, 179, 0, 0.12);
+        --danger-soft: rgba(255, 107, 107, 0.08);
+      }
+    }
+
+    @media (max-width: 1024px), (hover: none) and (pointer: coarse) {
+      :root {
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+      }
     }
 
     * {
@@ -38,259 +133,575 @@
 
     body {
       margin: 0;
-      font-family: 'Pretendard', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      color: var(--text);
       min-height: 100vh;
-      background:
-        radial-gradient(900px 560px at -10% -15%, #2d8cff30, transparent 65%),
-        radial-gradient(800px 520px at 110% 10%, #33ffbf24, transparent 60%),
-        linear-gradient(160deg, var(--bg), var(--bg-soft));
-      padding: 32px 14px 80px;
+      font-family: 'Pretendard', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      padding-bottom: 120px;
+    }
+
+    .blob-container {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      z-index: -1;
+      background: radial-gradient(900px 620px at 10% -10%, #5a6cff18, transparent 60%),
+        radial-gradient(900px 620px at 110% 10%, #ff009018, transparent 62%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+    }
+
+    .blob {
+      position: absolute;
+      filter: blur(18px);
+      opacity: 0.32;
+      pointer-events: none;
+    }
+
+    .b1 {
+      width: 48vw;
+      height: 48vw;
+      background: radial-gradient(circle, #ff6a6a60, transparent 70%);
+      top: -10vh;
+      left: -10vw;
+      animation: float 18s ease-in-out infinite;
+    }
+
+    .b2 {
+      width: 42vw;
+      height: 42vw;
+      background: radial-gradient(circle, #038b2550, transparent 70%);
+      bottom: -15vh;
+      right: -10vw;
+      animation: float 22s ease-in-out infinite reverse;
+    }
+
+    .b3 {
+      width: 36vw;
+      height: 36vw;
+      background: radial-gradient(circle, #ff6ae950, transparent 70%);
+      top: 40vh;
+      left: 10vw;
+      animation: float 26s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-20px); }
     }
 
     main {
-      width: min(860px, 100%);
+      width: min(960px, 92vw);
       margin: 0 auto;
-      display: grid;
+      padding: 40px 0 32px;
+      display: flex;
+      flex-direction: column;
       gap: 16px;
     }
 
     .card {
-      background: var(--card);
+      background: linear-gradient(180deg, var(--card), var(--card-2));
       border-radius: var(--radius);
-      border: 1px solid var(--line);
+      padding: 24px;
       box-shadow: var(--shadow);
-      backdrop-filter: blur(8px);
-      padding: 22px;
+      border: 1px solid var(--border);
     }
 
-    .hero h1 {
-      margin: 0 0 8px;
-      font-size: clamp(26px, 4.5vw, 34px);
+    .hero {
+      display: grid;
+      gap: 14px;
     }
 
-    .muted {
-      color: var(--muted);
+    .page-title {
       margin: 0;
+      font-size: clamp(24px, 5vw, 36px);
+      font-weight: 800;
     }
 
+    .page-desc {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .header-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .pill-link,
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .pill-link {
+      color: var(--text);
+      border: 1px solid color-mix(in oklab, var(--text) 15%, transparent);
+      background: color-mix(in oklab, var(--surface) 82%, transparent);
+    }
+
+    .pill-link.primary {
+      color: #fff;
+      border: none;
+      background: linear-gradient(135deg, var(--primary), var(--primary-2));
+      box-shadow: 0 15px 30px rgba(208, 79, 255, 0.2);
+    }
+
+    .top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .section-subtitle {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .chip {
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .chip.ok {
+      color: color-mix(in oklab, #0f172a 60%, #ffffff);
+      background: color-mix(in oklab, var(--success) 72%, white 28%);
+    }
+
+    .chip.locked {
+      color: #3a2400;
+      background: var(--warn);
+    }
+
+    .profile-grid,
     .meta-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
-      margin-top: 14px;
+      margin-top: 16px;
     }
 
-    .meta-item {
-      background: rgba(0, 0, 0, 0.25);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 14px;
-      padding: 12px;
+    .info-item {
+      border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      border-radius: 16px;
+      padding: 14px 16px;
+      background: var(--surface-soft);
+      display: grid;
+      gap: 6px;
     }
 
-    .meta-item .label {
-      display: block;
+    .info-item .label {
       color: var(--muted);
       font-size: 12px;
-      margin-bottom: 4px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
     }
 
-    .meta-item .value {
-      font-weight: 600;
+    .info-item .value {
+      font-size: 15px;
+      font-weight: 700;
       word-break: break-word;
     }
 
-    .row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-
-    .chip {
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      border-radius: 999px;
-      padding: 6px 10px;
+    .notice {
+      margin-top: 16px;
+      border-radius: 16px;
+      padding: 14px 16px;
+      font-size: 14px;
+      line-height: 1.55;
       border: 1px solid transparent;
     }
 
-    .chip.ok {
-      color: #0b2716;
-      background: #70f6be;
-      border-color: #70f6be;
-    }
-
-    .chip.locked {
-      color: #2a1704;
-      background: var(--warn);
-      border-color: var(--warn);
-    }
-
-    h2 {
-      margin: 0;
-      font-size: 20px;
-    }
-
-    .notice {
-      margin: 14px 0;
-      border-radius: 12px;
-      padding: 12px 14px;
-      font-size: 14px;
-      line-height: 1.45;
-    }
-
     .notice.ok {
-      background: rgba(92, 255, 177, 0.14);
-      color: #b9ffe0;
-      border: 1px solid rgba(92, 255, 177, 0.4);
+      background: var(--success-soft);
+      border-color: color-mix(in oklab, var(--success) 38%, transparent);
+      color: color-mix(in oklab, var(--success) 78%, white 22%);
     }
 
     .notice.warn {
-      background: rgba(255, 207, 114, 0.14);
-      color: #ffe0ab;
-      border: 1px solid rgba(255, 207, 114, 0.35);
+      background: var(--warn-soft);
+      border-color: color-mix(in oklab, var(--warn) 38%, transparent);
+      color: color-mix(in oklab, var(--warn) 78%, white 22%);
+    }
+
+    .notice.danger {
+      background: var(--danger-soft);
+      border-color: color-mix(in oklab, var(--danger) 36%, transparent);
+      color: color-mix(in oklab, var(--danger) 78%, white 22%);
     }
 
     .form-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      margin-top: 8px;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
     }
 
     label {
-      display: block;
       font-size: 13px;
       color: var(--muted);
-      margin: 0 0 6px;
+      font-weight: 600;
     }
 
-    input {
+    .text-field {
       width: 100%;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      background: rgba(0, 0, 0, 0.26);
+      border-radius: 14px;
+      padding: 12px 14px;
+      border: 1px solid color-mix(in oklab, var(--text) 16%, transparent);
+      background: var(--surface-soft);
       color: var(--text);
-      padding: 12px;
       font-size: 15px;
+      font-family: inherit;
       outline: none;
     }
 
-    input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(88, 208, 255, 0.2);
+    .text-field:focus {
+      border-color: color-mix(in oklab, var(--primary) 40%, transparent);
+      box-shadow: var(--ring);
     }
 
-    input:disabled {
+    .text-field:disabled {
       opacity: 0.58;
       cursor: not-allowed;
     }
 
-    .submit-btn {
-      margin-top: 12px;
-      width: 100%;
-      border: none;
-      border-radius: 12px;
-      padding: 13px 16px;
-      color: #031725;
-      font-weight: 700;
-      font-size: 15px;
-      background: linear-gradient(135deg, #66e2ff, #5cffb1);
-      cursor: pointer;
+    .button-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
     }
 
-    .submit-btn:disabled {
-      background: linear-gradient(135deg, #5b6a7e, #49586b);
-      color: #d7e0ed;
+    button,
+    .btn {
+      border: none;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-weight: 700;
+      font-size: 15px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: transform .2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow .2s ease, opacity .2s ease;
+    }
+
+    button:active,
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    button.primary,
+    .btn.primary {
+      background: linear-gradient(135deg, var(--primary), var(--primary-2));
+      color: #fff;
+      box-shadow: 0 15px 30px rgba(208, 79, 255, 0.24);
+    }
+
+    button.ghost,
+    .btn.ghost {
+      border: 1px solid color-mix(in oklab, var(--text) 15%, transparent);
+      background: transparent;
+      color: var(--text);
+    }
+
+    button.danger,
+    .btn.danger {
+      background: linear-gradient(135deg, var(--danger), var(--danger-2));
+      color: #fff;
+      border: 1px solid color-mix(in oklab, var(--danger) 48%, transparent);
+      box-shadow: 0 15px 30px rgba(255, 59, 122, 0.22);
+    }
+
+    button:disabled,
+    .btn:disabled {
+      opacity: 0.5;
       cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
     }
 
     .status-text {
-      margin-top: 12px;
+      margin: 12px 0 0;
+      min-height: 1.4em;
       font-size: 14px;
-    }
-
-    .status-text.error {
-      color: var(--danger);
+      color: var(--muted);
     }
 
     .status-text.ok {
-      color: var(--accent-2);
+      color: color-mix(in oklab, var(--success) 78%, white 22%);
     }
 
-    .quick-links {
-      margin: 0;
+    .status-text.error {
+      color: color-mix(in oklab, var(--danger) 78%, white 22%);
+    }
+
+    .danger-card {
+      border: 1px solid color-mix(in oklab, var(--danger) 26%, var(--border));
+      background: linear-gradient(180deg, rgba(255, 107, 107, 0.10), rgba(255, 59, 122, 0.04));
+    }
+
+    .danger-card ul {
+      margin: 16px 0 0;
       padding-left: 18px;
+      color: var(--muted);
+      display: grid;
+      gap: 8px;
+      line-height: 1.55;
+      font-size: 14px;
     }
 
-    .quick-links a {
-      color: #9fe3ff;
+    .danger-confirm {
+      margin-top: 18px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .action-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .action-card {
+      display: grid;
+      gap: 8px;
+      border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
+      border-radius: 16px;
+      padding: 16px;
+      background: var(--surface-soft);
       text-decoration: none;
+      color: inherit;
     }
 
-    .quick-links a:hover {
-      text-decoration: underline;
+    .action-card small {
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .login-card {
+      text-align: center;
+    }
+
+    .login-card p {
+      color: var(--muted);
+      line-height: 1.6;
+      margin: 0 0 16px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 18px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.78);
+      color: #fff;
+      font-size: 14px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      z-index: 1100;
+    }
+
+    .toast.show {
+      opacity: 1;
+    }
+
+    .bottom-nav {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(480px, calc(100% - 32px));
+      height: 68px;
+      padding: 8px 12px calc(8px + var(--safe-bottom));
+      display: flex;
+      background: var(--nav-bg);
+      backdrop-filter: saturate(180%) blur(20px);
+      border-radius: 24px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      z-index: 1000;
+    }
+
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 8px 4px;
+      border-radius: 16px;
+      transition: all .25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .nav-item:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, .06);
+    }
+
+    .nav-item.active {
+      color: var(--primary);
+      background: color-mix(in oklab, var(--primary) 12%, transparent);
+    }
+
+    .nav-item svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .fade-up {
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+      filter: blur(8px);
+      animation: rise .7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    .fade-up:nth-child(1) { animation-delay: .1s; }
+    .fade-up:nth-child(2) { animation-delay: .18s; }
+    .fade-up:nth-child(3) { animation-delay: .26s; }
+    .fade-up:nth-child(4) { animation-delay: .34s; }
+    .fade-up:nth-child(5) { animation-delay: .42s; }
+
+    @keyframes rise {
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+      }
     }
 
     @media (max-width: 720px) {
-      body {
-        padding-top: 20px;
+      main {
+        width: min(100%, calc(100vw - 24px));
+        padding-top: 24px;
       }
+
       .card {
-        padding: 16px;
+        padding: 18px;
       }
-      .meta-grid {
-        grid-template-columns: 1fr;
-      }
+
+      .profile-grid,
+      .meta-grid,
+      .action-grid,
       .form-grid {
         grid-template-columns: 1fr;
+      }
+
+      .button-row > * {
+        width: 100%;
+      }
+
+      .header-links {
+        flex-direction: column;
+      }
+
+      .pill-link {
+        width: 100%;
       }
     }
   </style>
 </head>
 <body>
+  <div class="blob-container" aria-hidden="true">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
+
   <main>
-    <section class="card hero">
-      <h1>계정 관리</h1>
-      <p class="muted">학번 정보는 매년 2월 20일~다음 해 2월 19일 주기에서 1회만 수정할 수 있습니다.</p>
+    <section class="card hero fade-up">
+      <div>
+        <h1 class="page-title">계정 관리</h1>
+        <p class="page-desc">DIMI Check의 계정 정보, 로그인 상태, 빠른 작업을 한 곳에서 관리하세요. 학번 정보는 매년 2월 20일부터 다음 해 2월 19일까지 1회만 수정할 수 있습니다.</p>
+      </div>
+      <div class="header-links">
+        <a class="pill-link" href="/my.html">← 마이 페이지로 돌아가기</a>
+        {% if user %}
+        <a class="pill-link primary" href="/console.html">개발자 콘솔</a>
+        {% endif %}
+      </div>
     </section>
 
     {% if not user %}
-      <section class="card">
-        <p>{{ error or '로그인이 필요합니다. ' }}<a href="/login.html">로그인 페이지</a>로 이동하세요.</p>
+      <section class="card login-card fade-up">
+        <h2 class="section-title">로그인이 필요합니다</h2>
+        <p>{{ error or '계정 관리에 접근하려면 먼저 로그인해야 합니다.' }}</p>
+        <a class="btn primary" href="/login.html">로그인 페이지로 이동</a>
       </section>
     {% else %}
-      <section class="card">
-        <div class="row">
-          <h2>기본 정보</h2>
+      <section class="card fade-up">
+        <div class="top-row">
+          <div>
+            <h2 class="section-title">기본 정보</h2>
+            <p class="section-subtitle">현재 계정 상태와 다음 수정 가능 시점을 확인할 수 있어요.</p>
+          </div>
           <span id="editStateValue" class="chip {{ 'ok' if can_edit else 'locked' }}">{{ '수정 가능' if can_edit else '이번 주기 수정 완료' }}</span>
         </div>
         <div class="meta-grid">
-          <div class="meta-item">
+          <div class="info-item">
             <span class="label">이메일</span>
             <span class="value">{{ user.email }}</span>
           </div>
-          <div class="meta-item">
+          <div class="info-item">
+            <span class="label">현재 학번</span>
+            <span class="value">{{ user.grade or '-' }}학년 {{ user.class_no or '-' }}반 {{ user.number or '-' }}번</span>
+          </div>
+          <div class="info-item">
             <span class="label">로그인 유지</span>
             <span class="value">{{ '사용 중' if remember_enabled else '사용 안 함' }}</span>
           </div>
-          <div class="meta-item">
+          <div class="info-item">
             <span class="label">마지막 수정</span>
-            <span id="lastUpdateValue" class="value">{{ (last_update.strftime('%Y-%m-%d %H:%M') if last_update else '없음') }}</span>
+            <span id="lastUpdateValue" class="value">{{ last_update.strftime('%Y-%m-%d %H:%M') if last_update else '없음' }}</span>
           </div>
-          <div class="meta-item">
+          <div class="info-item">
             <span class="label">다음 변경 가능일</span>
-            <span id="nextChangeValue" class="value">{{ ('지금' if can_edit else next_change.strftime('%Y-%m-%d')) }}</span>
+            <span id="nextChangeValue" class="value">{{ '지금' if can_edit else next_change.strftime('%Y-%m-%d') }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">바로 가기</span>
+            <span class="value">로그아웃, 회원 탈퇴, API 콘솔</span>
           </div>
         </div>
       </section>
 
-      <section class="card">
-        <h2>학번 변경</h2>
-        <p class="muted" style="margin-top:8px;">학년/반/번호만 입력하면 됩니다. 이름은 저장하지 않습니다.</p>
+      <section class="card fade-up">
+        <div class="top-row">
+          <div>
+            <h2 class="section-title">학번 변경</h2>
+            <p class="section-subtitle">학년/반/번호만 저장하며 이름은 별도로 저장하지 않습니다.</p>
+          </div>
+        </div>
         <p id="windowNotice" class="notice {{ 'ok' if can_edit else 'warn' }}">
           {% if can_edit %}
             현재 주기에서 수정 가능합니다. 저장하면 다음 주기 시작일(2월 20일)까지 다시 수정할 수 없습니다.
@@ -302,31 +713,87 @@
           <div class="form-grid">
             <div class="field">
               <label for="grade">학년</label>
-              <input id="grade" name="grade" type="number" min="1" max="3" value="{{ user.grade or '' }}" {% if not can_edit %}disabled{% endif %} required />
+              <input id="grade" name="grade" class="text-field" type="number" min="1" max="3" value="{{ user.grade or '' }}" {% if not can_edit %}disabled{% endif %} required />
             </div>
             <div class="field">
               <label for="class">반</label>
-              <input id="class" name="class" type="number" min="1" max="10" value="{{ user.class_no or '' }}" {% if not can_edit %}disabled{% endif %} required />
+              <input id="class" name="class" class="text-field" type="number" min="1" max="10" value="{{ user.class_no or '' }}" {% if not can_edit %}disabled{% endif %} required />
             </div>
             <div class="field">
               <label for="number">번호</label>
-              <input id="number" name="number" type="number" min="1" max="40" value="{{ user.number or '' }}" {% if not can_edit %}disabled{% endif %} required />
+              <input id="number" name="number" class="text-field" type="number" min="1" max="40" value="{{ user.number or '' }}" {% if not can_edit %}disabled{% endif %} required />
             </div>
           </div>
-          <button id="submitButton" class="submit-btn" type="submit" {% if not can_edit %}disabled{% endif %}>학번 정보 업데이트</button>
+          <div class="button-row">
+            <button id="submitButton" class="primary" type="submit" {% if not can_edit %}disabled{% endif %}>학번 정보 업데이트</button>
+          </div>
         </form>
-        <p id="accountStatus" class="status-text muted"></p>
+        <p id="accountStatus" class="status-text"></p>
       </section>
 
-      <section class="card">
-        <h2>빠른 작업</h2>
-        <ul class="quick-links">
-          <li><a href="/console.html">Public API 콘솔</a></li>
-          <li><a href="/auth/logout">로그아웃</a></li>
+      <section class="card fade-up">
+        <h2 class="section-title">빠른 작업</h2>
+        <p class="section-subtitle">계정 관련 작업을 빠르게 이동하거나 실행할 수 있어요.</p>
+        <div class="action-grid">
+          <a class="action-card" href="/console.html">
+            <strong>Public API 콘솔</strong>
+            <small>발급된 키, OAuth 클라이언트, 사용량을 확인합니다.</small>
+          </a>
+          <button type="button" id="logoutBtn" class="ghost action-card" style="text-align:left;">
+            <strong>로그아웃</strong>
+            <small>다른 계정으로 접속하려면 현재 로그인 세션을 종료하세요.</small>
+          </button>
+        </div>
+      </section>
+
+      <section class="card danger-card fade-up">
+        <div class="top-row">
+          <div>
+            <h2 class="section-title">회원 탈퇴</h2>
+            <p class="section-subtitle">탈퇴하면 주요 개인 데이터와 로그인 상태가 삭제되며, 되돌릴 수 없습니다.</p>
+          </div>
+        </div>
+        <ul>
+          <li>내 프로필, 자동 로그인, API 키, 개인 설정 연동 정보가 함께 삭제됩니다.</li>
+          <li>닉네임/아바타, 급식 투표, 읽음/반응 등 개인 기록도 정리됩니다.</li>
+          <li>정말 떠날 때만 진행하고, 필요하면 먼저 로그아웃 대신 세션 종료를 고려하세요.</li>
         </ul>
+        <div class="danger-confirm">
+          <label for="deleteConfirmInput">확인을 위해 아래 칸에 <strong>탈퇴</strong>를 정확히 입력하세요.</label>
+          <input type="text" id="deleteConfirmInput" class="text-field" maxlength="10" placeholder="탈퇴" autocomplete="off" />
+          <div class="button-row">
+            <button type="button" id="deleteAccountBtn" class="danger" disabled>회원 탈퇴</button>
+          </div>
+          <p id="deleteStatus" class="status-text"></p>
+        </div>
       </section>
     {% endif %}
   </main>
+
+  <nav class="bottom-nav" aria-label="하단 내비게이션">
+    <a href="/schoollife.html" class="nav-item">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 1 9l4 2.18v6.32L12 21l7-3.5V11.18L23 9 12 3zm0 2.69L17.53 9 12 11.31 6.47 9 12 5.69zM18 17.18l-5 2.5v-5.81l5-2.5v5.81z"/></svg>
+      <span>학교생활</span>
+    </a>
+    <a href="/routine.html" class="nav-item">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H4a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1Zm13 8H4v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9ZM6 7h12V6H6v1Z"/></svg>
+      <span>루틴</span>
+    </a>
+    <a href="/user.html" class="nav-item">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5z"/></svg>
+      <span>홈</span>
+    </a>
+    <a href="/chat.html" class="nav-item">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+      <span>채팅</span>
+    </a>
+    <a href="/my.html" class="nav-item active" aria-current="page">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-3.33 0-10 1.67-10 5v3h20v-3c0-3.33-6.67-5-10-5z"/></svg>
+      <span>마이</span>
+    </a>
+  </nav>
+
+  <div id="accountToast" class="toast" role="status" aria-live="polite"></div>
 
   {% if user %}
   <script>
@@ -337,6 +804,22 @@
     const lastUpdateValue = document.getElementById('lastUpdateValue');
     const nextChangeValue = document.getElementById('nextChangeValue');
     const windowNotice = document.getElementById('windowNotice');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const deleteConfirmInput = document.getElementById('deleteConfirmInput');
+    const deleteAccountBtn = document.getElementById('deleteAccountBtn');
+    const deleteStatus = document.getElementById('deleteStatus');
+    const toast = document.getElementById('accountToast');
+    let toastTimer = null;
+
+    const showToast = (message) => {
+      if (!toast || !message) return;
+      toast.textContent = message;
+      toast.classList.add('show');
+      window.clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2200);
+    };
 
     const formatKstDate = (value) => {
       if (!value) return '지금';
@@ -361,13 +844,11 @@
     };
 
     const setEditable = (editable) => {
-      if (!form) return;
-      form.querySelectorAll('input').forEach((el) => {
+      form?.querySelectorAll('input').forEach((el) => {
+        if (el === deleteConfirmInput) return;
         el.disabled = !editable;
       });
-      if (submitBtn) {
-        submitBtn.disabled = !editable;
-      }
+      if (submitBtn) submitBtn.disabled = !editable;
       if (editStateValue) {
         editStateValue.textContent = editable ? '수정 가능' : '이번 주기 수정 완료';
         editStateValue.classList.toggle('ok', editable);
@@ -381,10 +862,65 @@
       }
     };
 
+    logoutBtn?.addEventListener('click', () => {
+      window.location.href = '/auth/logout';
+    });
+
+    deleteConfirmInput?.addEventListener('input', () => {
+      const value = deleteConfirmInput.value.trim();
+      if (deleteStatus) {
+        deleteStatus.className = 'status-text';
+        deleteStatus.textContent = value && value !== '탈퇴' ? "'탈퇴'를 정확히 입력해야 버튼이 활성화됩니다." : '';
+      }
+      if (deleteAccountBtn) {
+        deleteAccountBtn.disabled = value !== '탈퇴';
+      }
+    });
+
+    deleteAccountBtn?.addEventListener('click', async () => {
+      const confirmation = deleteConfirmInput?.value?.trim() || '';
+      if (confirmation !== '탈퇴') {
+        showToast("'탈퇴'를 정확히 입력해주세요.");
+        return;
+      }
+
+      const confirmed = window.confirm('회원 탈퇴를 진행할까요?\n저장된 개인 데이터와 로그인 상태가 삭제되며 되돌릴 수 없습니다.');
+      if (!confirmed) return;
+
+      deleteStatus.className = 'status-text';
+      deleteStatus.textContent = '탈퇴 처리 중...';
+      deleteAccountBtn.disabled = true;
+      deleteAccountBtn.textContent = '탈퇴 처리 중...';
+
+      try {
+        const res = await fetch('/account/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ confirmation }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.message || data?.error || '회원 탈퇴에 실패했습니다.');
+        }
+
+        deleteStatus.className = 'status-text ok';
+        deleteStatus.textContent = '회원 탈퇴가 완료되었습니다. 로그인 페이지로 이동합니다.';
+        window.location.replace(data?.redirect || '/login.html?deleted=1');
+      } catch (error) {
+        console.error('[Account] Failed to delete account.', error);
+        deleteStatus.className = 'status-text error';
+        deleteStatus.textContent = error.message || '회원 탈퇴에 실패했습니다.';
+        deleteAccountBtn.disabled = false;
+        deleteAccountBtn.textContent = '회원 탈퇴';
+      }
+    });
+
     if (form) {
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
-        statusEl.className = 'status-text muted';
+        statusEl.className = 'status-text';
         statusEl.textContent = '저장 중...';
         try {
           const payload = new FormData(form);
@@ -410,6 +946,7 @@
           statusEl.textContent = data.can_edit
             ? '업데이트되었습니다.'
             : `업데이트되었습니다. 다음 변경 가능일: ${formatKstDate(data.next_change)}`;
+          showToast('학번 정보가 저장되었습니다.');
         } catch (err) {
           statusEl.className = 'status-text error';
           statusEl.textContent = err.message || '오류가 발생했습니다.';

@@ -108,6 +108,37 @@ def test_account_delete_requires_confirmation(account_app):
     assert response.get_json()["error"] == "confirmation_required"
 
 
+def test_account_page_renders_delete_section(account_app):
+    from extensions import db
+    from models import User, UserType
+
+    with account_app.app_context():
+        user = User(email="student@example.com", name="", type=UserType.STUDENT, grade=1, class_no=1, number=1)
+        db.session.add(user)
+        db.session.commit()
+        user_id = user.id
+
+    client = account_app.test_client()
+    with client.session_transaction() as session_state:
+        session_state["user"] = {
+            "id": user_id,
+            "email": "student@example.com",
+            "type": "student",
+            "grade": 1,
+            "section": 1,
+            "number": 1,
+        }
+
+    response = client.get("/account")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "계정 관리" in html
+    assert "회원 탈퇴" in html
+    assert "deleteConfirmInput" in html
+    assert "로그아웃" in html
+
+
 def test_account_delete_purges_user_and_student_scoped_data(account_app):
     from extensions import db
     from models import (

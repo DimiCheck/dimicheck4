@@ -1,9 +1,11 @@
 import importlib
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sys
 
 import gspread
 import pytest
+import requests
 from prometheus_client import REGISTRY
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -65,6 +67,43 @@ def test_static_html_pages_are_not_shadowed_by_short_code_route(monkeypatch):
     for path in ["/schoollife.html", "/routine.html", "/my.html", "/qrandseats.html"]:
         response = client.get(path)
         assert response.status_code == 200, path
+
+
+def test_schoollife_meal_offset_returns_tomorrows_menu(monkeypatch):
+    app = _load_app(monkeypatch)
+    client = app.test_client()
+    calls = []
+
+    class _FakeMealResponse:
+        def __init__(self, date_text):
+            self._date_text = date_text
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "date": self._date_text,
+                "data": {
+                    "breakfast": {"regular": ["아침 메뉴"]},
+                    "lunch": {"regular": ["점심 메뉴"]},
+                    "dinner": {"regular": ["저녁 메뉴"]},
+                },
+            }
+
+    def fake_get(url, *args, **kwargs):
+        calls.append(url)
+        date_text = url.rstrip("/").rsplit("/", 1)[-1]
+        return _FakeMealResponse(date_text)
+
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    response = client.get("/api/classes/schoollife/meal?offset=1")
+
+    expected_date = (datetime.now(timezone(timedelta(hours=9))).date() + timedelta(days=1)).strftime("%Y-%m-%d")
+    assert response.status_code == 200
+    assert response.get_json()["date"] == expected_date
+    assert calls[-1].endswith(f"/{expected_date}")
 
 
 @pytest.fixture
