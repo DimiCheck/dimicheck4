@@ -1,6 +1,11 @@
 {
   "wallpapers": [
     {
+      "id": "rickroll",
+      "name": "YOU GOT RICKROLLED",
+      "url": "https://i.namu.wiki/i/bLBrKBQHNepl0oCvCDNqyKJpTYwc2Kow7Hy-q_5asuSrBfCn875WPM4ToUttTTb8fIioSSslxrdMmj7zcRQvYg.gif"
+    },
+    {
       "id": "new-year-2026",
       "name": "불꽃축제",
       "url": "https://cdn.pixabay.com/photo/2015/08/07/15/47/fireworks-879461_1280.jpg"
