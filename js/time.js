@@ -44,6 +44,10 @@ const POST_SUNEUNG_START_DAY = 14;
 const POST_SUNEUNG_OFFSET_MINUTES = 10;
 const POST_SUNEUNG_MESSAGE_TEXT = '10분 더 해라';
 const POST_SUNEUNG_HOLD_VALUE = '10';
+const APRIL_FOOLS_MONTH = 3; // 0-indexed (4월)
+const APRIL_FOOLS_DAY = 1;
+const APRIL_FOOLS_SESSION_SCALE_MS = 4 * 60 * 1000;
+const APRIL_FOOLS_SESSION_START_REAL_MS = Date.now();
 
 const WEEKDAY_PHASES = Object.freeze([
   { label: '아침 시간',    startMin: 0,              endMin: 8*60 + 15 },
@@ -95,6 +99,54 @@ const DEFAULT_PHASE_CONFIG = {
 let phaseConfig = { default: DEFAULT_PHASE_CONFIG, grades: {} };
 let phaseConfigPromise = null;
 const PHASE_CONFIG_URL = '/timetable-phases.json';
+let aprilFoolsBanyaPlayedKey = null;
+let aprilFoolsBanyaAudio = null;
+
+function isAprilFoolsDay(now) {
+  return now.getMonth() === APRIL_FOOLS_MONTH && now.getDate() === APRIL_FOOLS_DAY;
+}
+
+function getDisplayedClockTime(now) {
+  if (!isAprilFoolsDay(now)) {
+    return now;
+  }
+
+  const sessionElapsedMs = Math.max(0, now.getTime() - APRIL_FOOLS_SESSION_START_REAL_MS);
+  const extraMs = Math.round((sessionElapsedMs * sessionElapsedMs) / APRIL_FOOLS_SESSION_SCALE_MS);
+  return new Date(now.getTime() + extraMs);
+}
+
+function isEndPhaseLabel(label) {
+  return label === '끝.' || label === '끝';
+}
+
+function playAprilFoolsBanya(now) {
+  if (!isAprilFoolsDay(now)) {
+    return;
+  }
+
+  const dayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+  if (aprilFoolsBanyaPlayedKey === dayKey) {
+    return;
+  }
+  aprilFoolsBanyaPlayedKey = dayKey;
+
+  try {
+    if (!aprilFoolsBanyaAudio) {
+      aprilFoolsBanyaAudio = new Audio('/banya.mp3');
+      aprilFoolsBanyaAudio.preload = 'auto';
+    }
+    aprilFoolsBanyaAudio.currentTime = 0;
+    const playResult = aprilFoolsBanyaAudio.play();
+    if (playResult && typeof playResult.catch === 'function') {
+      playResult.catch((error) => {
+        console.warn('[AprilFools] Failed to play banya.mp3', error);
+      });
+    }
+  } catch (error) {
+    console.warn('[AprilFools] Failed to initialize banya.mp3', error);
+  }
+}
 
 function parseTimeToMinutes(value) {
   if (typeof value === 'number') {
@@ -764,9 +816,10 @@ function checkRoutinePrompts(now) {
 
 function updateClock() {
   const now = new Date();
-  const hourNumber = now.getHours();
-  const minuteNumber = now.getMinutes();
-  const secondNumber = now.getSeconds();
+  const displayNow = getDisplayedClockTime(now);
+  const hourNumber = displayNow.getHours();
+  const minuteNumber = displayNow.getMinutes();
+  const secondNumber = displayNow.getSeconds();
 
   checkAutoReturn(now);
   checkRoutinePrompts(now);
@@ -782,7 +835,7 @@ function updateClock() {
   const days = ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
   const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
   document.getElementById('date').textContent =
-    `${months[now.getMonth()]} ${now.getDate()}일 ${days[now.getDay()]}`;
+    `${months[displayNow.getMonth()]} ${displayNow.getDate()}일 ${days[displayNow.getDay()]}`;
 
   // ===== 2) 아날로그 바늘 =====
   const hoursDeg = (hourNumber % 12) * 30 + (minuteNumber * 0.5);
@@ -806,13 +859,16 @@ function updateClock() {
   const pb = document.getElementById('progressbar');
   if (pb) pb.max = 100;
 
-  const curMin = hourNumber * 60 + minuteNumber;
+  const actualHourNumber = now.getHours();
+  const actualMinuteNumber = now.getMinutes();
+  const actualSecondNumber = now.getSeconds();
+  const curMin = actualHourNumber * 60 + actualMinuteNumber;
   let phase = null;
   for (const p of phases) {
     if (curMin >= p.startMin && curMin < p.endMin) { phase = p; break; }
   }
 
-  const countdownState = getCountdownState(now, hourNumber, minuteNumber, secondNumber);
+  const countdownState = getCountdownState(now, actualHourNumber, actualMinuteNumber, actualSecondNumber);
   const countdownActive = countdownState.type !== 'none';
 
   // ===== 4) 특수 카운트다운 & 상태 텍스트 =====
@@ -824,7 +880,7 @@ function updateClock() {
     tstatEl.textContent = phase ? phase.label : '';
   }
 
-  if (phase && phase.label === '끝.') {
+  if (phase && isEndPhaseLabel(phase.label)) {
     // 하루 종료 연출 (한 번만)
     if (typeof isfired !== 'undefined' && isfired === 0) {
       isfired = 1;
@@ -834,6 +890,7 @@ function updateClock() {
         fireworks.start();
       }
     }
+    playAprilFoolsBanya(now);
   }
 
   // ===== 6) 프로그레스 바(구간 진행률) =====
@@ -844,7 +901,7 @@ function updateClock() {
       pb.title = '';
       pb.style.setProperty('--p', 0); 
     } else {
-      const nowSec   = hourNumber * 3600 + minuteNumber * 60 + secondNumber;
+      const nowSec   = actualHourNumber * 3600 + actualMinuteNumber * 60 + actualSecondNumber;
       const startSec = phase.startMin * 60;
       const endSec   = phase.endMin * 60;
 
