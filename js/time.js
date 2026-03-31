@@ -48,6 +48,7 @@ const APRIL_FOOLS_MONTH = 3; // 0-indexed (4월)
 const APRIL_FOOLS_DAY = 1;
 const APRIL_FOOLS_SESSION_SCALE_MS = 4 * 60 * 1000;
 const APRIL_FOOLS_SESSION_START_REAL_MS = Date.now();
+const CLOCK_RENDER_INTERVAL_MS = 50;
 
 const WEEKDAY_PHASES = Object.freeze([
   { label: '아침 시간',    startMin: 0,              endMin: 8*60 + 15 },
@@ -101,6 +102,7 @@ let phaseConfigPromise = null;
 const PHASE_CONFIG_URL = '/timetable-phases.json';
 let aprilFoolsBanyaPlayedKey = null;
 let aprilFoolsBanyaAudio = null;
+let lastSecondHandDeg = null;
 
 function isAprilFoolsDay(now) {
   return now.getMonth() === APRIL_FOOLS_MONTH && now.getDate() === APRIL_FOOLS_DAY;
@@ -820,6 +822,7 @@ function updateClock() {
   const hourNumber = displayNow.getHours();
   const minuteNumber = displayNow.getMinutes();
   const secondNumber = displayNow.getSeconds();
+  const millisecondNumber = displayNow.getMilliseconds();
 
   checkAutoReturn(now);
   checkRoutinePrompts(now);
@@ -838,20 +841,19 @@ function updateClock() {
     `${months[displayNow.getMonth()]} ${displayNow.getDate()}일 ${days[displayNow.getDay()]}`;
 
   // ===== 2) 아날로그 바늘 =====
-  const hoursDeg = (hourNumber % 12) * 30 + (minuteNumber * 0.5);
-  const minutesDeg = minuteNumber * 6 + (secondNumber * 0.1);
-  const secondsDeg = secondNumber * 6;
+  const preciseSeconds = secondNumber + (millisecondNumber / 1000);
+  const preciseMinutes = minuteNumber + (preciseSeconds / 60);
+  const preciseHours = (hourNumber % 12) + (preciseMinutes / 60);
+  const hoursDeg = preciseHours * 30;
+  const minutesDeg = preciseMinutes * 6;
+  const secondsDeg = preciseSeconds * 6;
   document.getElementById('hourHand').style.transform   = `translateX(-50%) rotate(${hoursDeg}deg)`;
   document.getElementById('minuteHand').style.transform = `translateX(-50%) rotate(${minutesDeg}deg)`;
-  document.getElementById('secondHand').style.transform = `translateX(-50%) rotate(${secondsDeg}deg)`;
   const sh = document.getElementById('secondHand');
-  sh.style.transition = 'transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1)';
-  if (secondNumber === 59) { // 59.5초에 베지어 없애고 각도 초기화
-    setTimeout(() => {
-      sh.style.transition = '';
-      sh.style.transform = 'translateX(-50%) rotate(-6deg)';
-    }, 500);
-  }
+  const wrapped = lastSecondHandDeg !== null && secondsDeg + 180 < lastSecondHandDeg;
+  sh.style.transition = wrapped ? 'none' : `transform ${CLOCK_RENDER_INTERVAL_MS}ms linear`;
+  sh.style.transform = `translateX(-50%) rotate(${secondsDeg}deg)`;
+  lastSecondHandDeg = secondsDeg;
 
   // ===== 3) 구간(phase) 정의 & 찾기 =====
   const phases = getPhasesForDate(now);
@@ -1135,7 +1137,7 @@ async function initBoard() {
   updateEtcReasonPanel();
   updateClock();
   document.getElementById('boardNoticePopup')?.addEventListener('click', hideBoardNoticePopup);
-  setInterval(updateClock, 1000);
+  setInterval(updateClock, CLOCK_RENDER_INTERVAL_MS);
   setInterval(() => renderBoardNotices(boardNoticesCache), 1000);
 }
 
