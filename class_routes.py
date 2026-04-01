@@ -1787,6 +1787,8 @@ def get_schoollife_timetable():
         print(f"[TIMETABLE] KST now: {now}, grade: {grade}, section: {section}")
         key = (grade, section)
         cache_entry = _SCHOOLLIFE_CACHE["timetable"].get(key)
+        if cache_entry and _is_same_day(cache_entry["timestamp"], now):
+            return jsonify(cache_entry["data"])
 
         try:
             lessons, max_period = _fetch_timetable_from_api(grade, section)
@@ -1804,7 +1806,7 @@ def get_schoollife_timetable():
         except Exception as e:
             print(f"[TIMETABLE] API fetch error: {e}")
             print(f"[TIMETABLE] Traceback: {traceback.format_exc()}")
-            if cache_entry and _is_same_day(cache_entry.get("timestamp"), now):
+            if cache_entry:
                 return jsonify(cache_entry["data"])
             return jsonify({"error": str(e)}), 500
 
