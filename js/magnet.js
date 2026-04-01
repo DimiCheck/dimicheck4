@@ -1039,7 +1039,9 @@ function updateEtcReasonPanel() {
     if (reason === '!폭죽') {
       const container = document.querySelector('.fireworks');
       if (container && window.Fireworks) {
-        const fireworks = new Fireworks.default(container);
+        const fireworks = window.createBoardFireworks
+          ? window.createBoardFireworks(container)
+          : new Fireworks.default(container);
         fireworks.start();
         setTimeout(() => fireworks.stop(true), 7000);
       }

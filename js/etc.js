@@ -59,7 +59,11 @@ window.saveTimetabledata = saveTimetableData;
     fireworksBtn.addEventListener('click', () => {
       const container = document.querySelector('.fireworks');
       if (!container || !window.Fireworks) return;
-      if (!menuFireworks) menuFireworks = new Fireworks.default(container);
+      if (!menuFireworks) {
+        menuFireworks = window.createBoardFireworks
+          ? window.createBoardFireworks(container)
+          : new Fireworks.default(container);
+      }
       menuFireworks.start();
       if (fwStopTimer) clearTimeout(fwStopTimer);
       fwStopTimer = setTimeout(() => {

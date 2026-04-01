@@ -49,6 +49,11 @@ const APRIL_FOOLS_DAY = 1;
 const APRIL_FOOLS_SESSION_SCALE_MS = 4 * 60 * 1000;
 const APRIL_FOOLS_SESSION_START_REAL_MS = Date.now();
 const CLOCK_RENDER_INTERVAL_MS = 50;
+const APRIL_FOOLS_BSOD_STORAGE_KEY = 'dimicheck:april-fools-bsod';
+const APRIL_FOOLS_BSOD_WINDOWS = Object.freeze([
+  { id: 'evening-1', startMin: 17 * 60 + 20, endMin: 19 * 60 + 40 },
+  { id: 'evening-2', startMin: 20 * 60 + 10, endMin: 22 * 60 + 50 },
+]);
 
 const WEEKDAY_PHASES = Object.freeze([
   { label: '아침 시간',    startMin: 0,              endMin: 8*60 + 15 },
@@ -103,9 +108,72 @@ const PHASE_CONFIG_URL = '/timetable-phases.json';
 let aprilFoolsBanyaPlayedKey = null;
 let aprilFoolsBanyaAudio = null;
 let lastSecondHandDeg = null;
+let aprilFoolsBsodShowTimer = null;
+let aprilFoolsBsodHideTimer = null;
+
+function getRandomInt(min, max) {
+  const lower = Math.ceil(min);
+  const upper = Math.floor(max);
+  return Math.floor(Math.random() * (upper - lower + 1)) + lower;
+}
 
 function isAprilFoolsDay(now) {
   return now.getMonth() === APRIL_FOOLS_MONTH && now.getDate() === APRIL_FOOLS_DAY;
+}
+
+function getFireworksOptions(now = new Date()) {
+  if (!isAprilFoolsDay(now)) {
+    return {};
+  }
+
+  return {
+    intensity: 90,
+    particles: 180,
+    traceSpeed: 20,
+    explosion: 10,
+    traceLength: 6,
+    delay: { min: 6, max: 18 },
+    rocketsPoint: { min: 10, max: 90 },
+  };
+}
+
+window.createBoardFireworks = function createBoardFireworks(container) {
+  if (!container || !window.Fireworks) {
+    return null;
+  }
+  return new Fireworks.default(container, getFireworksOptions(new Date()));
+};
+
+function getAprilFoolsDayKey(now) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function getAprilFoolsBsodState(now = new Date()) {
+  const dayKey = getAprilFoolsDayKey(now);
+  try {
+    const raw = localStorage.getItem(APRIL_FOOLS_BSOD_STORAGE_KEY);
+    if (!raw) {
+      return { dayKey, shownSlots: [] };
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.dayKey !== dayKey) {
+      return { dayKey, shownSlots: [] };
+    }
+    return {
+      dayKey,
+      shownSlots: Array.isArray(parsed.shownSlots) ? parsed.shownSlots : [],
+    };
+  } catch (_) {
+    return { dayKey, shownSlots: [] };
+  }
+}
+
+function setAprilFoolsBsodState(state) {
+  try {
+    localStorage.setItem(APRIL_FOOLS_BSOD_STORAGE_KEY, JSON.stringify(state));
+  } catch (_) {
+    // ignore storage failures
+  }
 }
 
 function getDisplayedClockTime(now) {
@@ -148,6 +216,109 @@ function playAprilFoolsBanya(now) {
   } catch (error) {
     console.warn('[AprilFools] Failed to initialize banya.mp3', error);
   }
+}
+
+function minutesOfCurrentTime(now) {
+  return now.getHours() * 60 + now.getMinutes();
+}
+
+function getNextAprilFoolsBsodWindow(now = new Date()) {
+  const state = getAprilFoolsBsodState(now);
+  const nowMinutes = minutesOfCurrentTime(now);
+  return APRIL_FOOLS_BSOD_WINDOWS.find((windowConfig) => {
+    if (state.shownSlots.includes(windowConfig.id)) {
+      return false;
+    }
+    return nowMinutes < windowConfig.endMin;
+  }) || null;
+}
+
+function hideAprilFoolsBsod({ scheduleNext = true } = {}) {
+  const overlay = document.getElementById('aprilFoolsBsodOverlay');
+  if (overlay) {
+    overlay.hidden = true;
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+
+  if (aprilFoolsBsodHideTimer) {
+    clearTimeout(aprilFoolsBsodHideTimer);
+    aprilFoolsBsodHideTimer = null;
+  }
+
+  if (scheduleNext) {
+    scheduleAprilFoolsBsod();
+  }
+}
+
+function showAprilFoolsBsod() {
+  const now = new Date();
+  if (!isAprilFoolsDay(now)) {
+    return;
+  }
+
+  const state = getAprilFoolsBsodState(now);
+  const activeWindow = APRIL_FOOLS_BSOD_WINDOWS.find((windowConfig) => {
+    const nowMinutes = minutesOfCurrentTime(now);
+    return nowMinutes >= windowConfig.startMin && nowMinutes < windowConfig.endMin;
+  });
+  if (!activeWindow || state.shownSlots.includes(activeWindow.id)) {
+    return;
+  }
+
+  if (document.hidden) {
+    scheduleAprilFoolsBsod();
+    return;
+  }
+
+  const overlay = document.getElementById('aprilFoolsBsodOverlay');
+  if (!overlay) {
+    return;
+  }
+
+  overlay.hidden = false;
+  overlay.setAttribute('aria-hidden', 'false');
+  setAprilFoolsBsodState({
+    dayKey: state.dayKey,
+    shownSlots: [...state.shownSlots, activeWindow.id],
+  });
+
+  const visibleMs = getRandomInt(3500, 7000);
+  aprilFoolsBsodHideTimer = setTimeout(() => {
+    hideAprilFoolsBsod({ scheduleNext: true });
+  }, visibleMs);
+}
+
+function scheduleAprilFoolsBsod() {
+  const now = new Date();
+  if (!isAprilFoolsDay(now)) {
+    return;
+  }
+
+  const nextWindow = getNextAprilFoolsBsodWindow(now);
+  if (!nextWindow) {
+    return;
+  }
+
+  if (aprilFoolsBsodShowTimer) {
+    clearTimeout(aprilFoolsBsodShowTimer);
+  }
+
+  const nowMinutes = minutesOfCurrentTime(now);
+  const currentMsOfDay = ((nowMinutes * 60) + now.getSeconds()) * 1000 + now.getMilliseconds();
+  const startMsOfDay = nextWindow.startMin * 60 * 1000;
+  const endMsOfDay = nextWindow.endMin * 60 * 1000;
+  const earliestMs = Math.max(currentMsOfDay + 15_000, startMsOfDay);
+
+  if (earliestMs >= endMsOfDay) {
+    return;
+  }
+
+  const targetMsOfDay = getRandomInt(earliestMs, endMsOfDay - 1);
+  const nextDelayMs = Math.max(1_000, targetMsOfDay - currentMsOfDay);
+  aprilFoolsBsodShowTimer = setTimeout(() => {
+    aprilFoolsBsodShowTimer = null;
+    showAprilFoolsBsod();
+  }, nextDelayMs);
 }
 
 function parseTimeToMinutes(value) {
@@ -888,7 +1059,9 @@ function updateClock() {
       isfired = 1;
       const container = document.querySelector('.fireworks');
       if (container && window.Fireworks) {
-        const fireworks = new Fireworks.default(container);
+        const fireworks = window.createBoardFireworks
+          ? window.createBoardFireworks(container)
+          : new Fireworks.default(container);
         fireworks.start();
       }
     }
@@ -1135,8 +1308,26 @@ async function initBoard() {
   await loadRoutineData(true);
   updateAttendance();
   updateEtcReasonPanel();
+  document.body.classList.toggle('april-fools-fireworks', isAprilFoolsDay(new Date()));
   updateClock();
   document.getElementById('boardNoticePopup')?.addEventListener('click', hideBoardNoticePopup);
+  if (isAprilFoolsDay(new Date())) {
+    scheduleAprilFoolsBsod();
+    document.addEventListener('visibilitychange', () => {
+      if (!isAprilFoolsDay(new Date())) {
+        return;
+      }
+      if (document.hidden) {
+        hideAprilFoolsBsod({ scheduleNext: false });
+        if (aprilFoolsBsodShowTimer) {
+          clearTimeout(aprilFoolsBsodShowTimer);
+          aprilFoolsBsodShowTimer = null;
+        }
+      } else if (!aprilFoolsBsodShowTimer) {
+        scheduleAprilFoolsBsod();
+      }
+    });
+  }
   setInterval(updateClock, CLOCK_RENDER_INTERVAL_MS);
   setInterval(() => renderBoardNotices(boardNoticesCache), 1000);
 }
