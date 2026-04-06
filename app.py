@@ -53,10 +53,6 @@ from content_filter import contains_slang
 from ws import namespaces
 
 import gspread
-try:
-    import eventlet
-except ImportError:  # pragma: no cover - optional runtime dependency
-    eventlet = None
 
 
 class _NoopSocketIO:
@@ -93,9 +89,7 @@ app.add_url_rule("/metrics", "metrics", metrics)
 
 db.init_app(app)
 
-if eventlet is not None:
-    eventlet.monkey_patch()
-socketio_async_mode = "eventlet" if eventlet is not None else "threading"
+socketio_async_mode = "threading"
 try:
     socketio = SocketIO(
         app,

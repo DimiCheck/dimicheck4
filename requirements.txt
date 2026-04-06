@@ -2,6 +2,7 @@ flask==2.3.2
 python-dotenv==1.0.1
 flask-smorest==0.42.0
 flask-socketio==5.3.4
+simple-websocket>=1.0.0
 flask-cors==3.0.10
 flask-sqlalchemy==3.0.5
 prometheus-client==0.16.0

@@ -17,4 +17,5 @@ dependencies = [
     "prometheus-client==0.16.0",
     "python-jose[cryptography]==3.3.0",
     "requests==2.31.0",
+    "simple-websocket>=1.0.0",
 ]
