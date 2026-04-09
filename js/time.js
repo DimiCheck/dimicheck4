@@ -1348,7 +1348,7 @@ function connectBoardRealtime() {
 
   const namespace = `/ws/classes/${grade}/${section}`;
   boardSocket = io(namespace, {
-    transports: ['websocket', 'polling'],
+    transports: ['websocket'],
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,

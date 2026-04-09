@@ -175,19 +175,47 @@
 (function csrfFetchPatch() {
   const originalFetch = window.fetch;
   if (!originalFetch) return;
+  const CSRF_FAILURE_CACHE_KEY = 'dimicheck.csrfFetchBlockedUntil';
+  const CSRF_FAILURE_BACKOFF_MS = 60 * 1000;
+
+  function getCsrfFailureBackoffUntil() {
+    try {
+      return Number(sessionStorage.getItem(CSRF_FAILURE_CACHE_KEY) || 0);
+    } catch {
+      return 0;
+    }
+  }
+
+  function setCsrfFailureBackoffUntil(timestamp) {
+    try {
+      sessionStorage.setItem(CSRF_FAILURE_CACHE_KEY, String(timestamp));
+    } catch {
+      // Ignore storage failures
+    }
+  }
 
   async function fetchCsrfToken() {
     if (window.__csrfToken) return window.__csrfToken;
+    if (Date.now() < getCsrfFailureBackoffUntil()) {
+      return null;
+    }
     try {
       const res = await originalFetch('/me', { credentials: 'include' });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        setCsrfFailureBackoffUntil(Date.now() + CSRF_FAILURE_BACKOFF_MS);
+        return null;
+      }
       const data = await res.json().catch(() => null);
       const token = data && (data.csrf_token || data.csrfToken);
       if (token) {
         window.__csrfToken = token;
+        setCsrfFailureBackoffUntil(0);
+      } else {
+        setCsrfFailureBackoffUntil(Date.now() + CSRF_FAILURE_BACKOFF_MS);
       }
       return token || null;
     } catch (e) {
+      setCsrfFailureBackoffUntil(Date.now() + CSRF_FAILURE_BACKOFF_MS);
       console.warn('[CSRF] Failed to fetch token', e);
       return null;
     }

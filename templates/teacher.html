@@ -2324,7 +2324,7 @@
       for (let section = 1; section <= 6; section += 1) {
         const namespace = `/ws/classes/${grade}/${section}`;
         const socket = io(namespace, {
-          transports: ['websocket', 'polling'],
+          transports: ['websocket'],
           reconnection: true,
           reconnectionDelay: 1000,
           reconnectionDelayMax: 5000,
