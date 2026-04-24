@@ -47,7 +47,6 @@
   <link rel="apple-touch-icon" sizes="180x180" href="src/favicon/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="src/favicon/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="src/favicon/favicon-16x16.png">
-  <script defer src="/js/chat.js"></script>
   <script defer src="/js/voting.js"></script>
   <script defer src="/js/reactions.js"></script>
 <style>
@@ -1581,11 +1580,6 @@
 	        ensureFavoriteButtons();
 	        renderFavoriteSelection();
 
-	        // 채팅 매니저 초기화 (백그라운드 폴링 시작)
-	        if (window.chatManager) {
-	          window.chatManager.init(myGrade, mySection, myNumber);
-	        }
-
 	        await loadMyState();
 	        await loadMyFavorite();
 	        await loadUserNotices();
@@ -2097,11 +2091,10 @@
       setInterval(ping, HEARTBEAT_MS);
     }
 
-    // 진입 시 로그인 확인
-    checkLogin();
-    setInterval(() => loadUserNotices(), 10000);
-    startHeartbeat();
-  </script>
+	    // 진입 시 로그인 확인
+	    checkLogin();
+	    startHeartbeat();
+	  </script>
   <nav class="bottom-nav" aria-label="하단 내비게이션">
     <a href="/schoollife.html" class="nav-item">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 1 9l4 2.18v6.32L12 21l7-3.5V11.18L23 9 12 3zm0 2.69L17.53 9 12 11.31 6.47 9 12 5.69zM18 17.18l-5 2.5v-5.81l5-2.5v5.81z"/></svg>

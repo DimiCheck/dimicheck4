@@ -882,6 +882,12 @@ body.fullscreen .fullscreen-btn {
   gap: 4px;
 }
 
+.magnet-quick-menu__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .magnet-quick-menu__item {
   border: none;
   background: transparent;
