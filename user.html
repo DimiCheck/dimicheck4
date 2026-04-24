@@ -251,6 +251,40 @@
       transition:all .3s cubic-bezier(0.34, 1.56, 0.64, 1);
       overflow:hidden;
     }
+    .status-card.edit-mode{
+      cursor:grab;
+      user-select:none;
+      box-shadow:0 0 0 1px color-mix(in oklab, var(--primary) 18%, transparent);
+    }
+    .status-card.edit-mode:active{
+      cursor:grabbing;
+    }
+    .status-grid.edit-mode .status-card{
+      transform:none !important;
+    }
+    .status-card.edit-mode::after{
+      content:'편집';
+      position:absolute;
+      top:14px;
+      left:14px;
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.08em;
+      color:color-mix(in oklab, var(--primary) 72%, var(--text));
+      opacity:.82;
+    }
+    .status-card.edit-mode .status-label,
+    .status-card.edit-mode .status-desc{
+      padding-left:36px;
+    }
+    .status-card.is-edit-source{
+      border-color:color-mix(in oklab, var(--primary) 55%, transparent);
+      box-shadow:0 0 0 5px color-mix(in oklab, var(--primary) 20%, transparent);
+    }
+    .status-card.is-drag-target{
+      border-color:color-mix(in oklab, #38d67a 45%, transparent);
+      box-shadow:0 0 0 5px color-mix(in oklab, #38d67a 20%, transparent);
+    }
     .status-card::before{
       content:'';
       position:absolute;
@@ -301,6 +335,63 @@
     }
     .status-label{font-weight:800; letter-spacing:.2px; margin-bottom:6px; color:var(--text)}
     .status-desc{color:color-mix(in oklab, var(--muted) 90%, var(--text)); font-size:13px}
+    .status-favorite-btn{
+      position:absolute;
+      top:12px;
+      right:12px;
+      width:32px;
+      height:32px;
+      border-radius:999px;
+      border:1px solid color-mix(in oklab, var(--text) 10%, transparent);
+      background:color-mix(in oklab, var(--surface) 88%, transparent);
+      color:color-mix(in oklab, var(--muted) 75%, var(--text));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      opacity:0;
+      transform:translateY(-4px);
+      transition:opacity .18s ease, transform .18s ease, color .18s ease, border-color .18s ease, background .18s ease;
+      z-index:2;
+    }
+    .status-favorite-btn svg{
+      width:16px;
+      height:16px;
+    }
+    .status-card:hover .status-favorite-btn,
+    .status-card:focus-within .status-favorite-btn,
+    .status-favorite-btn.is-active{
+      opacity:1;
+      transform:translateY(0);
+    }
+    .status-favorite-btn.is-active{
+      color:#f5b400;
+      border-color:rgba(245, 180, 0, 0.35);
+      background:rgba(245, 180, 0, 0.14);
+    }
+    .status-card.has-favorite{
+      border-color:rgba(245, 180, 0, 0.28);
+    }
+    .status-grid.edit-mode .status-favorite-btn{
+      display:none;
+    }
+    @media (hover: none), (pointer: coarse){
+      .status-favorite-btn{
+        opacity:1;
+        transform:none;
+      }
+    }
+    .sr-only{
+      position:absolute;
+      width:1px;
+      height:1px;
+      padding:0;
+      margin:-1px;
+      overflow:hidden;
+      clip:rect(0, 0, 0, 0);
+      white-space:nowrap;
+      border:0;
+    }
 
     .etc-box{ display:none; gap:10px; margin-top:12px; flex-wrap:wrap }
     .etc-row{ display:flex; gap:10px; width:100% }
@@ -406,6 +497,21 @@
       display:flex;
       align-items:center;
       gap:6px;
+    }
+    .icon-btn{
+      width:42px;
+      min-width:42px;
+      height:42px;
+      padding:0;
+    }
+    .icon-btn svg{
+      width:18px;
+      height:18px;
+    }
+    .icon-btn.active{
+      background:color-mix(in oklab, var(--primary) 18%, var(--surface));
+      color:var(--primary);
+      border-color:color-mix(in oklab, var(--primary) 40%, transparent);
     }
     .thought-trigger .btn{
       min-width:auto;
@@ -880,6 +986,9 @@
             💬
             <span id="chatBadge" class="chat-badge" style="display:none"></span>
           </button> -->
+          <button class="btn ghost icon-btn" type="button" id="editLayoutBtn" aria-label="상태 버튼 편집" aria-pressed="false">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25Zm14.71-9.04a1.003 1.003 0 0 0 0-1.42l-2.5-2.5a1.003 1.003 0 0 0-1.42 0l-1.96 1.96 3.75 3.75 2.13-1.79Z"/></svg>
+          </button>
           <button class="btn ghost" type="button" id="logoutBtn" aria-label="로그아웃">로그아웃</button>
         </div>
       </div>
@@ -897,7 +1006,7 @@
       <!-- 상태 선택 -->
       <div>
         <div class="section-head">내 위치/상태 선택</div>
-        <div class="grid" id="statusGrid">
+        <div class="grid status-grid" id="statusGrid">
           <div class="status-card" data-status="화장실(물)" tabindex="0" role="button" aria-label="화장실(물)">
             <div class="status-label">화장실(물)</div>
             <div class="status-desc">화장실 잠깐 다녀오는 중</div>
@@ -1064,23 +1173,30 @@
     let selectedStatus = null;
     let lastSavedStatus = null;
     let saveTimer = null;
-    let isSaving = false;
-    let loginReady = false;
-    let pendingSelection = null;
-    const currentStatusDisplay = document.getElementById('currentStatus');
-    const noticeAlertBox = document.getElementById('noticeAlertBox');
-    let noticeInitialized = false;
-    let noticeAlertRenderKey = '';
+	    let isSaving = false;
+	    let loginReady = false;
+	    let pendingSelection = null;
+	    let favoriteStatusCode = null;
+	    let isFavoriteSaving = false;
+	    let isStatusEditMode = false;
+	    let editSwapSourceCard = null;
+	    let draggedEditCard = null;
+	    const currentStatusDisplay = document.getElementById('currentStatus');
+	    const noticeAlertBox = document.getElementById('noticeAlertBox');
+	    let noticeInitialized = false;
+	    let noticeAlertRenderKey = '';
 
     // Get the unsaved indicator element
-    const unsavedIndicator = document.getElementById('unsavedIndicator');
-    const logoToast = document.getElementById('logoToast');
-    const savedBadge = document.getElementById('savedBadge');
-    const statusCards = Array.from(document.querySelectorAll('.status-card'));
-    statusCards.forEach(card => {
-      const descEl = card.querySelector('.status-desc');
-      if (descEl) {
-        card.dataset.originalDesc = descEl.textContent.trim();
+	    const unsavedIndicator = document.getElementById('unsavedIndicator');
+	    const logoToast = document.getElementById('logoToast');
+	    const savedBadge = document.getElementById('savedBadge');
+	    const statusGrid = document.getElementById('statusGrid');
+	    const editLayoutBtn = document.getElementById('editLayoutBtn');
+	    const statusCards = Array.from(document.querySelectorAll('.status-card'));
+	    statusCards.forEach(card => {
+	      const descEl = card.querySelector('.status-desc');
+	      if (descEl) {
+	        card.dataset.originalDesc = descEl.textContent.trim();
       }
     });
 
@@ -1190,9 +1306,209 @@
       absence: "결석(조퇴)",
       section: "교실",
     };
-    const reverseCategoryLabels = Object.fromEntries(
-      Object.entries(categoryLabels).map(([k, v]) => [v, k])
-    );
+	    const reverseCategoryLabels = Object.fromEntries(
+	      Object.entries(categoryLabels).map(([k, v]) => [v, k])
+	    );
+	    const favoriteEligibleStatusCodes = new Set([
+	      'toilet',
+	      'hallway',
+	      'club',
+	      'afterschool',
+	      'project',
+	      'early',
+	      'absence',
+	    ]);
+
+	    function statusLayoutStorageKey() {
+	      if (!myGrade || !mySection || !myNumber) return null;
+	      return `dimicheck:user-status-layout:${myGrade}-${mySection}-${myNumber}`;
+	    }
+
+	    function getCurrentStatusCards() {
+	      return Array.from(statusGrid?.querySelectorAll('.status-card') || []);
+	    }
+
+	    function clearEditSwapSource() {
+	      if (editSwapSourceCard) {
+	        editSwapSourceCard.classList.remove('is-edit-source');
+	      }
+	      editSwapSourceCard = null;
+	    }
+
+	    function persistStatusLayout() {
+	      const key = statusLayoutStorageKey();
+	      if (!key || !statusGrid) return;
+	      const order = getCurrentStatusCards()
+	        .map(card => card.dataset.status)
+	        .filter(Boolean);
+	      try {
+	        localStorage.setItem(key, JSON.stringify(order));
+	      } catch (error) {
+	        console.warn('[User] failed to persist status layout', error);
+	      }
+	    }
+
+	    function applySavedStatusLayout() {
+	      const key = statusLayoutStorageKey();
+	      if (!key || !statusGrid) return;
+	      let savedOrder = null;
+	      try {
+	        savedOrder = JSON.parse(localStorage.getItem(key) || 'null');
+	      } catch (error) {
+	        console.warn('[User] failed to read status layout', error);
+	        savedOrder = null;
+	      }
+	      if (!Array.isArray(savedOrder) || savedOrder.length === 0) return;
+	      const cardMap = new Map(getCurrentStatusCards().map(card => [card.dataset.status, card]));
+	      const orderedCards = [];
+	      savedOrder.forEach((status) => {
+	        const card = cardMap.get(status);
+	        if (!card) return;
+	        orderedCards.push(card);
+	        cardMap.delete(status);
+	      });
+	      cardMap.forEach(card => orderedCards.push(card));
+	      orderedCards.forEach(card => statusGrid.appendChild(card));
+	    }
+
+	    function moveStatusCardRelative(draggedCard, targetCard) {
+	      if (!statusGrid || !draggedCard || !targetCard || draggedCard === targetCard) return;
+	      const cards = getCurrentStatusCards();
+	      const draggedIndex = cards.indexOf(draggedCard);
+	      const targetIndex = cards.indexOf(targetCard);
+	      if (draggedIndex === -1 || targetIndex === -1) return;
+	      if (draggedIndex < targetIndex) {
+	        statusGrid.insertBefore(draggedCard, targetCard.nextSibling);
+	      } else {
+	        statusGrid.insertBefore(draggedCard, targetCard);
+	      }
+	      persistStatusLayout();
+	    }
+
+	    function swapStatusCardPositions(cardA, cardB) {
+	      if (!statusGrid || !cardA || !cardB || cardA === cardB) return;
+	      const marker = document.createElement('div');
+	      statusGrid.replaceChild(marker, cardA);
+	      statusGrid.replaceChild(cardA, cardB);
+	      statusGrid.replaceChild(cardB, marker);
+	      persistStatusLayout();
+	    }
+
+	    function setStatusEditMode(nextMode) {
+	      isStatusEditMode = Boolean(nextMode);
+	      statusGrid?.classList.toggle('edit-mode', isStatusEditMode);
+	      editLayoutBtn?.classList.toggle('active', isStatusEditMode);
+	      editLayoutBtn?.setAttribute('aria-pressed', String(isStatusEditMode));
+	      getCurrentStatusCards().forEach((card) => {
+	        card.classList.toggle('edit-mode', isStatusEditMode);
+	        card.draggable = isStatusEditMode;
+	        card.classList.remove('is-drag-target');
+	      });
+	      if (!isStatusEditMode) {
+	        clearEditSwapSource();
+	      }
+	    }
+
+	    function handleEditModeCardClick(card) {
+	      if (!isStatusEditMode || !card) return;
+	      if (editSwapSourceCard === card) {
+	        clearEditSwapSource();
+	        return;
+	      }
+	      if (!editSwapSourceCard) {
+	        editSwapSourceCard = card;
+	        editSwapSourceCard.classList.add('is-edit-source');
+	        return;
+	      }
+	      const sourceCard = editSwapSourceCard;
+	      clearEditSwapSource();
+	      swapStatusCardPositions(sourceCard, card);
+	    }
+
+	    function isFavoriteEligibleCard(card) {
+	      const code = reverseCategoryLabels[card?.dataset?.status];
+	      return favoriteEligibleStatusCodes.has(code);
+	    }
+
+	    function ensureFavoriteButtons() {
+	      statusCards.forEach((card) => {
+	        if (!isFavoriteEligibleCard(card) || card.querySelector('.status-favorite-btn')) {
+	          return;
+	        }
+	        const button = document.createElement('button');
+	        button.type = 'button';
+	        button.className = 'status-favorite-btn';
+	        button.setAttribute('aria-pressed', 'false');
+	        button.innerHTML = `
+	          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 17.27 5.18 3.73-1.64-6.08L20 10.24l-6.25-.52L12 4 10.25 9.72 4 10.24l4.46 4.68L6.82 21z"/></svg>
+	          <span class="sr-only">즐겨찾기</span>
+	        `;
+	        button.addEventListener('click', async (event) => {
+	          event.stopPropagation();
+	          if (isStatusEditMode || isFavoriteSaving) return;
+	          const targetCode = reverseCategoryLabels[card.dataset.status];
+	          await saveFavoriteStatus(targetCode === favoriteStatusCode ? null : targetCode);
+	        });
+	        card.appendChild(button);
+	      });
+	    }
+
+	    function renderFavoriteSelection() {
+	      statusCards.forEach((card) => {
+	        const code = reverseCategoryLabels[card.dataset.status];
+	        const isActive = Boolean(code && code === favoriteStatusCode);
+	        card.classList.toggle('has-favorite', isActive);
+	        const button = card.querySelector('.status-favorite-btn');
+	        if (!button) return;
+	        button.classList.toggle('is-active', isActive);
+	        button.setAttribute('aria-pressed', String(isActive));
+	        button.setAttribute('aria-label', isActive ? `${card.dataset.status} 즐겨찾기 해제` : `${card.dataset.status} 즐겨찾기 설정`);
+	        button.title = isActive ? '즐겨찾기 해제' : '즐겨찾기 설정';
+	      });
+	    }
+
+	    async function loadMyFavorite() {
+	      try {
+	        const res = await fetch('/api/classes/favorite/me', {
+	          credentials: 'include',
+	          cache: 'no-store',
+	        });
+	        if (!res.ok) throw new Error(`favorite load failed: ${res.status}`);
+	        const payload = await res.json();
+	        favoriteStatusCode = favoriteEligibleStatusCodes.has(payload?.favoriteStatus)
+	          ? payload.favoriteStatus
+	          : null;
+	      } catch (error) {
+	        console.warn('[User] favorite load failed', error);
+	        favoriteStatusCode = null;
+	      }
+	      renderFavoriteSelection();
+	    }
+
+	    async function saveFavoriteStatus(statusCode) {
+	      isFavoriteSaving = true;
+	      try {
+	        const res = await fetch('/api/classes/favorite', {
+	          method: 'PUT',
+	          credentials: 'include',
+	          headers: { 'Content-Type': 'application/json' },
+	          body: JSON.stringify({ statusCode }),
+	        });
+	        if (!res.ok) {
+	          throw new Error(await res.text());
+	        }
+	        const payload = await res.json();
+	        favoriteStatusCode = favoriteEligibleStatusCodes.has(payload?.favoriteStatus)
+	          ? payload.favoriteStatus
+	          : null;
+	        renderFavoriteSelection();
+	      } catch (error) {
+	        console.error('[User] favorite save failed', error);
+	        alert(`즐겨찾기 저장 실패: ${error.message}`);
+	      } finally {
+	        isFavoriteSaving = false;
+	      }
+	    }
 
     // ===== 시간 표시 =====
     function updateTime() {
@@ -1257,21 +1573,25 @@
         } catch (err) {
           console.warn('[Notifications] failed to cache class context', err);
         }
-        window.notificationManager?.setClassContext?.({
-          grade: myGrade,
-          section: mySection
-        });
+	        window.notificationManager?.setClassContext?.({
+	          grade: myGrade,
+	          section: mySection
+	        });
+	        applySavedStatusLayout();
+	        ensureFavoriteButtons();
+	        renderFavoriteSelection();
 
-        // 채팅 매니저 초기화 (백그라운드 폴링 시작)
-        if (window.chatManager) {
-          window.chatManager.init(myGrade, mySection, myNumber);
-        }
+	        // 채팅 매니저 초기화 (백그라운드 폴링 시작)
+	        if (window.chatManager) {
+	          window.chatManager.init(myGrade, mySection, myNumber);
+	        }
 
-        await loadMyState();
-        await loadUserNotices();
-      } catch (e) {
-        console.warn("checkLogin failed:", e);
-        location.href = "/auth/login";
+	        await loadMyState();
+	        await loadMyFavorite();
+	        await loadUserNotices();
+	      } catch (e) {
+	        console.warn("checkLogin failed:", e);
+	        location.href = "/auth/login";
       }
     }
 
@@ -1374,8 +1694,12 @@
       }
     }
 
-    function setSelected(card) {
-      const wasSelected = selectedStatus === card.dataset.status;
+	    function setSelected(card) {
+	      if (isStatusEditMode) {
+	        handleEditModeCardClick(card);
+	        return;
+	      }
+	      const wasSelected = selectedStatus === card.dataset.status;
 
       // 해제
       if (wasSelected) {
@@ -1417,16 +1741,50 @@
       applyCurrentSelection();
     }
 
-    // 키보드 접근성(Enter/Space)
-    document.querySelectorAll('.status-card').forEach(card => {
-      card.addEventListener('click', () => setSelected(card));
-      card.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          setSelected(card);
-        }
-      });
-    });
+	    // 키보드 접근성(Enter/Space)
+	    document.querySelectorAll('.status-card').forEach(card => {
+	      card.addEventListener('click', () => setSelected(card));
+	      card.addEventListener('keydown', (e) => {
+	        if (e.key === 'Enter' || e.key === ' ') {
+	          e.preventDefault();
+	          setSelected(card);
+	        }
+	      });
+	      card.addEventListener('dragstart', (event) => {
+	        if (!isStatusEditMode) {
+	          event.preventDefault();
+	          return;
+	        }
+	        draggedEditCard = card;
+	        clearEditSwapSource();
+	        if (event.dataTransfer) {
+	          event.dataTransfer.effectAllowed = 'move';
+	          event.dataTransfer.setData('text/plain', card.dataset.status || '');
+	        }
+	      });
+	      card.addEventListener('dragover', (event) => {
+	        if (!isStatusEditMode || !draggedEditCard || draggedEditCard === card) return;
+	        event.preventDefault();
+	        card.classList.add('is-drag-target');
+	      });
+	      card.addEventListener('dragleave', () => {
+	        card.classList.remove('is-drag-target');
+	      });
+	      card.addEventListener('drop', (event) => {
+	        if (!isStatusEditMode || !draggedEditCard || draggedEditCard === card) return;
+	        event.preventDefault();
+	        moveStatusCardRelative(draggedEditCard, card);
+	        card.classList.remove('is-drag-target');
+	      });
+	      card.addEventListener('dragend', () => {
+	        draggedEditCard = null;
+	        getCurrentStatusCards().forEach((currentCard) => currentCard.classList.remove('is-drag-target'));
+	      });
+	    });
+
+	    editLayoutBtn?.addEventListener('click', () => {
+	      setStatusEditMode(!isStatusEditMode);
+	    });
 
     // 기타 입력
     function renderChips() {

@@ -26,6 +26,7 @@ from models import (
     PresenceLog,
     PresenceState,
     RememberedSession,
+    StudentStatusFavorite,
     TeacherNoticeRead,
     TermsConsent,
     User,
@@ -60,6 +61,7 @@ def _query_ids(model, *conditions) -> list[int]:
 
 
 def _delete_user_related_records(user: User) -> None:
+    StudentStatusFavorite.__table__.create(bind=db.engine, checkfirst=True)
     api_key_ids = _query_ids(APIKey, APIKey.user_id == user.id)
     if api_key_ids:
         APIRateLimit.query.filter(APIRateLimit.api_key_id.in_(api_key_ids)).delete(synchronize_session=False)
@@ -73,6 +75,7 @@ def _delete_user_related_records(user: User) -> None:
         OAuthRefreshToken,
         RememberedSession,
         APIKey,
+        StudentStatusFavorite,
     ):
         model.query.filter_by(user_id=user.id).delete(synchronize_session=False)
 

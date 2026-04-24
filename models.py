@@ -172,6 +172,25 @@ class HomeTarget(db.Model):
     user = db.relationship("User", backref=db.backref("home_target", uselist=False))
 
 
+class StudentStatusFavorite(db.Model):
+    __tablename__ = "student_status_favorites"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), unique=True, nullable=False)
+    grade = db.Column(db.Integer, nullable=False)
+    section = db.Column(db.Integer, nullable=False)
+    student_number = db.Column(db.Integer, nullable=False)
+    status_code = db.Column(db.String(32), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index("idx_student_status_favorites_class_student", "grade", "section", "student_number"),
+    )
+
+    user = db.relationship("User", backref=db.backref("status_favorite", uselist=False))
+
+
 class ClassConfig(db.Model):
     __tablename__ = "class_configs"
 

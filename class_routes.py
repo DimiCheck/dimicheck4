@@ -19,6 +19,7 @@ from models import (
     ChatConsent,
     MealVote,
     CalendarEvent,
+    StudentStatusFavorite,
     TeacherNotice,
     TeacherNoticeRead,
 )
@@ -174,12 +175,33 @@ _NOTICE_DOT_SECONDS = 10 * 60
 _NOTICE_BURST_WINDOW = timedelta(minutes=10)
 _MARQUEE_MAX_AGE = timedelta(minutes=30)
 _NOTICE_POPUP_MARKER = "__popup__"
+FAVORITE_STATUS_CODES = {
+    "toilet",
+    "hallway",
+    "club",
+    "afterschool",
+    "project",
+    "early",
+    "absence",
+}
 
 
 def _ensure_notice_tables() -> bool:
     try:
         TeacherNotice.__table__.create(bind=db.engine, checkfirst=True)
         TeacherNoticeRead.__table__.create(bind=db.engine, checkfirst=True)
+        return True
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return False
+
+
+def _ensure_favorite_table() -> bool:
+    try:
+        StudentStatusFavorite.__table__.create(bind=db.engine, checkfirst=True)
         return True
     except Exception:
         try:
@@ -386,6 +408,27 @@ def _emit_class_state_update(
             **payload,
         },
         namespace=f'/ws/classes/{grade}/{section}',
+    )
+
+
+def _emit_class_favorite_update(
+    grade: int,
+    section: int,
+    student_number: int,
+    favorite_status: str | None,
+) -> None:
+    socketio = current_app.extensions.get("socketio") if current_app else None
+    if not socketio:
+        return
+    socketio.emit(
+        "favorite_updated",
+        {
+            "grade": grade,
+            "section": section,
+            "studentNumber": student_number,
+            "favoriteStatus": favorite_status,
+        },
+        namespace=f"/ws/classes/{grade}/{section}",
     )
 
 
@@ -662,6 +705,145 @@ def mark_teacher_notices_read():
         db.session.commit()
 
     return jsonify({"ok": True, "marked": created})
+
+
+@blueprint.get("/favorites")
+def get_class_favorites():
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+    if grade is None or section is None:
+        return jsonify({"error": "missing grade/section"}), 400
+    if not _teacher_or_board_only(grade, section):
+        return jsonify({"error": "forbidden"}), 403
+    if not _ensure_favorite_table():
+        return jsonify({"grade": grade, "section": section, "favorites": {}})
+
+    favorites: dict[str, str] = {}
+    rows = StudentStatusFavorite.query.filter_by(grade=grade, section=section).all()
+    for row in rows:
+        status_code = str(row.status_code or "").strip().lower()
+        if status_code not in FAVORITE_STATUS_CODES:
+            continue
+        normalized_number = _normalize_magnet_number_key(row.student_number)
+        if normalized_number is None:
+            continue
+        favorites[normalized_number] = status_code
+    return jsonify({"grade": grade, "section": section, "favorites": favorites})
+
+
+@blueprint.get("/favorite/me")
+def get_my_favorite():
+    user = session.get("user") or {}
+    if not user:
+        return jsonify({"error": "login_required"}), 401
+
+    grade, section, student_number = _get_student_session_info()
+    if grade is None or section is None or student_number is None:
+        return jsonify({"error": "forbidden"}), 403
+    if not _ensure_favorite_table():
+        return jsonify(
+            {
+                "grade": grade,
+                "section": section,
+                "studentNumber": student_number,
+                "favoriteStatus": None,
+            }
+        )
+
+    favorite = StudentStatusFavorite.query.filter_by(user_id=user.get("id")).first()
+    favorite_status = None
+    if favorite:
+        status_code = str(favorite.status_code or "").strip().lower()
+        if status_code in FAVORITE_STATUS_CODES:
+            favorite_status = status_code
+    return jsonify(
+        {
+            "grade": grade,
+            "section": section,
+            "studentNumber": student_number,
+            "favoriteStatus": favorite_status,
+        }
+    )
+
+
+@blueprint.put("/favorite")
+def upsert_my_favorite():
+    user = session.get("user") or {}
+    if not user:
+        return jsonify({"error": "login_required"}), 401
+
+    grade, section, student_number = _get_student_session_info()
+    if grade is None or section is None or student_number is None:
+        return jsonify({"error": "forbidden"}), 403
+    if not _ensure_favorite_table():
+        return jsonify({"error": "favorite storage unavailable"}), 503
+
+    payload = request.get_json(silent=True) or {}
+    status_code_raw = payload.get("statusCode")
+    normalized_status = None
+    if status_code_raw is not None:
+        normalized_status = str(status_code_raw).strip().lower() or None
+        if normalized_status is not None and normalized_status not in FAVORITE_STATUS_CODES:
+            return jsonify({"error": "invalid favorite status"}), 400
+
+    favorite = StudentStatusFavorite.query.filter_by(user_id=user.get("id")).first()
+    previous_status = None
+    previous_grade = grade
+    previous_section = section
+    previous_student_number = student_number
+    if favorite:
+        previous_status = str(favorite.status_code or "").strip().lower() or None
+        previous_grade = favorite.grade
+        previous_section = favorite.section
+        previous_student_number = favorite.student_number
+
+    if normalized_status is None:
+        if favorite:
+            db.session.delete(favorite)
+            db.session.commit()
+        if previous_status is not None:
+            _emit_class_favorite_update(previous_grade, previous_section, previous_student_number, None)
+        return jsonify(
+            {
+                "ok": True,
+                "grade": grade,
+                "section": section,
+                "studentNumber": student_number,
+                "favoriteStatus": None,
+            }
+        )
+
+    if not favorite:
+        favorite = StudentStatusFavorite(
+            user_id=user.get("id"),
+            grade=grade,
+            section=section,
+            student_number=student_number,
+            status_code=normalized_status,
+        )
+        db.session.add(favorite)
+    else:
+        favorite.grade = grade
+        favorite.section = section
+        favorite.student_number = student_number
+        favorite.status_code = normalized_status
+
+    db.session.commit()
+
+    if previous_status != normalized_status or previous_grade != grade or previous_section != section:
+        if previous_status is not None and (previous_grade != grade or previous_section != section):
+            _emit_class_favorite_update(previous_grade, previous_section, previous_student_number, None)
+        _emit_class_favorite_update(grade, section, student_number, normalized_status)
+
+    return jsonify(
+        {
+            "ok": True,
+            "grade": grade,
+            "section": section,
+            "studentNumber": student_number,
+            "favoriteStatus": normalized_status,
+        }
+    )
 
 
 @blueprint.post("/state/save")

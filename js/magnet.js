@@ -21,6 +21,18 @@ const MAGNET_MENU_OPTIONS = [
   { label: '결석(조퇴)', value: 'absence' }
 ];
 
+const FAVORITE_STATUS_LABELS = {
+  toilet: '화장실(물)',
+  hallway: '복도',
+  club: '동아리',
+  afterschool: '방과후',
+  project: '프로젝트',
+  early: '조기입실',
+  absence: '결석(조퇴)'
+};
+const FAVORITE_STATUS_CODES = new Set(Object.keys(FAVORITE_STATUS_LABELS));
+let boardFavoriteStatusByNumber = Object.create(null);
+
 const thoughtBubbleRegistry = new Map(); // number -> { element, timeoutId, expiresAt, text }
 const reactionBadgeRegistry = new Map(); // number -> { element, timeoutId, expiresAt, emoji }
 
@@ -328,6 +340,7 @@ let magnetMenuOverlay = null;
 let magnetMenuPanel = null;
 let magnetMenuCurrentTarget = null;
 let magnetMenuKeydownBound = false;
+let magnetMenuActionsHost = null;
 
 const magnetGroup = {
   leader: null,
@@ -501,6 +514,134 @@ function getGroupedMagnets(includeLeader = true) {
   const others = magnetGroup.members.slice();
   return includeLeader ? [magnetGroup.leader, ...others] : others;
 }
+
+function normalizeFavoriteStatusAction(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return FAVORITE_STATUS_CODES.has(normalized) ? normalized : null;
+}
+
+function getBoardFavoriteAction(number) {
+  const key = String(number || '').trim();
+  return normalizeFavoriteStatusAction(boardFavoriteStatusByNumber[key]);
+}
+
+function applyBoardFavoriteSnapshot(favorites) {
+  const next = Object.create(null);
+  if (favorites && typeof favorites === 'object') {
+    Object.entries(favorites).forEach(([number, status]) => {
+      const normalizedStatus = normalizeFavoriteStatusAction(status);
+      const key = String(number || '').trim();
+      if (!key || !normalizedStatus) return;
+      next[key] = normalizedStatus;
+    });
+  }
+  boardFavoriteStatusByNumber = next;
+  if (magnetMenuCurrentTarget) {
+    renderMagnetQuickMenuOptions(magnetMenuCurrentTarget);
+    highlightMagnetQuickMenuSelection(resolveMagnetQuickMenuState(magnetMenuCurrentTarget));
+  }
+}
+
+function applyBoardFavoriteUpdate(studentNumber, favoriteStatus) {
+  const key = String(studentNumber || '').trim();
+  if (!key) return;
+  const normalizedStatus = normalizeFavoriteStatusAction(favoriteStatus);
+  if (!normalizedStatus) {
+    delete boardFavoriteStatusByNumber[key];
+  } else {
+    boardFavoriteStatusByNumber[key] = normalizedStatus;
+  }
+  if (magnetMenuCurrentTarget && String(magnetMenuCurrentTarget.dataset.number || '') === key) {
+    renderMagnetQuickMenuOptions(magnetMenuCurrentTarget);
+    highlightMagnetQuickMenuSelection(resolveMagnetQuickMenuState(magnetMenuCurrentTarget));
+  }
+}
+
+async function loadBoardFavorites() {
+  if (!grade || !section) return {};
+  try {
+    const res = await fetch(`/api/classes/favorites?grade=${grade}&section=${section}`, {
+      credentials: 'include',
+      cache: 'no-store'
+    });
+    if (!res.ok) {
+      throw new Error(`favorites load failed: ${res.status}`);
+    }
+    const payload = await res.json();
+    applyBoardFavoriteSnapshot(payload && payload.favorites);
+    return boardFavoriteStatusByNumber;
+  } catch (err) {
+    console.warn('[favorites] load failed', err);
+    applyBoardFavoriteSnapshot({});
+    return boardFavoriteStatusByNumber;
+  }
+}
+
+window.loadBoardFavorites = loadBoardFavorites;
+window.applyBoardFavoriteUpdate = applyBoardFavoriteUpdate;
+
+function buildMagnetMenuOptions(target) {
+  const favoriteAction = target ? getBoardFavoriteAction(target.dataset.number) : null;
+  const items = [];
+  if (favoriteAction) {
+    items.push({
+      label: `★ 즐겨찾기 · ${FAVORITE_STATUS_LABELS[favoriteAction]}`,
+      value: favoriteAction,
+      favorite: true
+    });
+  }
+  MAGNET_MENU_OPTIONS.forEach((option) => {
+    if (favoriteAction && option.value === favoriteAction) {
+      return;
+    }
+    items.push({ ...option, favorite: false });
+  });
+  return items;
+}
+
+function renderMagnetQuickMenuOptions(target) {
+  if (!magnetMenuActionsHost) return;
+  const options = buildMagnetMenuOptions(target);
+  magnetMenuActionsHost.innerHTML = '';
+  options.forEach((opt) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'magnet-quick-menu__item';
+    if (opt.favorite) {
+      btn.classList.add('magnet-quick-menu__item--favorite');
+    }
+    btn.dataset.action = opt.value;
+    btn.setAttribute('role', 'menuitem');
+    btn.textContent = opt.label;
+    magnetMenuActionsHost.appendChild(btn);
+  });
+}
+
+function resolveMagnetTapAction(target) {
+  const currentAction = resolveMagnetQuickMenuState(target);
+  if (currentAction === 'classroom') {
+    return getBoardFavoriteAction(target.dataset.number) || 'toilet';
+  }
+  return 'classroom';
+}
+
+function handleMagnetTapAction(target) {
+  if (!target) return false;
+  const action = resolveMagnetTapAction(target);
+  if (!action) return false;
+  applyMagnetQuickAction(target, action);
+  return true;
+}
+
+function returnMagnetToClassroomByNumber(number, options = {}) {
+  const magnet = document.querySelector(`.magnet[data-number="${number}"]:not(.placeholder)`);
+  if (!magnet) return false;
+  applyMagnetQuickAction(magnet, 'classroom', options);
+  return true;
+}
+
+window.returnMagnetToClassroomByNumber = returnMagnetToClassroomByNumber;
+
 function ensureMagnetQuickMenuElements() {
   if (magnetMenuOverlay && magnetMenuPanel) {
     return magnetMenuOverlay;
@@ -527,15 +668,9 @@ function ensureMagnetQuickMenuElements() {
   separator.className = 'magnet-menu-separator';
   magnetMenuPanel.appendChild(separator);
 
-  MAGNET_MENU_OPTIONS.forEach(opt => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'magnet-quick-menu__item';
-    btn.dataset.action = opt.value;
-    btn.setAttribute('role', 'menuitem');
-    btn.textContent = opt.label;
-    magnetMenuPanel.appendChild(btn);
-  });
+  magnetMenuActionsHost = document.createElement('div');
+  magnetMenuActionsHost.className = 'magnet-quick-menu__actions';
+  magnetMenuPanel.appendChild(magnetMenuActionsHost);
 
   magnetMenuOverlay.addEventListener('click', (event) => {
     if (event.target === magnetMenuOverlay) {
@@ -702,6 +837,7 @@ async function openMagnetQuickMenu(target, origin) {
   const { clientX = 0, clientY = 0 } = origin || {};
   positionMagnetQuickMenu(clientX, clientY);
 
+  renderMagnetQuickMenuOptions(target);
   const currentAction = resolveMagnetQuickMenuState(target);
   highlightMagnetQuickMenuSelection(currentAction);
 
@@ -872,13 +1008,13 @@ function createPlaceholder(num) {
   p.style.left = pos.left + 'px';
   p.style.top  = pos.top  + 'px';
   p.setAttribute('role', 'button');
-  p.setAttribute('aria-label', `${num}번 자석 위치 찾기`);
+  p.setAttribute('aria-label', `${num}번 자석을 교실로 복귀`);
   p.tabIndex = 0;
-  p.addEventListener('click', () => highlightMagnetByNumber(num));
+  p.addEventListener('click', () => returnMagnetToClassroomByNumber(num));
   p.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      highlightMagnetByNumber(num);
+      returnMagnetToClassroomByNumber(num);
     }
   });
   document.getElementById('magnetContainer').appendChild(p);
@@ -1605,12 +1741,20 @@ function addDragFunctionality(el) {
       magnetGroup.active = false;
     }
 
+    let handledTapAction = false;
     if (isDragging) {
       dropMagnet();
+    } else if (
+      isPointerDown &&
+      !longPressTriggered &&
+      (!magnetGroup.leader || magnetGroup.leader === el) &&
+      magnetGroup.members.length === 0
+    ) {
+      handledTapAction = handleMagnetTapAction(el);
     }
 
     if (!isDragging && magnetGroup.leader === el) {
-      clearMagnetGroup({ restore: true });
+      clearMagnetGroup({ restore: !handledTapAction });
     }
 
     resetInteractionState();

@@ -1304,6 +1304,9 @@ async function loadBoardNotices() {
 async function initBoard() {
   await createMagnetsFromServer(grade, section);
   await loadState(grade, section);
+  if (typeof window.loadBoardFavorites === 'function') {
+    await window.loadBoardFavorites();
+  }
   await loadBoardNotices();
   await loadRoutineData(true);
   updateAttendance();
@@ -1396,6 +1399,15 @@ function connectBoardRealtime() {
     } catch (err) {
       console.warn('[board realtime] apply failed, falling back to loadState', err);
       loadState(grade, section, { ignoreOffline: true, forceSync: true });
+    }
+  });
+
+  boardSocket.on('favorite_updated', (payload) => {
+    if (Number(payload?.grade) !== Number(grade) || Number(payload?.section) !== Number(section)) {
+      return;
+    }
+    if (typeof window.applyBoardFavoriteUpdate === 'function') {
+      window.applyBoardFavoriteUpdate(payload?.studentNumber, payload?.favoriteStatus ?? null);
     }
   });
 

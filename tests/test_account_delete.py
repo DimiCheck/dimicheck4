@@ -153,6 +153,7 @@ def test_account_delete_purges_user_and_student_scoped_data(account_app):
         HomeTarget,
         MealVote,
         RememberedSession,
+        StudentStatusFavorite,
         TermsConsent,
         User,
         UserAvatar,
@@ -174,6 +175,7 @@ def test_account_delete_purges_user_and_student_scoped_data(account_app):
 
         db.session.add(TermsConsent(user_id=user.id, version="v1"))
         db.session.add(HomeTarget(user_id=user.id))
+        db.session.add(StudentStatusFavorite(user_id=user.id, grade=1, section=1, student_number=1, status_code="project"))
         db.session.add(Counter(user_id=user.id, name="visits", value=3))
         db.session.add(RememberedSession(session_id="remember-token", user_id=user.id, expires_at=datetime.utcnow()))
 
@@ -233,6 +235,7 @@ def test_account_delete_purges_user_and_student_scoped_data(account_app):
         assert User.query.count() == 0
         assert TermsConsent.query.count() == 0
         assert HomeTarget.query.count() == 0
+        assert StudentStatusFavorite.query.count() == 0
         assert APIKey.query.count() == 0
         assert APIRateLimit.query.count() == 0
         assert Counter.query.count() == 0
