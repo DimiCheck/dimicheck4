@@ -139,6 +139,10 @@
       <img src="src/infoicn.png" alt="정보"/>
     </button>
     <div id="infoMenu" class="fab-menu" role="menu">
+      <button class="fab-item fab-item--with-indicator" role="menuitem" id="whatsNewItem">
+        <span>새 기능</span>
+        <span class="fab-item-indicator" aria-hidden="true"></span>
+      </button>
       <button class="fab-item" role="menuitem" id="foodItem">오늘 급식 보기</button>
       <button class="fab-item" role="menuitem" id="timeItem">오늘 시간표</button>
       <button class="fab-item" role="menuitem" id="wallpaperItem">배경화면 변경</button>
@@ -208,6 +212,31 @@
       <h2>배경화면 선택</h2>
       <p class="wallpaper-subtitle">목록을 눌러 교실 배경을 바로 바꿔보세요.</p>
       <div id="wallpaperGrid" class="wallpaper-grid" role="list"></div>
+    </div>
+  </div>
+
+  <div id="whatsNewModal" class="modal-overlay" hidden>
+    <div class="modal-content whats-new-modal" role="dialog" aria-modal="true" aria-labelledby="whatsNewTitle">
+      <button class="modal-close" id="whatsNewClose" aria-label="새 기능 안내 닫기">&times;</button>
+      <div class="whats-new-badge">새 기능</div>
+      <h2 id="whatsNewTitle">더 빠르게 이동할 수 있습니다</h2>
+      <div class="whats-new-list">
+        <div class="whats-new-item">
+          <strong>가볍게 탭하면</strong>
+          <span>교실에서는 즐겨찾기 위치로 이동하고, 즐겨찾기가 없으면 화장실(물)로 이동합니다.</span>
+        </div>
+        <div class="whats-new-item">
+          <strong>교실 밖에서 탭하면</strong>
+          <span>바로 교실 자리로 돌아옵니다.</span>
+        </div>
+        <div class="whats-new-item">
+          <strong>기존 방식은 그대로</strong>
+          <span>길게 누르면 메뉴가 열리고, 드래그로 직접 이동할 수도 있습니다.</span>
+        </div>
+      </div>
+      <div class="whats-new-actions">
+        <button type="button" class="fab-item whats-new-confirm" id="whatsNewConfirm">확인</button>
+      </div>
     </div>
   </div>
 
