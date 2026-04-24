@@ -554,7 +554,7 @@ function normalizeRoutineData(value) {
   };
   return {
     afterschool: normalizeMap(value.afterschool),
-    club: normalizeMap(value.changdong || value.club)
+    club: normalizeMap(value.club || value.changdong)
   };
 }
 

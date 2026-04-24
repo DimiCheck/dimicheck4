@@ -31,3 +31,35 @@ def test_normalize_timetable_rows_sorts_and_deduplicates():
         {"period": None, "subject": "동아리"},
         {"period": None, "subject": "창의융합"},
     ]
+
+
+def test_fetch_timetable_uses_same_fallback_neis_key_as_client(monkeypatch):
+    from class_routes import _NEIS_FALLBACK_API_KEY, _fetch_timetable_from_api
+    from config import config
+
+    captured = {}
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"hisTimetable": [{}, {"row": []}]}
+
+    def fake_get(url, params=None, timeout=None):
+        captured["url"] = url
+        captured["params"] = params or {}
+        captured["timeout"] = timeout
+        return _FakeResponse()
+
+    monkeypatch.setattr("class_routes.requests.get", fake_get)
+    monkeypatch.setattr(config, "NEIS_API_KEY", None)
+
+    lessons, max_period = _fetch_timetable_from_api(2, 4)
+
+    assert lessons == []
+    assert max_period == 0
+    assert captured["url"] == "https://open.neis.go.kr/hub/hisTimetable"
+    assert captured["params"]["KEY"] == _NEIS_FALLBACK_API_KEY
+    assert captured["params"]["GRADE"] == 2
+    assert captured["params"]["CLASS_NM"] == 4

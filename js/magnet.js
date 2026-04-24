@@ -341,6 +341,7 @@ let magnetMenuPanel = null;
 let magnetMenuCurrentTarget = null;
 let magnetMenuKeydownBound = false;
 let magnetMenuActionsHost = null;
+let magnetMenuLastOrigin = null;
 
 const magnetGroup = {
   leader: null,
@@ -615,6 +616,11 @@ function renderMagnetQuickMenuOptions(target) {
     btn.textContent = opt.label;
     magnetMenuActionsHost.appendChild(btn);
   });
+  requestAnimationFrame(() => {
+    if (magnetMenuLastOrigin) {
+      positionMagnetQuickMenu(magnetMenuLastOrigin.clientX, magnetMenuLastOrigin.clientY);
+    }
+  });
 }
 
 function resolveMagnetTapAction(target) {
@@ -722,6 +728,11 @@ function positionMagnetQuickMenu(x, y) {
   magnetMenuPanel.style.top = `${top}px`;
 }
 
+function repositionMagnetQuickMenu() {
+  if (!magnetMenuLastOrigin) return;
+  positionMagnetQuickMenu(magnetMenuLastOrigin.clientX, magnetMenuLastOrigin.clientY);
+}
+
 async function loadMagnetProfile(studentNumber, grade, section) {
   try {
     const res = await fetch(
@@ -826,18 +837,21 @@ function renderMagnetMenuProfile(profile, studentNumber) {
     noMsg.textContent = '메시지를 보낸 적이 없습니다';
     container.appendChild(noMsg);
   }
+  requestAnimationFrame(repositionMagnetQuickMenu);
 }
 
 async function openMagnetQuickMenu(target, origin) {
   clearMagnetGroup({ restore: true });
   const overlay = ensureMagnetQuickMenuElements();
   magnetMenuCurrentTarget = target;
+  magnetMenuLastOrigin = {
+    clientX: Number(origin?.clientX) || 0,
+    clientY: Number(origin?.clientY) || 0
+  };
   overlay.hidden = false;
 
-  const { clientX = 0, clientY = 0 } = origin || {};
-  positionMagnetQuickMenu(clientX, clientY);
-
   renderMagnetQuickMenuOptions(target);
+  repositionMagnetQuickMenu();
   const currentAction = resolveMagnetQuickMenuState(target);
   highlightMagnetQuickMenuSelection(currentAction);
 
@@ -859,6 +873,7 @@ function closeMagnetQuickMenu() {
     magnetMenuOverlay.hidden = true;
   }
   magnetMenuCurrentTarget = null;
+  magnetMenuLastOrigin = null;
 }
 
 function handleMagnetQuickMenuSelect(action) {

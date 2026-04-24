@@ -391,16 +391,16 @@
         </div>
       </div>
 
-      <!-- 창동 -->
-      <div class="card fade-up" role="group" aria-labelledby="changdong-title">
-        <div class="group-title" id="changdong-title">창동 요일 선택 (하루만 선택)</div>
-        <p class="p" style="margin:6px 0 12px">창동 이동 요일을 한 가지만 선택하세요. (선택 해제 가능)</p>
-        <div class="pill-row" id="changdongDays" role="radiogroup" aria-label="창동 요일">
-          <button class="pill" data-day="Mon" aria-pressed="false" aria-checked="false" role="radio">월</button>
-          <button class="pill" data-day="Tue" aria-pressed="false" aria-checked="false" role="radio">화</button>
-          <button class="pill" data-day="Wed" aria-pressed="false" aria-checked="false" role="radio">수</button>
-          <button class="pill" data-day="Thu" aria-pressed="false" aria-checked="false" role="radio">목</button>
-          <button class="pill" data-day="Fri" aria-pressed="false" aria-checked="false" role="radio">금</button>
+      <!-- 동아리 -->
+      <div class="card fade-up" role="group" aria-labelledby="club-title">
+        <div class="group-title" id="club-title">동아리 요일 선택 (복수 선택 가능)</div>
+        <p class="p" style="margin:6px 0 12px">매주 반복되는 동아리 요일을 선택하세요.</p>
+        <div class="pill-row" id="clubDays" aria-label="동아리 요일">
+          <button class="pill" data-day="Mon" aria-pressed="false">월</button>
+          <button class="pill" data-day="Tue" aria-pressed="false">화</button>
+          <button class="pill" data-day="Wed" aria-pressed="false">수</button>
+          <button class="pill" data-day="Thu" aria-pressed="false">목</button>
+          <button class="pill" data-day="Fri" aria-pressed="false">금</button>
         </div>
       </div>
 
@@ -426,7 +426,7 @@
 
       <div class="bigcopy fade-up">
         <h1 class="h1">반복 일정을<br/>루틴으로 가볍게</h1>
-        <p class="p">방과후/창동 요일을 저장하면, 칠판에서 한 번에 적용할 수 있어요.</p>
+        <p class="p">방과후/동아리 요일을 저장하면, 칠판에서 한 번에 적용할 수 있어요.</p>
       </div>
 
       <div class="hero-cta fade-up" aria-label="하이라이트">
@@ -442,7 +442,7 @@
     const ALLOWED_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
     const ALLOWED_DAY_SET = new Set(ALLOWED_DAYS);
 
-    const defaultRoutine = () => ({ afterschool: {}, changdong: {} });
+    const defaultRoutine = () => ({ afterschool: {}, club: {} });
 
     let routine = defaultRoutine();
     let grade = null;
@@ -454,7 +454,7 @@
     let saveLabelTimer = null;
 
     const $af = document.getElementById('afterschoolDays');
-    const $cd = document.getElementById('changdongDays');
+    const $club = document.getElementById('clubDays');
     const saveBtn = document.getElementById('saveBtn');
     const resetBtn = document.getElementById('resetBtn');
     const metaEl = document.getElementById('userMeta');
@@ -516,10 +516,10 @@
         return defaultRoutine();
       }
       const normalizedAfterschool = normalizeMap(value.afterschool || value.afterschool_data || value.afterschoolDays || {});
-      const normalizedChangdong = normalizeMap(value.changdong || value.changdong_data || {});
+      const normalizedClub = normalizeMap(value.club || value.changdong || value.changdong_data || {});
       return {
         afterschool: normalizedAfterschool,
-        changdong: normalizedChangdong
+        club: normalizedClub
       };
     }
 
@@ -600,13 +600,12 @@
         });
       }
 
-      if ($cd) {
-        $cd.querySelectorAll('.pill').forEach(btn => {
+      if ($club) {
+        $club.querySelectorAll('.pill').forEach(btn => {
           const day = btn.dataset.day;
-          const members = routine.changdong[day] || [];
+          const members = routine.club[day] || [];
           const on = currentNum != null && members.includes(currentNum);
           btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-          btn.setAttribute('aria-checked', on ? 'true' : 'false');
           btn.dataset.count = members.length ? members.length : '';
         });
       }
@@ -813,8 +812,8 @@
       });
     }
 
-    if ($cd) {
-      $cd.addEventListener('click', (event) => {
+    if ($club) {
+      $club.addEventListener('click', (event) => {
         const btn = findPillButton(event);
         if (!btn || !btn.dataset.day) return;
         const day = btn.dataset.day;
@@ -822,18 +821,11 @@
         if (!ensureStudentNumberOrWarn()) return;
 
         const currentNum = getCurrentNumber();
-        // 다른 요일에서 제거
-        for (const key of Object.keys(routine.changdong)) {
-          if (key !== day) {
-            removeSelfFromDay(routine.changdong, key);
-          }
-        }
-
-        const members = routine.changdong[day] || [];
+        const members = routine.club[day] || [];
         if (members.includes(currentNum)) {
-          removeSelfFromDay(routine.changdong, day);
+          removeSelfFromDay(routine.club, day);
         } else {
-          addSelfToDay(routine.changdong, day);
+          addSelfToDay(routine.club, day);
         }
         hasUnsavedChanges = true;
         render();
@@ -858,7 +850,7 @@
           return;
         }
         if (!ensureStudentNumberOrWarn()) return;
-        const confirmed = window.confirm(`방과후/창동 선택을 모두 초기화할까요?
+        const confirmed = window.confirm(`방과후/동아리 선택을 모두 초기화할까요?
 (지금 기기에서 저장한 모든 요일이 삭제됩니다)`);
         if (!confirmed) return;
         routine = defaultRoutine();

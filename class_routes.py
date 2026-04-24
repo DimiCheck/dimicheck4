@@ -1411,7 +1411,7 @@ def get_routine():
     routine = ClassRoutine.query.filter_by(grade=grade, section=section).first()
     if not routine:
         # 빈 구조 반환
-        return jsonify({"afterschool": {}, "changdong": {}})
+        return jsonify({"afterschool": {}, "club": {}, "changdong": {}})
 
     return jsonify(routine.to_dict())
 
@@ -1459,10 +1459,12 @@ def save_routine():
 
     payload = request.get_json(silent=True) or {}
     afterschool = payload.get("afterschool") or {}
-    changdong = payload.get("changdong") or {}
+    club = payload.get("club")
+    if club is None:
+        club = payload.get("changdong") or {}
 
     afterschool_map = _normalize_participant_map(afterschool)
-    changdong_map = _normalize_participant_map(changdong)
+    club_map = _normalize_participant_map(club)
 
     routine = ClassRoutine.query.filter_by(grade=grade, section=section).first()
     if not routine:
@@ -1474,7 +1476,7 @@ def save_routine():
 
     if is_teacher or is_board:
         routine.set_afterschool_map(afterschool_map)
-        routine.set_changdong_map(changdong_map)
+        routine.set_club_map(club_map)
     else:
         session_grade, session_section, session_number = _get_student_session_info()
         if (
@@ -1485,7 +1487,7 @@ def save_routine():
             return jsonify({"error": "forbidden"}), 403
 
         existing_afterschool = routine.get_afterschool_map()
-        existing_changdong = routine.get_changdong_map()
+        existing_club = routine.get_club_map()
 
         updated_afterschool = {
             day: list(numbers) for day, numbers in existing_afterschool.items()
@@ -1512,34 +1514,33 @@ def save_routine():
                     else:
                         updated_afterschool.pop(day, None)
 
-        updated_changdong = {
-            day: list(numbers) for day, numbers in existing_changdong.items()
+        updated_club = {
+            day: list(numbers) for day, numbers in existing_club.items()
         }
 
-        requested_changdong_days = [
+        requested_club_days = {
             day
-            for day, numbers in changdong_map.items()
+            for day, numbers in club_map.items()
             if session_number in numbers
-        ]
+        }
 
-        selected_changdong_day = requested_changdong_days[0] if requested_changdong_days else None
-
-        for day in list(updated_changdong.keys()):
-            members = [num for num in updated_changdong[day] if num != session_number]
-            if members:
-                updated_changdong[day] = members
+        for day in ALLOWED_ROUTINE_DAYS:
+            members = list(updated_club.get(day, []))
+            if day in requested_club_days:
+                if session_number not in members:
+                    members.append(session_number)
+                members.sort()
+                updated_club[day] = members
             else:
-                updated_changdong.pop(day)
-
-        if selected_changdong_day is not None and selected_changdong_day in ALLOWED_ROUTINE_DAYS:
-            members = updated_changdong.get(selected_changdong_day, [])
-            if session_number not in members:
-                members.append(session_number)
-            members.sort()
-            updated_changdong[selected_changdong_day] = members
+                if session_number in members:
+                    members = [num for num in members if num != session_number]
+                    if members:
+                        updated_club[day] = members
+                    else:
+                        updated_club.pop(day, None)
 
         routine.set_afterschool_map(updated_afterschool)
-        routine.set_changdong_map(updated_changdong)
+        routine.set_club_map(updated_club)
 
     db.session.commit()
 
@@ -1667,6 +1668,7 @@ _SCHOOLLIFE_CACHE = {
     "meal": {},
     "timetable": {},  # keyed by (grade, section)
 }
+_NEIS_FALLBACK_API_KEY = "da82433f0f3a4351bda4ca9a0f11fc7d"
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 _MEAL_DISK_CACHE_DIR = os.path.join(_BASE_DIR, "instance")
@@ -1826,9 +1828,8 @@ def _fetch_timetable_from_api(grade: int, section: int):
         "GRADE": grade,
         "CLASS_NM": section,
         "ALL_TI_YMD": today,
+        "KEY": config.NEIS_API_KEY or _NEIS_FALLBACK_API_KEY,
     }
-    if config.NEIS_API_KEY:
-        params["KEY"] = config.NEIS_API_KEY
     print(f"[TIMETABLE] Making request to NEIS API with params: {params}")
     res = requests.get("https://open.neis.go.kr/hub/hisTimetable", params=params, timeout=15)
     res.raise_for_status()
@@ -1969,7 +1970,7 @@ def get_schoollife_timetable():
         print(f"[TIMETABLE] KST now: {now}, grade: {grade}, section: {section}")
         key = (grade, section)
         cache_entry = _SCHOOLLIFE_CACHE["timetable"].get(key)
-        if cache_entry and _is_same_day(cache_entry["timestamp"], now):
+        if cache_entry and _is_same_day(cache_entry.get("timestamp"), now):
             return jsonify(cache_entry["data"])
 
         try:

@@ -153,10 +153,18 @@ class ClassRoutine(db.Model):
         first_day = next(iter(sorted(normalized.keys())), None)
         self.changdong_day = first_day
 
+    def get_club_map(self):
+        return self.get_changdong_map()
+
+    def set_club_map(self, mapping):
+        self.set_changdong_map(mapping)
+
     def to_dict(self):
+        club = self.get_club_map()
         return {
             "afterschool": self.get_afterschool_map(),
-            "changdong": self.get_changdong_map()
+            "club": club,
+            "changdong": club,
         }
 
 
