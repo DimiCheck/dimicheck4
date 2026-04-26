@@ -938,6 +938,57 @@ body.fullscreen .fullscreen-btn {
   height: 19px;
 }
 
+.magnet-multi-select-toggle {
+  position: absolute;
+  z-index: 870;
+  min-height: 36px;
+  padding: 0 10px 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(12, 17, 26, 0.58);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px) saturate(135%);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+
+.magnet-multi-select-toggle:hover,
+.magnet-multi-select-toggle:focus-visible {
+  outline: none;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(18, 26, 38, 0.72);
+  transform: translateY(-1px);
+}
+
+.magnet-multi-select-toggle.is-active {
+  color: #111827;
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(255, 255, 255, 0.92);
+}
+
+.magnet-multi-select-toggle__count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: rgba(37, 99, 235, 0.88);
+  font-size: 12px;
+  line-height: 1;
+}
+
 .badge.color-red {
   background: linear-gradient(135deg, #ff4444, #cc0000);
 }
@@ -2005,6 +2056,29 @@ body.april-fools-fireworks .fireworks {
   z-index: 1190;
 }
 
+.magnet.magnet-multi-selected {
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.92),
+    0 0 0 7px rgba(37, 99, 235, 0.52),
+    0 14px 30px rgba(37, 99, 235, 0.26),
+    inset 0 -5px 12px rgba(0, 0, 0, 0.32),
+    0 0 18px var(--ornament-glow);
+}
+
+.magnet.magnet-multi-selected::after {
+  content: "";
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background:
+    linear-gradient(135deg, #fff, #dbeafe);
+  border: 2px solid #2563eb;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.28);
+}
+
 .magnet-group-badge {
   position: absolute;
   top: -8px;
@@ -2221,5 +2295,17 @@ body.april-fools-fireworks .fireworks {
 
   .magnet-quick-drop-cell__label {
     font-size: 12px;
+  }
+
+  .magnet-multi-select-toggle {
+    min-height: 32px;
+    padding: 0 8px 0 12px;
+    font-size: 12px;
+  }
+
+  .magnet-multi-select-toggle__count {
+    min-width: 20px;
+    height: 20px;
+    font-size: 11px;
   }
 }

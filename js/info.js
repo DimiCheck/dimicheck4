@@ -1,5 +1,5 @@
 (function () {
-  const WHATS_NEW_VERSION = 'board-whats-new-2026-04-quick-drop';
+  const WHATS_NEW_VERSION = 'board-whats-new-2026-04-multi-select-drop';
   const WHATS_NEW_SEEN_KEY = 'dimicheck:board-whats-new-seen';
   const WHATS_NEW_MENU_OPENED_KEY = 'dimicheck:board-whats-new-menu-opened';
   const WHATS_NEW_FIRST_EXPOSED_KEY = 'dimicheck:board-whats-new-first-exposed';

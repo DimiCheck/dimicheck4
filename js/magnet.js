@@ -23,11 +23,6 @@ const MAGNET_MENU_OPTIONS = [
 
 const MAGNET_QUICK_DROP_TARGETS = [
   {
-    label: '교실',
-    value: 'classroom',
-    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9 20v-6h6v6"/><path d="M8 11h.01M16 11h.01"/></svg>'
-  },
-  {
     label: '화장실(물)',
     value: 'toilet',
     icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h8v6a4 4 0 0 1-8 0V5Z"/><path d="M10 2h4"/><path d="M7 15h10"/><path d="M12 15v6"/><path d="M9 21h6"/></svg>'
@@ -56,6 +51,11 @@ const MAGNET_QUICK_DROP_TARGETS = [
     label: '조기입실',
     value: 'early',
     icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16"/><path d="M6 18V9h12v9"/><path d="M8 9V6h8v3"/><path d="M9 14h6"/></svg>'
+  },
+  {
+    label: '기타',
+    value: 'etc',
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>'
   },
   {
     label: '결석(조퇴)',
@@ -388,6 +388,9 @@ let magnetMenuLastOrigin = null;
 let magnetQuickDropOverlay = null;
 let magnetQuickDropActiveAction = null;
 let magnetQuickDropFrameId = null;
+let magnetMultiSelectToggleButton = null;
+let magnetMultiSelectEnabled = false;
+const magnetMultiSelected = new Set();
 const MAGNET_QUICK_DROP_CANCEL_ACTION = 'cancel';
 
 const magnetGroup = {
@@ -561,6 +564,142 @@ function getGroupedMagnets(includeLeader = true) {
   if (!magnetGroup.leader) return [];
   const others = magnetGroup.members.slice();
   return includeLeader ? [magnetGroup.leader, ...others] : others;
+}
+
+function getValidMultiSelectedMagnets() {
+  const selected = [];
+  magnetMultiSelected.forEach(magnet => {
+    if (!magnet || !document.body.contains(magnet) || magnet.classList.contains('placeholder')) {
+      magnetMultiSelected.delete(magnet);
+      return;
+    }
+    selected.push(magnet);
+  });
+  return selected;
+}
+
+function updateMagnetMultiSelectToggle() {
+  const selectedCount = getValidMultiSelectedMagnets().length;
+  if (magnetMultiSelectToggleButton) {
+    magnetMultiSelectToggleButton.classList.toggle('is-active', magnetMultiSelectEnabled);
+    magnetMultiSelectToggleButton.innerHTML = `
+      <span>다중 선택</span>
+      <span class="magnet-multi-select-toggle__count">${selectedCount}</span>
+    `;
+    magnetMultiSelectToggleButton.setAttribute('aria-pressed', String(magnetMultiSelectEnabled));
+  }
+  document.body.classList.toggle('magnet-multi-select-mode', magnetMultiSelectEnabled);
+}
+
+function setMagnetMultiSelected(magnet, selected) {
+  if (!magnet || magnet.classList.contains('placeholder')) return;
+  if (selected) {
+    magnetMultiSelected.add(magnet);
+  } else {
+    magnetMultiSelected.delete(magnet);
+  }
+  magnet.classList.toggle('magnet-multi-selected', selected);
+  updateMagnetMultiSelectToggle();
+}
+
+function clearMagnetMultiSelection() {
+  magnetMultiSelected.forEach(magnet => {
+    if (magnet) {
+      magnet.classList.remove('magnet-multi-selected');
+    }
+  });
+  magnetMultiSelected.clear();
+  updateMagnetMultiSelectToggle();
+}
+
+function setMagnetMultiSelectMode(enabled) {
+  magnetMultiSelectEnabled = Boolean(enabled);
+  clearMagnetGroup({ restore: true });
+  hideMagnetQuickDropOverlay();
+  if (!magnetMultiSelectEnabled) {
+    clearMagnetMultiSelection();
+  }
+  updateMagnetMultiSelectToggle();
+}
+
+function ensureMagnetMultiSelectToggle() {
+  if (magnetMultiSelectToggleButton) {
+    positionMagnetMultiSelectToggle();
+    return magnetMultiSelectToggleButton;
+  }
+  const container = document.getElementById('magnetContainer');
+  if (!container) return null;
+
+  magnetMultiSelectToggleButton = document.createElement('button');
+  magnetMultiSelectToggleButton.type = 'button';
+  magnetMultiSelectToggleButton.className = 'magnet-multi-select-toggle';
+  magnetMultiSelectToggleButton.setAttribute('aria-pressed', 'false');
+  magnetMultiSelectToggleButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setMagnetMultiSelectMode(!magnetMultiSelectEnabled);
+  });
+  magnetMultiSelectToggleButton.addEventListener('mousedown', event => event.stopPropagation());
+  magnetMultiSelectToggleButton.addEventListener('touchstart', event => event.stopPropagation(), { passive: true });
+  container.appendChild(magnetMultiSelectToggleButton);
+  updateMagnetMultiSelectToggle();
+  positionMagnetMultiSelectToggle();
+  return magnetMultiSelectToggleButton;
+}
+
+function positionMagnetMultiSelectToggle() {
+  const container = document.getElementById('magnetContainer');
+  if (!container || !magnetMultiSelectToggleButton) return;
+  const bounds = getMagnetClassroomBounds(container);
+  if (!bounds) return;
+  const top = Math.max(0, bounds.top - 46);
+  magnetMultiSelectToggleButton.style.left = `${bounds.left}px`;
+  magnetMultiSelectToggleButton.style.top = `${top}px`;
+}
+
+function startMagnetGroupFromMultiSelection(leader) {
+  if (!leader || leader.classList.contains('placeholder')) return;
+  if (!magnetMultiSelected.has(leader)) {
+    setMagnetMultiSelected(leader, true);
+  }
+
+  const container = document.getElementById('magnetContainer');
+  if (!container) return;
+
+  const selected = getValidMultiSelectedMagnets();
+  const members = selected.filter(magnet => magnet !== leader);
+  clearMagnetGroup({ restore: false });
+
+  magnetGroup.leader = leader;
+  magnetGroup.pointerId = 'multi-select';
+  magnetGroup.members = [];
+  magnetGroup.offsets = new Map();
+  magnetGroup.originals = new Map();
+  magnetGroup.active = true;
+  storeOriginalState(leader);
+
+  const leaderPos = getMagnetPosition(leader);
+  leader.classList.add('magnet-group-leader');
+  leader.style.zIndex = '1200';
+
+  members.forEach((member, index) => {
+    storeOriginalState(member);
+    const memberPos = getMagnetPosition(member);
+    member.classList.remove('attached');
+    member.classList.add('magnet-group-member');
+    if (member.parentElement !== container) {
+      container.appendChild(member);
+    }
+    setMagnetPosition(member, memberPos.left, memberPos.top);
+    magnetGroup.members.push(member);
+    magnetGroup.offsets.set(member, {
+      dx: memberPos.left - leaderPos.left,
+      dy: memberPos.top - leaderPos.top
+    });
+    member.style.zIndex = String(1200 - (index + 1));
+  });
+
+  updateGroupBadge();
 }
 
 function normalizeFavoriteStatusAction(value) {
@@ -1139,18 +1278,50 @@ function shouldShowMagnetQuickDropFor(magnet) {
 function applyMagnetQuickDropAction(action, magnets) {
   if (!action || !Array.isArray(magnets) || !magnets.length) return false;
   const nextAction = action === MAGNET_QUICK_DROP_CANCEL_ACTION ? 'classroom' : action;
-  magnets.filter(Boolean).forEach(magnet => {
-    applyMagnetQuickAction(magnet, nextAction, { skipSave: true });
+  const targets = magnets.filter(Boolean);
+  const shouldDeferReason = nextAction === 'etc' && targets.length > 1;
+  const groupReasonTargets = shouldDeferReason ? targets : null;
+  const needsReasonPrompt = shouldDeferReason
+    ? groupReasonTargets.some(magnet => {
+        const reason = (magnet.dataset.reason || '').trim();
+        return reason.length === 0;
+      })
+    : false;
+
+  targets.forEach(magnet => {
+    applyMagnetQuickAction(magnet, nextAction, {
+      skipSave: true,
+      deferReasonDialog: shouldDeferReason
+    });
   });
   updateAttendance();
   updateMagnetOutline();
   updateEtcReasonPanel();
   saveState(grade, section);
+  if (shouldDeferReason && needsReasonPrompt && groupReasonTargets && groupReasonTargets.length) {
+    openReasonDialog(groupReasonTargets);
+  }
   return true;
 }
 
 document.addEventListener('visibilitychange', () => {
   hideMagnetQuickDropOverlay();
+});
+
+window.addEventListener('resize', () => {
+  positionMagnetMultiSelectToggle();
+  if (magnetQuickDropOverlay && !magnetQuickDropOverlay.hidden) {
+    positionMagnetQuickDropOverlay(magnetQuickDropOverlay);
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape' || !magnetMultiSelectEnabled) return;
+  if (getValidMultiSelectedMagnets().length) {
+    clearMagnetMultiSelection();
+  } else {
+    setMagnetMultiSelectMode(false);
+  }
 });
 
 function resolveMagnetQuickMenuState(target) {
@@ -1305,6 +1476,7 @@ function createMagnets(end = 31, skipNumbers = [12]) {
   const tc = document.getElementById('total-count');
   if (tc) tc.textContent = `${total}명`;
 
+  ensureMagnetMultiSelectToggle();
   updateMagnetOutline();
 }
 
@@ -1678,6 +1850,7 @@ function addDragFunctionality(el) {
   let startTop = 0;
   let activeTouchId = null;
   let quickDropEligible = false;
+  let multiSelectWasSelectedAtPress = false;
 
   function getTouchFromList(touchList) {
     if (!touchList || !touchList.length) return null;
@@ -1717,6 +1890,7 @@ function addDragFunctionality(el) {
     isDragging = false;
     didPrepareForDrag = false;
     quickDropEligible = false;
+    multiSelectWasSelectedAtPress = false;
     window.isMagnetDragging = false;
     activeTouchId = null;
     el.classList.remove('dragging');
@@ -1771,7 +1945,7 @@ function addDragFunctionality(el) {
     const isTouchStart = e.type === 'touchstart';
     const pointerType = e.pointerType || (isTouchStart ? 'touch' : 'mouse');
 
-    if (pointerType === 'touch' || pointerType === 'pen') {
+    if (!magnetMultiSelectEnabled && (pointerType === 'touch' || pointerType === 'pen')) {
       if (!magnetGroup.leader) {
         startMagnetGroup(el, e.pointerId !== undefined ? e.pointerId : 'touch');
       } else if (magnetGroup.leader === el) {
@@ -1786,7 +1960,7 @@ function addDragFunctionality(el) {
           return;
         }
       }
-    } else if (magnetGroup.leader && magnetGroup.leader !== el) {
+    } else if (!magnetMultiSelectEnabled && magnetGroup.leader && magnetGroup.leader !== el) {
       clearMagnetGroup();
     }
 
@@ -1810,6 +1984,10 @@ function addDragFunctionality(el) {
     didPrepareForDrag = false;
     longPressTriggered = false;
     quickDropEligible = shouldShowMagnetQuickDropFor(el);
+    multiSelectWasSelectedAtPress = magnetMultiSelected.has(el);
+    if (magnetMultiSelectEnabled && !multiSelectWasSelectedAtPress) {
+      setMagnetMultiSelected(el, true);
+    }
 
     startClientX = pos.clientX;
     startClientY = pos.clientY;
@@ -1818,7 +1996,9 @@ function addDragFunctionality(el) {
     startLeft = parseFloat(el.style.left) || 0;
     startTop = parseFloat(el.style.top) || 0;
 
-    longPressTimer = setTimeout(() => triggerLongPress(pos.clientX, pos.clientY), LONG_PRESS_DELAY);
+    if (!magnetMultiSelectEnabled) {
+      longPressTimer = setTimeout(() => triggerLongPress(pos.clientX, pos.clientY), LONG_PRESS_DELAY);
+    }
 
     if (e.type === 'touchstart' && e.cancelable) {
       e.preventDefault();
@@ -1841,6 +2021,9 @@ function addDragFunctionality(el) {
       if (moveX > DRAG_MOVE_THRESHOLD || moveY > DRAG_MOVE_THRESHOLD) {
         clearLongPressTimer();
         prepareForDrag(clientX, clientY);
+        if (magnetMultiSelectEnabled) {
+          startMagnetGroupFromMultiSelection(el);
+        }
         isDragging = true;
         window.isMagnetDragging = true;
         el.classList.add('dragging');
@@ -1997,6 +2180,14 @@ function addDragFunctionality(el) {
     let handledTapAction = false;
     if (isDragging) {
       dropMagnet();
+      if (magnetMultiSelectEnabled) {
+        clearMagnetMultiSelection();
+      }
+    } else if (isPointerDown && magnetMultiSelectEnabled) {
+      if (multiSelectWasSelectedAtPress) {
+        setMagnetMultiSelected(el, false);
+      }
+      handledTapAction = true;
     } else if (
       isPointerDown &&
       !longPressTriggered &&
@@ -2046,6 +2237,9 @@ function addDragFunctionality(el) {
     if (magnetGroup.leader === el) {
       magnetGroup.active = false;
       clearMagnetGroup();
+    }
+    if (magnetMultiSelectEnabled && isDragging) {
+      clearMagnetMultiSelection();
     }
     longPressTriggered = false;
     resetInteractionState();
