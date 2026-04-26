@@ -1659,6 +1659,37 @@ function updateMagnetOutline() {
 }
 
 /* ===================== 출결 계산 ===================== */
+function ensureSectionCountIndicator(section) {
+  if (!section || section.dataset.category === 'etc') return null;
+  const title = section.querySelector('.section-title');
+  if (!title) return null;
+
+  let indicator = title.querySelector('.section-count-indicator');
+  if (!indicator) {
+    indicator = document.createElement('span');
+    indicator.className = 'section-count-indicator';
+    indicator.setAttribute('aria-hidden', 'true');
+    title.appendChild(indicator);
+  }
+  return indicator;
+}
+
+function updateSectionCountIndicator(section, count) {
+  const indicator = ensureSectionCountIndicator(section);
+  if (!indicator) return;
+
+  if (!count) {
+    indicator.hidden = true;
+    indicator.textContent = '';
+    indicator.removeAttribute('title');
+    return;
+  }
+
+  indicator.hidden = false;
+  indicator.textContent = `${count}명`;
+  indicator.title = `${count}명`;
+}
+
 function updateAttendance() {
   const total = document.querySelectorAll('.magnet:not(.placeholder)').length;
   const excluded = new Set(['toilet', 'hallway']);
@@ -1671,6 +1702,7 @@ function updateAttendance() {
     if (!content) return;
 
     const n = content.querySelectorAll('.magnet:not(.placeholder)').length;
+    updateSectionCountIndicator(section, n);
     if (!excluded.has(cat)) NabsentCount += n;
     absentCount += n;
   });

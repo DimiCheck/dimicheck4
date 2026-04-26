@@ -593,6 +593,29 @@ body.fullscreen .fullscreen-btn {
   transform: translateY(-1px);
 }
 
+.section-count-indicator {
+  margin-left: auto;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.74);
+  background: rgba(255, 255, 255, 0.075);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.section-count-indicator[hidden] {
+  display: none;
+}
+
 .etc-reason-popover {
   position: fixed;
   z-index: 1800;
