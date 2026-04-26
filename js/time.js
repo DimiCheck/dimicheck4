@@ -599,6 +599,8 @@ let routinePromptMessage = null;
 let routinePromptDetails = null;
 let routinePromptButtons = null;
 let routinePromptActive = null;
+let routinePromptDismissTimer = null;
+const ROUTINE_SUMMARY_DISMISS_MS = 3500;
 
 function ensureRoutinePromptElements() {
   if (routinePromptOverlay) {
@@ -620,74 +622,83 @@ function ensureRoutinePromptElements() {
   position: fixed;
   inset: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(15, 23, 42, 0.35);
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0 24px 110px;
+  background: transparent;
+  pointer-events: none;
   z-index: 4000;
 }
 .routine-prompt-overlay[hidden] {
   display: none;
 }
 .routine-prompt {
-  width: min(420px, 92vw);
-  border-radius: 16px;
-  padding: 24px;
-  background: var(--card, #1f2937);
-  color: var(--text, #e2e8f0);
-  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.35);
+  width: min(430px, calc(100vw - 32px));
+  border-radius: 22px;
+  padding: 18px;
+  background: rgba(13, 17, 25, 0.94);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 22px 58px rgba(0, 0, 0, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px) saturate(150%);
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
+  pointer-events: auto;
+  animation: routinePromptIn 0.18s ease-out;
 }
-@media (prefers-color-scheme: light) {
+@keyframes routinePromptIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (max-width: 640px) {
+  .routine-prompt-overlay {
+    justify-content: center;
+    padding: 0 14px 18px;
+  }
   .routine-prompt {
-    background: rgba(255, 255, 255, 0.96);
-    color: #0f172a;
-    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
+    width: 100%;
   }
 }
 .routine-prompt__title {
   margin: 0;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 850;
+  letter-spacing: -0.03em;
 }
 .routine-prompt__message {
   margin: 0;
-  font-size: 15px;
+  color: rgba(248, 250, 252, 0.84);
+  font-size: 14px;
   line-height: 1.5;
 }
 .routine-prompt__details {
-  font-size: 14px;
-  color: var(--muted, #94a3b8);
+  max-height: 98px;
+  overflow: auto;
+  font-size: 13px;
+  color: rgba(248, 250, 252, 0.68);
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-@media (prefers-color-scheme: light) {
-  .routine-prompt__details {
-    color: #5b6475;
-  }
-}
 .routine-prompt__detail-item {
-  padding: 6px 10px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
-}
-@media (prefers-color-scheme: light) {
-  .routine-prompt__detail-item {
-    background: rgba(15, 23, 42, 0.08);
-  }
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.075);
 }
 .routine-prompt__buttons {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
+}
+.routine-prompt__buttons[hidden] {
+  display: none;
 }
 .routine-btn {
-  min-width: 88px;
-  padding: 10px 18px;
+  min-width: 76px;
+  padding: 9px 15px;
   border-radius: 999px;
-  font-weight: 600;
+  font-weight: 800;
   font-size: 14px;
   cursor: pointer;
   border: 1px solid transparent;
@@ -703,20 +714,17 @@ function ensureRoutinePromptElements() {
   transform: translateY(1px);
 }
 .routine-btn--cancel {
-  border-color: rgba(148, 163, 184, 0.45);
-}
-@media (prefers-color-scheme: light) {
-  .routine-btn--cancel {
-    border-color: rgba(100, 116, 139, 0.4);
-  }
+  color: rgba(248, 250, 252, 0.76);
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
 }
 .routine-btn--confirm {
-  background: #2563eb;
-  color: #fff;
+  background: #f8fafc;
+  color: #111827;
   border: 0;
 }
 .routine-btn--confirm:hover {
-  background: #1d4ed8;
+  background: #ffffff;
 }
 `;
     document.head.appendChild(style);
@@ -729,7 +737,7 @@ function ensureRoutinePromptElements() {
   const dialog = document.createElement('div');
   dialog.className = 'routine-prompt';
   dialog.setAttribute('role', 'dialog');
-  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('aria-modal', 'false');
 
   const titleEl = document.createElement('h2');
   titleEl.className = 'routine-prompt__title';
@@ -778,8 +786,13 @@ function ensureRoutinePromptElements() {
   };
 }
 
-function renderRoutineModal({ title, message, detailItems = [], buttons = [] }) {
+function renderRoutineModal({ title, message, detailItems = [], buttons = [], autoDismissMs = 0 }) {
   const { overlay, titleEl, messageEl, detailsEl, buttonsEl } = ensureRoutinePromptElements();
+  if (routinePromptDismissTimer) {
+    clearTimeout(routinePromptDismissTimer);
+    routinePromptDismissTimer = null;
+  }
+
   titleEl.textContent = title;
   messageEl.textContent = message;
 
@@ -797,6 +810,7 @@ function renderRoutineModal({ title, message, detailItems = [], buttons = [] }) 
   }
 
   buttonsEl.innerHTML = '';
+  buttonsEl.hidden = buttons.length === 0;
   buttons.forEach((def) => {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -807,13 +821,19 @@ function renderRoutineModal({ title, message, detailItems = [], buttons = [] }) 
   });
 
   overlay.hidden = false;
-  const firstButton = buttonsEl.querySelector('button');
-  if (firstButton) {
-    setTimeout(() => firstButton.focus(), 0);
+  if (autoDismissMs > 0) {
+    routinePromptDismissTimer = window.setTimeout(() => {
+      routinePromptDismissTimer = null;
+      closeRoutinePrompt();
+    }, autoDismissMs);
   }
 }
 
 function closeRoutinePrompt() {
+  if (routinePromptDismissTimer) {
+    clearTimeout(routinePromptDismissTimer);
+    routinePromptDismissTimer = null;
+  }
   if (!routinePromptOverlay) return;
   routinePromptOverlay.hidden = true;
   routinePromptActive = null;
@@ -838,8 +858,8 @@ function openRoutineDecision({ label, participants, onConfirm, onCancel }) {
     }
   };
   renderRoutineModal({
-    title: '루틴 적용',
-    message: `${label} 루틴을 적용할까요?`,
+    title: `${label} 루틴`,
+    message: `${participants.length}명을 ${label}로 이동할까요?`,
     detailItems: participantLine ? [participantLine] : [],
     buttons: [
       {
@@ -890,28 +910,20 @@ function showRoutineSummary(label, participants, result) {
 
   renderRoutineModal({
     title: `${label} 루틴 적용 완료`,
-    message: `${label} 루틴이 적용되었습니다.`,
+    message: movedList.length ? `${movedList.length}명을 이동했습니다.` : '이동할 대상이 없습니다.',
     detailItems,
-    buttons: [
-      {
-        label: '확인',
-        variant: 'confirm',
-        onClick: () => {
-          routinePromptActive = null;
-          closeRoutinePrompt();
-        }
-      }
-    ]
+    buttons: [],
+    autoDismissMs: ROUTINE_SUMMARY_DISMISS_MS
   });
 }
 
 function showRoutinePrompt(category, participants, stateKey) {
   if (!Array.isArray(participants) || !participants.length) return;
-  if (window.isMagnetDragging || window.isAutoReturning || window.isRoutineApplying) {
+  if (routinePromptActive || window.isMagnetDragging || window.isAutoReturning || window.isRoutineApplying) {
     return;
   }
 
-  routinePromptState[stateKey] = 'shown';
+  routinePromptState[stateKey] = { status: 'shown' };
   const label = ROUTINE_LABELS[category] || '루틴';
   console.log('[routine] prompt', { category, participants, stateKey });
   openRoutineDecision({
@@ -927,7 +939,7 @@ function showRoutinePrompt(category, participants, stateKey) {
       showRoutineSummary(label, participants, result);
     },
     onCancel: () => {
-      console.log('[routine] prompt cancelled', stateKey);
+      console.log('[routine] prompt ignored for today', stateKey);
       routinePromptState[stateKey] = 'done';
     }
   });
@@ -981,7 +993,11 @@ function checkRoutinePrompts(now) {
     }
 
     const stateKey = `${prompt.key}-${todayKey}`;
-    if (routinePromptState[stateKey] === 'done' || routinePromptState[stateKey] === 'shown') return;
+    const state = routinePromptState[stateKey];
+    if (state === 'done' || state === 'shown') return;
+    if (state && typeof state === 'object') {
+      if (state.status === 'done' || state.status === 'shown') return;
+    }
 
     showRoutinePrompt(prompt.category, participants, stateKey);
   });
