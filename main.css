@@ -37,6 +37,60 @@ body::before {
   z-index: -1;
 }
 
+.app-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #f8fafc;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.08), transparent 34%),
+    #000;
+  opacity: 1;
+  transition: opacity 0.28s ease, visibility 0.28s ease;
+}
+
+.app-splash.is-hiding {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.app-splash__center {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  transform: translateY(-18px);
+}
+
+.app-splash__logo {
+  width: 92px;
+  height: 92px;
+  object-fit: contain;
+  filter: drop-shadow(0 18px 36px rgba(255, 255, 255, 0.12));
+}
+
+.app-splash__brand {
+  font-size: clamp(28px, 5vw, 42px);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.app-splash__status {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: max(32px, env(safe-area-inset-bottom));
+  color: rgba(248, 250, 252, 0.68);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
 /* Magnet Container */
 .magnet-container {
   border-radius: 10px;

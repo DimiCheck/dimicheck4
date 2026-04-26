@@ -30,6 +30,89 @@
   <link rel="icon" type="image/png" sizes="16x16" href="src/favicon/favicon-16x16.png">
 </head>
 <body>
+  <div id="appSplash" class="app-splash" role="status" aria-live="polite">
+    <div class="app-splash__center">
+      <img class="app-splash__logo" src="/logo.png" alt="" aria-hidden="true">
+      <div class="app-splash__brand">DimiCheck</div>
+    </div>
+    <div id="appSplashStatus" class="app-splash__status">디미체크 준비 중...</div>
+  </div>
+  <script>
+    (function () {
+      const splash = document.getElementById('appSplash');
+      const status = document.getElementById('appSplashStatus');
+      if (!splash || !status) return;
+
+      const startedAt = performance.now();
+      const MIN_VISIBLE_MS = 450;
+      const MAX_VISIBLE_MS = 2800;
+      let boardReady = false;
+      let pwaSettled = false;
+      let reloading = false;
+      let hidden = false;
+
+      function setStatus(message) {
+        if (message) status.textContent = message;
+      }
+
+      function hideSplash() {
+        if (hidden || reloading) return;
+        hidden = true;
+        splash.classList.add('is-hiding');
+        window.setTimeout(() => {
+          splash.hidden = true;
+        }, 280);
+      }
+
+      function maybeHideSplash() {
+        if (hidden || reloading || !boardReady || !pwaSettled) return;
+        const elapsed = performance.now() - startedAt;
+        window.setTimeout(hideSplash, Math.max(0, MIN_VISIBLE_MS - elapsed));
+      }
+
+      window.addEventListener('dimicheck:splash-status', (event) => {
+        setStatus(event.detail && event.detail.message);
+      });
+
+      window.addEventListener('dimicheck:pwa-status', (event) => {
+        const detail = event.detail || {};
+        setStatus(detail.message);
+        if (detail.phase === 'checking' || detail.phase === 'installing') {
+          pwaSettled = false;
+        } else if (detail.phase === 'ready' || detail.phase === 'unsupported' || detail.phase === 'error') {
+          pwaSettled = true;
+          maybeHideSplash();
+        } else if (detail.phase === 'reloading') {
+          reloading = true;
+        }
+      });
+
+      window.addEventListener('dimicheck:pwa-update', () => {
+        setStatus('새 버전을 준비하는 중...');
+      });
+
+      window.addEventListener('dimicheck:pwa-controllerchange', () => {
+        setStatus('업데이트를 확인하는 중...');
+      });
+
+      window.addEventListener('dimicheck:board-ready', () => {
+        boardReady = true;
+        if (!reloading && pwaSettled) setStatus('디미체크 준비 완료');
+        maybeHideSplash();
+      });
+
+      window.setTimeout(() => {
+        pwaSettled = true;
+        maybeHideSplash();
+      }, 1400);
+
+      window.setTimeout(() => {
+        boardReady = true;
+        pwaSettled = true;
+        maybeHideSplash();
+      }, MAX_VISIBLE_MS);
+    })();
+  </script>
   <div
     id="connectionStatusBanner"
     class="connection-banner"

@@ -1509,7 +1509,13 @@ window.forceResyncState = async function forceResyncState() {
   }
 };
 
-initBoard();
+initBoard()
+  .catch((err) => {
+    console.warn('[board] init failed', err);
+  })
+  .finally(() => {
+    window.dispatchEvent(new Event('dimicheck:board-ready'));
+  });
 connectBoardRealtime();
 
 setInterval(() => {

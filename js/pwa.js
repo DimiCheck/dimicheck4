@@ -1,5 +1,12 @@
 (function () {
+  function dispatchPwaStatus(message, phase) {
+    window.dispatchEvent(new CustomEvent('dimicheck:pwa-status', {
+      detail: { message, phase }
+    }));
+  }
+
   if (!('serviceWorker' in navigator)) {
+    dispatchPwaStatus('디미체크 준비 중...', 'unsupported');
     return;
   }
 
@@ -25,14 +32,19 @@
   }
 
   async function registerServiceWorker() {
+    dispatchPwaStatus('업데이트 확인 중...', 'checking');
     const swUrl = await resolveServiceWorkerUrl();
     navigator.serviceWorker
       .register(swUrl, { updateViaCache: 'none' })
       .then((registration) => {
         onRegistration(registration);
+        if (!registration.waiting && !registration.installing) {
+          dispatchPwaStatus('디미체크 준비 중...', 'ready');
+        }
       })
       .catch((error) => {
         console.error('[PWA] Service worker registration failed:', error);
+        dispatchPwaStatus('디미체크 준비 중...', 'error');
       });
   }
 
@@ -46,16 +58,20 @@
       if (!worker) {
         return;
       }
+      dispatchPwaStatus('업데이트를 준비하는 중...', 'installing');
 
       worker.addEventListener('statechange', () => {
         if (worker.state === 'installed' && navigator.serviceWorker.controller) {
           dispatchUpdateEvent(worker);
+        } else if (worker.state === 'installed') {
+          dispatchPwaStatus('디미체크 준비 중...', 'ready');
         }
       });
     });
   }
 
   function dispatchUpdateEvent(worker) {
+    dispatchPwaStatus('새 버전을 준비하는 중...', 'installing');
     const updateEvent = new CustomEvent('dimicheck:pwa-update', { detail: worker });
     window.dispatchEvent(updateEvent);
   }
@@ -85,6 +101,7 @@
       // Ignore storage failures
     }
     refreshing = true;
+    dispatchPwaStatus('업데이트를 위해 새로고침하는 중...', 'reloading');
     window.location.reload();
   });
 })();
