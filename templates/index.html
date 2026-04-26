@@ -50,6 +50,8 @@
       const MAX_VISIBLE_MS = 2800;
       let boardReady = false;
       let pwaSettled = false;
+      let pwaStatusSeen = false;
+      let pwaBusy = false;
       let reloading = false;
       let hidden = false;
 
@@ -93,19 +95,26 @@
 
       window.addEventListener('dimicheck:pwa-status', (event) => {
         const detail = event.detail || {};
+        pwaStatusSeen = true;
         setStatus(detail.message);
         setVersion(detail.version, detail.appVersion);
         if (detail.phase === 'checking' || detail.phase === 'installing') {
+          pwaBusy = true;
           pwaSettled = false;
         } else if (detail.phase === 'ready' || detail.phase === 'unsupported' || detail.phase === 'error') {
+          pwaBusy = false;
           pwaSettled = true;
           maybeHideSplash();
         } else if (detail.phase === 'reloading') {
+          pwaBusy = true;
           reloading = true;
         }
       });
 
       window.addEventListener('dimicheck:pwa-update', () => {
+        pwaStatusSeen = true;
+        pwaBusy = true;
+        pwaSettled = false;
         setStatus('새 버전을 준비하는 중...');
       });
 
@@ -120,15 +129,27 @@
       });
 
       window.setTimeout(() => {
-        pwaSettled = true;
-        maybeHideSplash();
+        if (!pwaStatusSeen) {
+          pwaSettled = true;
+          maybeHideSplash();
+        }
       }, 1400);
 
       window.setTimeout(() => {
         boardReady = true;
-        pwaSettled = true;
+        if (!pwaBusy) {
+          pwaSettled = true;
+        }
         maybeHideSplash();
       }, MAX_VISIBLE_MS);
+
+      window.setTimeout(() => {
+        if (!reloading && pwaBusy) {
+          pwaBusy = false;
+          pwaSettled = true;
+          maybeHideSplash();
+        }
+      }, 9000);
     })();
   </script>
   <div

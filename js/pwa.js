@@ -82,7 +82,7 @@
     window.dispatchEvent(updateEvent);
   }
 
-  window.addEventListener('load', registerServiceWorker);
+  registerServiceWorker();
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     const changeEvent = new Event('dimicheck:pwa-controllerchange');
