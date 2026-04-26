@@ -1131,6 +1131,7 @@ let boardNoticeRenderKey = '';
 const BOARD_NOTICE_POPUP_MS = 5000;
 let boardNoticePopupTimer = null;
 let boardNoticePopupAnimation = null;
+let boardNoticeRenderTimer = null;
 
 function getBoardPopupSeenStorageKey() {
   return `dimicheck:boardPopupNotice:${grade}-${section}`;
@@ -1173,7 +1174,7 @@ function hideBoardNoticePopup() {
 }
 
 function showBoardNoticePopup(notice) {
-  if (!notice?.popup || !notice?.id || hasSeenBoardPopup(notice.id)) {
+  if (!notice?.popup || !notice?.id || !isBoardNoticeActive(notice) || hasSeenBoardPopup(notice.id)) {
     return;
   }
 
@@ -1206,12 +1207,36 @@ function mergeBoardNoticeCache(incoming) {
   const map = new Map();
   [...list, ...boardNoticesCache].forEach((notice) => {
     const id = Number(notice?.id || 0);
+    if (!isBoardNoticeActive(notice)) return;
     if (!id || map.has(id)) return;
     map.set(id, notice);
   });
   boardNoticesCache = Array.from(map.values())
     .sort((a, b) => Number(b?.createdAtMs || 0) - Number(a?.createdAtMs || 0))
     .slice(0, 120);
+}
+
+function isBoardNoticeActive(notice, now = Date.now()) {
+  if (!notice || notice.expired) return false;
+  const expiresAtMs = Number(notice.expiresAtMs || 0);
+  if (expiresAtMs > 0) {
+    return expiresAtMs > now;
+  }
+  if (notice.expiresAt) {
+    const parsed = Date.parse(String(notice.expiresAt));
+    if (Number.isFinite(parsed)) {
+      return parsed > now;
+    }
+  }
+  return true;
+}
+
+function getBoardNoticeExpiresAtMs(notice) {
+  const direct = Number(notice?.expiresAtMs || 0);
+  if (direct > 0) return direct;
+  if (!notice?.expiresAt) return 0;
+  const parsed = Date.parse(String(notice.expiresAt));
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function formatBoardNoticeTime(createdAtMs) {
@@ -1221,12 +1246,61 @@ function formatBoardNoticeTime(createdAtMs) {
   return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 }
 
+function escapeBoardNoticeText(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function scheduleBoardNoticeRenderRefresh(notices = boardNoticesCache, now = Date.now()) {
+  if (boardNoticeRenderTimer) {
+    clearTimeout(boardNoticeRenderTimer);
+    boardNoticeRenderTimer = null;
+  }
+  if (!Array.isArray(notices) || !notices.length) return;
+
+  const nextDelay = notices.reduce((soonest, notice) => {
+    const createdAtMs = Number(notice?.createdAtMs || 0);
+    const expiresAtMs = getBoardNoticeExpiresAtMs(notice);
+    const candidateTimes = [];
+    if (createdAtMs > 0) {
+      candidateTimes.push(createdAtMs + 10_000, createdAtMs + 10 * 60 * 1000);
+    }
+    if (expiresAtMs > 0) {
+      candidateTimes.push(expiresAtMs);
+    }
+    const nextTime = candidateTimes
+      .filter((time) => time > now)
+      .sort((a, b) => a - b)[0];
+    if (!nextTime) return soonest;
+    return Math.min(soonest, nextTime - now + 100);
+  }, Number.POSITIVE_INFINITY);
+
+  if (!Number.isFinite(nextDelay)) return;
+  boardNoticeRenderTimer = window.setTimeout(() => {
+    boardNoticeRenderTimer = null;
+    renderBoardNotices(boardNoticesCache);
+  }, Math.max(1000, nextDelay));
+}
+
 function renderBoardNotices(notices = boardNoticesCache) {
   const container = document.getElementById('boardNoticeList');
   if (!container) return;
 
   const now = Date.now();
-  if (!Array.isArray(notices) || !notices.length) {
+  const activeNotices = Array.isArray(notices)
+    ? notices.filter((notice) => isBoardNoticeActive(notice, now))
+    : [];
+  boardNoticesCache = activeNotices;
+
+  if (!activeNotices.length) {
+    if (boardNoticeRenderTimer) {
+      clearTimeout(boardNoticeRenderTimer);
+      boardNoticeRenderTimer = null;
+    }
     if (boardNoticeRenderKey === 'empty') {
       return;
     }
@@ -1235,14 +1309,16 @@ function renderBoardNotices(notices = boardNoticesCache) {
     return;
   }
 
-  const renderKey = notices.map((notice) => {
+  const renderKey = activeNotices.map((notice) => {
     const createdAtMs = Number(notice?.createdAtMs || 0);
     const ageMs = createdAtMs > 0 ? Math.max(0, now - createdAtMs) : Number.MAX_SAFE_INTEGER;
     const showGlow = ageMs <= 10_000;
     const showDot = ageMs > 10_000 && ageMs <= 10 * 60 * 1000;
+    const expiresAtMs = getBoardNoticeExpiresAtMs(notice);
     return [
       String(notice?.id || ''),
       String(createdAtMs || ''),
+      String(expiresAtMs || ''),
       showGlow ? '1' : '0',
       showDot ? '1' : '0',
       String(notice?.teacherName || ''),
@@ -1255,30 +1331,22 @@ function renderBoardNotices(notices = boardNoticesCache) {
   }
   boardNoticeRenderKey = renderKey;
 
-  container.innerHTML = notices.map((notice) => {
+  container.innerHTML = activeNotices.map((notice) => {
     const createdAtMs = Number(notice?.createdAtMs || 0);
     const ageMs = createdAtMs > 0 ? Math.max(0, now - createdAtMs) : Number.MAX_SAFE_INTEGER;
     const showGlow = ageMs <= 10_000;
     const showDot = ageMs > 10_000 && ageMs <= 10 * 60 * 1000;
-    const safeTeacher = String(notice?.teacherName || '선생님')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-    const safeText = String(notice?.text || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+    const safeTeacher = escapeBoardNoticeText(notice?.teacherName || '선생님');
+    const safeText = escapeBoardNoticeText(notice?.text || '');
+    const autoHideText = notice?.autoHide ? ' · 자동 숨김' : '';
     return `
       <div class="board-notice-item${showGlow ? ' notice-glow' : ''}">
         <div>${showDot ? '<span class="board-notice-dot" aria-hidden="true"></span>' : ''}${safeText}</div>
-        <div class="board-notice-meta">${safeTeacher} · ${formatBoardNoticeTime(createdAtMs)}</div>
+        <div class="board-notice-meta">${safeTeacher} · ${formatBoardNoticeTime(createdAtMs)}${autoHideText}</div>
       </div>
     `;
   }).join('');
+  scheduleBoardNoticeRenderRefresh(activeNotices, now);
 }
 
 async function loadBoardNotices() {
@@ -1290,7 +1358,9 @@ async function loadBoardNotices() {
     });
     if (!response.ok) return;
     const payload = await response.json();
-    boardNoticesCache = Array.isArray(payload?.notices) ? payload.notices : [];
+    boardNoticesCache = Array.isArray(payload?.notices)
+      ? payload.notices.filter((notice) => isBoardNoticeActive(notice))
+      : [];
     renderBoardNotices(boardNoticesCache);
     const popupNotice = boardNoticesCache.find((notice) => notice?.popup && !hasSeenBoardPopup(notice.id));
     if (popupNotice) {
@@ -1332,7 +1402,6 @@ async function initBoard() {
     });
   }
   setInterval(updateClock, CLOCK_RENDER_INTERVAL_MS);
-  setInterval(() => renderBoardNotices(boardNoticesCache), 1000);
 }
 
 let boardSocket = null;
@@ -1361,6 +1430,7 @@ function connectBoardRealtime() {
   boardSocket.on('connect', () => {
     boardRealtimeConnected = true;
     console.log('[board realtime] connected', namespace);
+    loadBoardNotices();
   });
 
   boardSocket.on('disconnect', () => {
@@ -1412,6 +1482,9 @@ function connectBoardRealtime() {
   });
 
   boardSocket.on('notice_created', (notice) => {
+    if (!isBoardNoticeActive(notice)) {
+      return;
+    }
     mergeBoardNoticeCache([notice]);
     renderBoardNotices(boardNoticesCache);
     showBoardNoticePopup(notice);
@@ -1463,9 +1536,8 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-setInterval(() => {
-  if (!canSyncWithBackend()) {
-    return;
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && canSyncWithBackend()) {
+    loadBoardNotices();
   }
-  loadBoardNotices();
-}, 60000);
+});

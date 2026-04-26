@@ -1176,6 +1176,13 @@
     <div class="notice-form">
       <div class="notice-row">
         <input id="noticeTeacherName" class="notice-input" type="text" placeholder="선생님 이름" maxlength="80" />
+        <select id="noticeExpiry" class="notice-input" aria-label="공지 표시 시간">
+          <option value="">계속 표시</option>
+          <option value="10m">10분 후 숨김</option>
+          <option value="30m">30분 후 숨김</option>
+          <option value="1h">1시간 후 숨김</option>
+          <option value="today">오늘 자정까지</option>
+        </select>
         <label class="notice-target-toggle">
           <input id="noticeAllTargets" type="checkbox" checked />
           전체(모든 반)
@@ -1275,6 +1282,7 @@
     const studentSearchResult = document.getElementById('studentSearchResult');
     const noticeTeacherName = document.getElementById('noticeTeacherName');
     const noticeText = document.getElementById('noticeText');
+    const noticeExpiry = document.getElementById('noticeExpiry');
     const noticeAllTargets = document.getElementById('noticeAllTargets');
     const noticePopup = document.getElementById('noticePopup');
     const noticeTargetsWrap = document.getElementById('noticeTargetsWrap');
@@ -1403,6 +1411,29 @@
       return `${month}/${day} ${h}:${m}`;
     }
 
+    function getNoticeExpiryPayload() {
+      const preset = noticeExpiry?.value || '';
+      const durations = {
+        '10m': 10 * 60,
+        '30m': 30 * 60,
+        '1h': 60 * 60,
+      };
+      if (durations[preset]) {
+        return { expiresInSeconds: durations[preset] };
+      }
+      if (preset === 'today') {
+        return { expiresPreset: 'today' };
+      }
+      return {};
+    }
+
+    function formatNoticeExpiry(notice) {
+      if (!notice?.autoHide) return '';
+      if (notice?.expired) return '만료됨';
+      const expiresAt = notice?.expiresAt || notice?.expiresAtMs;
+      return `자동 숨김${expiresAt ? ` · ${formatNoticeTime(expiresAt)}` : ''}`;
+    }
+
     function isMobileNoticeDrawerMode() {
       return window.matchMedia('(max-width: 920px)').matches;
     }
@@ -1450,6 +1481,7 @@
         const text = escapeHTML(notice?.text || '');
         const target = escapeHTML(notice?.targetLabel || '');
         const created = formatNoticeTime(notice?.createdAt || notice?.createdAtMs || Date.now());
+        const expiry = formatNoticeExpiry(notice);
         return `
           <article class="notice-history-item">
             <div class="notice-history-meta">
@@ -1457,7 +1489,7 @@
               <span>${created}</span>
             </div>
             <div class="notice-history-text">${text}</div>
-            <div class="notice-history-target">${target}</div>
+            <div class="notice-history-target">${target}${expiry ? ` · ${escapeHTML(expiry)}` : ''}</div>
           </article>
         `;
       }).join('');
@@ -2249,6 +2281,7 @@
             text,
             targetClasses: targets,
             popup,
+            ...getNoticeExpiryPayload(),
           }),
         });
         const parsed = await response.json().catch(() => ({}));
@@ -2256,6 +2289,7 @@
           throw new Error(parsed?.error || '공지 전송에 실패했습니다.');
         }
         noticeText.value = '';
+        if (noticeExpiry) noticeExpiry.value = '';
         if (noticePopup) noticePopup.checked = false;
         noticeFeedback.textContent = '공지 등록 완료!';
         if (!noticeView.hidden || noticeView.classList.contains('visible')) {

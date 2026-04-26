@@ -7,7 +7,7 @@ import re
 import requests
 
 from flask import Blueprint, current_app, jsonify, request, session
-from sqlalchemy import or_
+from sqlalchemy import inspect, or_, text
 
 from content_filter import contains_slang
 from extensions import db
@@ -175,6 +175,7 @@ _NOTICE_DOT_SECONDS = 10 * 60
 _NOTICE_BURST_WINDOW = timedelta(minutes=10)
 _MARQUEE_MAX_AGE = timedelta(minutes=30)
 _NOTICE_POPUP_MARKER = "__popup__"
+_KST = timezone(timedelta(hours=9))
 FAVORITE_STATUS_CODES = {
     "toilet",
     "hallway",
@@ -190,6 +191,14 @@ def _ensure_notice_tables() -> bool:
     try:
         TeacherNotice.__table__.create(bind=db.engine, checkfirst=True)
         TeacherNoticeRead.__table__.create(bind=db.engine, checkfirst=True)
+        notice_columns = {
+            column["name"]
+            for column in inspect(db.engine).get_columns(TeacherNotice.__tablename__)
+        }
+        if "expires_at" not in notice_columns:
+            column_type = "TIMESTAMP" if db.engine.dialect.name == "postgresql" else "DATETIME"
+            with db.engine.begin() as connection:
+                connection.execute(text(f"ALTER TABLE teacher_notices ADD COLUMN expires_at {column_type}"))
         return True
     except Exception:
         try:
@@ -446,6 +455,58 @@ def _notice_created_at_utc(notice: TeacherNotice) -> datetime:
     return created_at.astimezone(timezone.utc)
 
 
+def _notice_expires_at_utc(notice: TeacherNotice) -> datetime | None:
+    expires_at = getattr(notice, "expires_at", None)
+    if not expires_at:
+        return None
+    if expires_at.tzinfo is None:
+        return expires_at.replace(tzinfo=timezone.utc)
+    return expires_at.astimezone(timezone.utc)
+
+
+def _notice_is_active(notice: TeacherNotice, now_utc: datetime | None = None) -> bool:
+    expires_at = _notice_expires_at_utc(notice)
+    if expires_at is None:
+        return True
+    now = now_utc or datetime.now(timezone.utc)
+    return expires_at > now
+
+
+def _normalize_notice_expires_at(payload: dict, now_utc: datetime | None = None) -> datetime | None:
+    now = now_utc or datetime.now(timezone.utc)
+    preset = str(payload.get("expiresPreset") or payload.get("expiryPreset") or "").strip().lower()
+
+    duration_seconds = payload.get("expiresInSeconds")
+    if duration_seconds is None:
+        duration_seconds = payload.get("ttlSeconds")
+    if duration_seconds is None and preset:
+        preset_durations = {
+            "10m": 10 * 60,
+            "30m": 30 * 60,
+            "1h": 60 * 60,
+        }
+        if preset in preset_durations:
+            duration_seconds = preset_durations[preset]
+
+    if duration_seconds is not None:
+        try:
+            seconds = int(duration_seconds)
+        except (TypeError, ValueError):
+            seconds = 0
+        if seconds > 0:
+            return now + timedelta(seconds=min(seconds, 24 * 60 * 60))
+
+    if preset in {"today", "today-end", "midnight", "end-of-day"}:
+        local_now = now.astimezone(_KST)
+        local_midnight = (local_now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        return local_midnight.astimezone(timezone.utc)
+
+    expires_at = _parse_payload_datetime(payload.get("expiresAt") or payload.get("expires_at"))
+    if expires_at and expires_at > now:
+        return expires_at
+    return None
+
+
 def _parse_payload_datetime(value: object) -> datetime | None:
     if not value:
         return None
@@ -461,9 +522,11 @@ def _parse_payload_datetime(value: object) -> datetime | None:
 def _serialize_notice(notice: TeacherNotice, *, now_utc: datetime | None = None) -> dict:
     now = now_utc or datetime.now(timezone.utc)
     created_at = _notice_created_at_utc(notice)
+    expires_at = _notice_expires_at_utc(notice)
     age_seconds = max(0, int((now - created_at).total_seconds()))
     targets = _parse_notice_target_classes(notice.target_classes)
     target_labels = "전체(모든 반)" if notice.target_all or not targets else ", ".join(targets)
+    expired = bool(expires_at and expires_at <= now)
     return {
         "id": notice.id,
         "teacherName": notice.teacher_name,
@@ -471,6 +534,10 @@ def _serialize_notice(notice: TeacherNotice, *, now_utc: datetime | None = None)
         "popup": _notice_has_popup_flag(notice),
         "createdAt": created_at.isoformat(),
         "createdAtMs": int(created_at.timestamp() * 1000),
+        "expiresAt": expires_at.isoformat() if expires_at else None,
+        "expiresAtMs": int(expires_at.timestamp() * 1000) if expires_at else None,
+        "expired": expired,
+        "autoHide": expires_at is not None,
         "ageSeconds": age_seconds,
         "showGlow": age_seconds <= _NOTICE_FRESH_SECONDS,
         "showDot": _NOTICE_FRESH_SECONDS < age_seconds <= _NOTICE_DOT_SECONDS,
@@ -483,6 +550,8 @@ def _serialize_notice(notice: TeacherNotice, *, now_utc: datetime | None = None)
 def _emit_teacher_notice(notice: TeacherNotice) -> None:
     socketio = current_app.extensions.get("socketio") if current_app else None
     if not socketio:
+        return
+    if not _notice_is_active(notice):
         return
 
     payload = _serialize_notice(notice)
@@ -507,7 +576,14 @@ def _emit_teacher_notice(notice: TeacherNotice) -> None:
         socketio.emit("notice_created", payload, namespace=namespace)
 
 
-def _load_targeted_notices(grade: int, section: int, *, limit: int = 100) -> list[TeacherNotice]:
+def _load_targeted_notices(
+    grade: int,
+    section: int,
+    *,
+    limit: int = 100,
+    include_expired: bool = False,
+) -> list[TeacherNotice]:
+    now = datetime.now(timezone.utc)
     key = _to_notice_target_key(grade, section)
     candidates = (
         TeacherNotice.query
@@ -521,7 +597,12 @@ def _load_targeted_notices(grade: int, section: int, *, limit: int = 100) -> lis
         .limit(max(1, limit))
         .all()
     )
-    return [notice for notice in candidates if _notice_matches_class(notice, grade, section)]
+    return [
+        notice
+        for notice in candidates
+        if _notice_matches_class(notice, grade, section)
+        and (include_expired or _notice_is_active(notice, now))
+    ]
 
 
 def _select_board_notices(notices: list[TeacherNotice]) -> list[TeacherNotice]:
@@ -556,12 +637,14 @@ def create_teacher_notice():
 
     target_all, target_classes = _normalize_notice_targets(payload)
     popup = bool(payload.get("popup") or payload.get("highlight") or payload.get("displayPopup"))
+    expires_at = _normalize_notice_expires_at(payload)
 
     notice = TeacherNotice(
         teacher_name=teacher_name,
         text=text,
         target_all=target_all,
         target_classes=_notice_target_payload(target_all, target_classes, popup),
+        expires_at=expires_at.replace(tzinfo=None) if expires_at else None,
     )
     db.session.add(notice)
     db.session.commit()
@@ -595,7 +678,8 @@ def get_teacher_notices():
         )
 
     fetch_limit = 500 if mode == "all" else 120
-    notices = _load_targeted_notices(grade, section, limit=fetch_limit)
+    include_expired = bool(mode == "all" and is_teacher_session_active())
+    notices = _load_targeted_notices(grade, section, limit=fetch_limit, include_expired=include_expired)
     if mode == "board":
         selected = _select_board_notices(notices)
     elif mode == "all":

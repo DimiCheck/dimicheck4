@@ -458,9 +458,11 @@ class TeacherNotice(db.Model):
     target_all = db.Column(db.Boolean, default=True, nullable=False)
     target_classes = db.Column(db.Text, nullable=False, default="[]")  # JSON array: ["1-1","2-3"]
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=True)
 
     __table_args__ = (
         db.Index("idx_teacher_notice_created_at", "created_at"),
+        db.Index("idx_teacher_notice_expires_at", "expires_at"),
     )
 
 

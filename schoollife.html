@@ -1161,6 +1161,7 @@
   // -------- notices --------
   let noticeFirstLoaded = false;
   let schoollifeNoticeRenderKey = '';
+  let schoollifeNoticeExpiryTimer = null;
 
   function getNoticeQueryView() {
     const params = new URLSearchParams(window.location.search);
@@ -1187,6 +1188,40 @@
     const value = String(text || '').trim();
     if (value.length <= max) return value;
     return `${value.slice(0, max)}...`;
+  }
+
+  function getNoticeExpiresAtMs(notice) {
+    const direct = Number(notice?.expiresAtMs || 0);
+    if (direct > 0) return direct;
+    if (!notice?.expiresAt) return 0;
+    const parsed = Date.parse(String(notice.expiresAt));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function getActiveNotice(notice) {
+    if (!notice || notice.expired) return null;
+    const expiresAtMs = getNoticeExpiresAtMs(notice);
+    if (expiresAtMs > 0 && expiresAtMs <= Date.now()) return null;
+    return notice;
+  }
+
+  function clearSchoollifeNoticeExpiryTimer() {
+    if (!schoollifeNoticeExpiryTimer) return;
+    clearTimeout(schoollifeNoticeExpiryTimer);
+    schoollifeNoticeExpiryTimer = null;
+  }
+
+  function scheduleSchoollifeNoticeExpiryRefresh(notice) {
+    clearSchoollifeNoticeExpiryTimer();
+    const expiresAtMs = getNoticeExpiresAtMs(notice);
+    if (!expiresAtMs) return;
+    const delay = expiresAtMs - Date.now() + 100;
+    if (delay <= 0) return;
+    schoollifeNoticeExpiryTimer = setTimeout(() => {
+      schoollifeNoticeExpiryTimer = null;
+      renderSchoollifeLatestNotice(null, false);
+      loadLatestNotice();
+    }, delay);
   }
 
   function getNoticeNotifyStorageKey(grade, section) {
@@ -1218,7 +1253,9 @@
   function renderSchoollifeLatestNotice(notice, hasUnread) {
     const container = document.getElementById('schoollifeNoticeLatest');
     if (!container) return;
+    notice = getActiveNotice(notice);
     if (!notice) {
+      clearSchoollifeNoticeExpiryTimer();
       if (schoollifeNoticeRenderKey === 'empty') {
         return;
       }
@@ -1246,6 +1283,7 @@
       <div>[${unreadLabel}] ${escapeHtml(trimNoticeText(notice.text, 120))}</div>
       <div class="notice-mini-meta">${escapeHtml(meta)}</div>
     `;
+    scheduleSchoollifeNoticeExpiryRefresh(notice);
   }
 
   async function loadLatestNotice() {
@@ -1253,7 +1291,7 @@
     if (!grade || !section) return;
     try {
       const payload = await fetchJson(`/api/classes/notices?grade=${grade}&section=${section}&mode=latest`);
-      const notice = payload?.notices?.[0] || null;
+      const notice = getActiveNotice(payload?.notices?.[0] || null);
       renderSchoollifeLatestNotice(notice, payload?.hasUnread);
       await maybeNotifyNewNotice(notice, grade, section);
     } catch (error) {
@@ -1313,7 +1351,7 @@
     if (!grade || !section) return;
     try {
       const payload = await fetchJson(`/api/classes/notices?grade=${grade}&section=${section}&mode=all`);
-      const notices = Array.isArray(payload?.notices) ? payload.notices : [];
+      const notices = Array.isArray(payload?.notices) ? payload.notices.filter(getActiveNotice) : [];
       if (!list) return;
       if (!notices.length) {
         list.innerHTML = '<div class="notice-empty">등록된 공지가 없습니다.</div>';
@@ -1871,8 +1909,13 @@
     if (getNoticeQueryView() === 'notices') {
       openNoticeModal();
     }
-    setInterval(() => loadLatestNotice(), 10000);
   }
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      loadLatestNotice();
+    }
+  });
 
   bootstrapSchoollifePage();
 </script>
