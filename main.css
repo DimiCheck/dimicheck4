@@ -989,6 +989,72 @@ body.fullscreen .fullscreen-btn {
   line-height: 1;
 }
 
+.magnet-multi-select-hint {
+  position: absolute;
+  z-index: 880;
+  width: max-content;
+  max-width: 260px;
+  padding: 12px 34px 12px 14px;
+  border-radius: 14px;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(12, 17, 26, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px) saturate(140%);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: auto;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.magnet-multi-select-hint[hidden] {
+  display: none;
+}
+
+.magnet-multi-select-hint.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.magnet-multi-select-hint::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  background: rgba(12, 17, 26, 0.92);
+  border-right: 1px solid rgba(255, 255, 255, 0.16);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.magnet-multi-select-hint__close {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.72);
+  background: transparent;
+  font-size: 18px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.magnet-multi-select-hint__close:hover,
+.magnet-multi-select-hint__close:focus-visible {
+  outline: none;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .badge.color-red {
   background: linear-gradient(135deg, #ff4444, #cc0000);
 }
@@ -1194,6 +1260,7 @@ body.fullscreen .fullscreen-btn {
 }
 
 .fab {
+  position: relative;
   width: 64px;
   height: 64px;
   border-radius: 50%;
@@ -1202,6 +1269,7 @@ body.fullscreen .fullscreen-btn {
   display: grid;
   place-items: center;
   cursor: pointer;
+  overflow: visible;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
   transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
 }
@@ -1240,6 +1308,8 @@ body.fullscreen .fullscreen-btn {
   border-radius: 999px;
   background: #ff4d4f;
   border: 2px solid rgba(20, 20, 20, 0.95);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .fab-menu.open {
@@ -2297,5 +2367,11 @@ body.april-fools-fireworks .fireworks {
     min-width: 20px;
     height: 20px;
     font-size: 11px;
+  }
+
+  .magnet-multi-select-hint {
+    max-width: 220px;
+    padding: 10px 32px 10px 12px;
+    font-size: 12px;
   }
 }

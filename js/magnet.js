@@ -389,9 +389,12 @@ let magnetQuickDropOverlay = null;
 let magnetQuickDropActiveAction = null;
 let magnetQuickDropFrameId = null;
 let magnetMultiSelectToggleButton = null;
+let magnetMultiSelectHint = null;
+let magnetMultiSelectHintTimer = null;
 let magnetMultiSelectEnabled = false;
 const magnetMultiSelected = new Set();
 const MAGNET_QUICK_DROP_CANCEL_ACTION = 'cancel';
+const MAGNET_MULTI_SELECT_HINT_KEY = 'dimicheck:board-multi-select-hint-seen';
 
 const magnetGroup = {
   leader: null,
@@ -619,8 +622,12 @@ function setMagnetMultiSelectMode(enabled) {
   hideMagnetQuickDropOverlay();
   if (!magnetMultiSelectEnabled) {
     clearMagnetMultiSelection();
+    hideMagnetMultiSelectHint();
   }
   updateMagnetMultiSelectToggle();
+  if (magnetMultiSelectEnabled) {
+    showMagnetMultiSelectHintOnce();
+  }
 }
 
 function ensureMagnetMultiSelectToggle() {
@@ -648,6 +655,92 @@ function ensureMagnetMultiSelectToggle() {
   return magnetMultiSelectToggleButton;
 }
 
+function hasSeenMagnetMultiSelectHint() {
+  try {
+    return localStorage.getItem(MAGNET_MULTI_SELECT_HINT_KEY) === '1';
+  } catch (error) {
+    return false;
+  }
+}
+
+function markMagnetMultiSelectHintSeen() {
+  try {
+    localStorage.setItem(MAGNET_MULTI_SELECT_HINT_KEY, '1');
+  } catch (error) {
+    // localStorage can be blocked; the hint still self-dismisses for this page view.
+  }
+}
+
+function ensureMagnetMultiSelectHint() {
+  if (magnetMultiSelectHint) return magnetMultiSelectHint;
+  const container = document.getElementById('magnetContainer');
+  if (!container) return null;
+
+  magnetMultiSelectHint = document.createElement('div');
+  magnetMultiSelectHint.className = 'magnet-multi-select-hint';
+  magnetMultiSelectHint.hidden = true;
+  magnetMultiSelectHint.innerHTML = `
+    <button type="button" class="magnet-multi-select-hint__close" aria-label="다중 선택 도움말 닫기">&times;</button>
+    <div>자석을 여러 개 선택한 뒤, 선택한 자석 중 하나를 끌어 함께 이동할 수 있습니다.</div>
+  `;
+  magnetMultiSelectHint.querySelector('.magnet-multi-select-hint__close')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    hideMagnetMultiSelectHint({ persist: true });
+  });
+  container.appendChild(magnetMultiSelectHint);
+  return magnetMultiSelectHint;
+}
+
+function positionMagnetMultiSelectHint() {
+  if (!magnetMultiSelectHint || magnetMultiSelectHint.hidden || !magnetMultiSelectToggleButton) return;
+  const container = document.getElementById('magnetContainer');
+  if (!container) return;
+
+  const containerRect = container.getBoundingClientRect();
+  const buttonRect = magnetMultiSelectToggleButton.getBoundingClientRect();
+  const hintRect = magnetMultiSelectHint.getBoundingClientRect();
+  const gap = 8;
+  const left = Math.min(
+    Math.max(0, buttonRect.left - containerRect.left + buttonRect.width / 2 - hintRect.width / 2),
+    Math.max(0, containerRect.width - hintRect.width)
+  );
+  const top = Math.max(0, buttonRect.top - containerRect.top - hintRect.height - gap);
+  magnetMultiSelectHint.style.left = `${left}px`;
+  magnetMultiSelectHint.style.top = `${top}px`;
+}
+
+function hideMagnetMultiSelectHint(options = {}) {
+  const { persist = false } = options;
+  if (magnetMultiSelectHintTimer) {
+    clearTimeout(magnetMultiSelectHintTimer);
+    magnetMultiSelectHintTimer = null;
+  }
+  if (persist) {
+    markMagnetMultiSelectHintSeen();
+  }
+  if (!magnetMultiSelectHint) return;
+  magnetMultiSelectHint.classList.remove('is-visible');
+  magnetMultiSelectHint.hidden = true;
+}
+
+function showMagnetMultiSelectHintOnce() {
+  if (hasSeenMagnetMultiSelectHint()) return;
+  const hint = ensureMagnetMultiSelectHint();
+  if (!hint) return;
+  hint.hidden = false;
+  requestAnimationFrame(() => {
+    positionMagnetMultiSelectHint();
+    hint.classList.add('is-visible');
+  });
+  if (magnetMultiSelectHintTimer) {
+    clearTimeout(magnetMultiSelectHintTimer);
+  }
+  magnetMultiSelectHintTimer = window.setTimeout(() => {
+    hideMagnetMultiSelectHint({ persist: true });
+  }, 5000);
+}
+
 function positionMagnetMultiSelectToggle() {
   const container = document.getElementById('magnetContainer');
   if (!container || !magnetMultiSelectToggleButton) return;
@@ -656,6 +749,7 @@ function positionMagnetMultiSelectToggle() {
   const top = Math.max(0, bounds.top - 46);
   magnetMultiSelectToggleButton.style.left = `${bounds.left}px`;
   magnetMultiSelectToggleButton.style.top = `${top}px`;
+  positionMagnetMultiSelectHint();
 }
 
 function startMagnetGroupFromMultiSelection(leader) {
@@ -2025,6 +2119,7 @@ function addDragFunctionality(el) {
         clearLongPressTimer();
         prepareForDrag(clientX, clientY);
         if (magnetMultiSelectEnabled) {
+          hideMagnetMultiSelectHint({ persist: true });
           startMagnetGroupFromMultiSelection(el);
         }
         isDragging = true;
@@ -2184,7 +2279,7 @@ function addDragFunctionality(el) {
     if (isDragging) {
       dropMagnet();
       if (magnetMultiSelectEnabled) {
-        clearMagnetMultiSelection();
+        setMagnetMultiSelectMode(false);
       }
     } else if (isPointerDown && magnetMultiSelectEnabled) {
       if (multiSelectWasSelectedAtPress) {
@@ -2242,7 +2337,7 @@ function addDragFunctionality(el) {
       clearMagnetGroup();
     }
     if (magnetMultiSelectEnabled && isDragging) {
-      clearMagnetMultiSelection();
+      setMagnetMultiSelectMode(false);
     }
     longPressTriggered = false;
     resetInteractionState();
