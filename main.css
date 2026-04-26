@@ -108,6 +108,65 @@ body::before {
   border: 1px dashed rgba(255, 255, 255, 0.18);
 }
 
+.magnet.placeholder.has-status-badge {
+  overflow: visible;
+}
+
+.placeholder-status-badge {
+  position: absolute;
+  right: -9px;
+  bottom: -7px;
+  min-width: 28px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(14, 18, 27, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.06em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.magnet.placeholder[data-status-category="toilet"] .placeholder-status-badge {
+  background: rgba(20, 112, 157, 0.9);
+}
+
+.magnet.placeholder[data-status-category="hallway"] .placeholder-status-badge {
+  background: rgba(76, 91, 112, 0.9);
+}
+
+.magnet.placeholder[data-status-category="club"] .placeholder-status-badge {
+  background: rgba(130, 86, 185, 0.9);
+}
+
+.magnet.placeholder[data-status-category="afterschool"] .placeholder-status-badge {
+  background: rgba(188, 114, 28, 0.92);
+}
+
+.magnet.placeholder[data-status-category="project"] .placeholder-status-badge {
+  background: rgba(198, 67, 67, 0.92);
+}
+
+.magnet.placeholder[data-status-category="early"] .placeholder-status-badge {
+  background: rgba(46, 132, 78, 0.92);
+}
+
+.magnet.placeholder[data-status-category="etc"] .placeholder-status-badge {
+  background: rgba(89, 94, 105, 0.94);
+}
+
+.magnet.placeholder[data-status-category="absence"] .placeholder-status-badge {
+  background: rgba(36, 42, 54, 0.94);
+}
+
 .magnet.placeholder:focus-visible {
   outline: 3px solid rgba(255, 255, 255, 0.8);
   outline-offset: 2px;

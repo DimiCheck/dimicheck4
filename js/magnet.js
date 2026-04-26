@@ -74,6 +74,16 @@ const FAVORITE_STATUS_LABELS = {
   absence: '결석(조퇴)'
 };
 const FAVORITE_STATUS_CODES = new Set(Object.keys(FAVORITE_STATUS_LABELS));
+const PLACEHOLDER_STATUS_BADGES = {
+  toilet: { label: '화장실', title: '화장실(물)' },
+  hallway: { label: '복도', title: '복도' },
+  club: { label: '동아리', title: '동아리' },
+  afterschool: { label: '방과후', title: '방과후' },
+  project: { label: '프젝', title: '프로젝트' },
+  early: { label: '조입', title: '조기입실' },
+  etc: { label: '기타', title: '기타' },
+  absence: { label: '결석', title: '결석(조퇴)' }
+};
 let boardFavoriteStatusByNumber = Object.create(null);
 
 const thoughtBubbleRegistry = new Map(); // number -> { element, timeoutId, expiresAt, text }
@@ -1209,6 +1219,7 @@ function applyMagnetQuickAction(target, action, options = {}) {
   updateAttendance();
   updateMagnetOutline();
   updateEtcReasonPanel();
+  updatePlaceholderStatusBadges();
   if (typeof window.updateThoughtBubblePositionForMagnet === 'function') {
     window.updateThoughtBubblePositionForMagnet(target);
   }
@@ -1398,6 +1409,7 @@ function applyMagnetQuickDropAction(action, magnets) {
   updateAttendance();
   updateMagnetOutline();
   updateEtcReasonPanel();
+  updatePlaceholderStatusBadges();
   saveState(grade, section);
   if (shouldDeferReason && needsReasonPrompt && groupReasonTargets && groupReasonTargets.length) {
     openReasonDialog(groupReasonTargets);
@@ -1488,6 +1500,7 @@ function returnCategoryToClassroom(category) {
   updateAttendance();
   updateMagnetOutline();
   updateEtcReasonPanel();
+  updatePlaceholderStatusBadges();
 
   if (typeof renderReasonButtons === 'function') {
     renderReasonButtons();
@@ -1534,6 +1547,7 @@ function createPlaceholder(num) {
   const p = document.createElement('div');
   p.className = 'magnet placeholder';
   p.textContent = num;
+  p.dataset.number = String(num);
   p.style.left = pos.left + 'px';
   p.style.top  = pos.top  + 'px';
   p.setAttribute('role', 'button');
@@ -1597,6 +1611,7 @@ function createMagnets(end = 31, skipNumbers = [12]) {
   if (tc) tc.textContent = `${total}명`;
 
   ensureMagnetMultiSelectToggle();
+  updatePlaceholderStatusBadges();
   updateMagnetOutline();
 }
 
@@ -1726,6 +1741,59 @@ function createReasonRow(reason, nums) {
   row.appendChild(badges);
   row.appendChild(text);
   return row;
+}
+
+function clearPlaceholderStatusBadge(placeholder) {
+  if (!placeholder) return;
+  placeholder.classList.remove('has-status-badge');
+  placeholder.removeAttribute('data-status-category');
+  placeholder.removeAttribute('title');
+  const badge = placeholder.querySelector('.placeholder-status-badge');
+  if (badge) {
+    badge.remove();
+  }
+  const number = placeholder.dataset.number || placeholder.textContent.trim();
+  if (number) {
+    placeholder.setAttribute('aria-label', `${number}번 자석을 교실로 복귀`);
+  }
+}
+
+function setPlaceholderStatusBadge(placeholder, category, magnet) {
+  const config = PLACEHOLDER_STATUS_BADGES[category];
+  if (!placeholder || !config) return;
+  let badge = placeholder.querySelector('.placeholder-status-badge');
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.className = 'placeholder-status-badge';
+    placeholder.appendChild(badge);
+  }
+
+  const number = placeholder.dataset.number || placeholder.textContent.trim();
+  const reason = category === 'etc' ? (magnet?.dataset?.reason || '').trim() : '';
+  const title = reason ? `${config.title} · ${reason}` : config.title;
+
+  badge.textContent = category === 'etc' && reason
+    ? (reason.length <= 3 ? reason : `${reason.slice(0, 2)}..`)
+    : config.label;
+  placeholder.classList.add('has-status-badge');
+  placeholder.dataset.statusCategory = category;
+  placeholder.title = title;
+  placeholder.setAttribute('aria-label', `${number}번 자석 현재 위치: ${title}. 클릭하면 교실로 복귀`);
+}
+
+function updatePlaceholderStatusBadges() {
+  placeholders.forEach(placeholder => clearPlaceholderStatusBadge(placeholder));
+
+  document.querySelectorAll('.board-section[data-category]').forEach(section => {
+    const category = section.dataset.category;
+    if (!PLACEHOLDER_STATUS_BADGES[category]) return;
+    section.querySelectorAll('.section-content .magnet:not(.placeholder)').forEach(magnet => {
+      const number = Number(magnet.dataset.number);
+      if (!Number.isFinite(number)) return;
+      const placeholder = placeholders.get(number);
+      setPlaceholderStatusBadge(placeholder, category, magnet);
+    });
+  });
 }
 
 function ensureEtcReasonShortcut() {
@@ -2172,6 +2240,7 @@ function addDragFunctionality(el) {
       updateAttendance();
       updateMagnetOutline();
       updateEtcReasonPanel();
+      updatePlaceholderStatusBadges();
       saveState(grade, section);
     }
   }
@@ -2354,6 +2423,7 @@ function addDragFunctionality(el) {
         updateAttendance();
         updateMagnetOutline();
         updateEtcReasonPanel();
+        updatePlaceholderStatusBadges();
         saveState(grade, section);
 
         if (shouldDeferReason && needsReasonPrompt && groupReasonTargets && groupReasonTargets.length) {
@@ -2373,6 +2443,7 @@ function addDragFunctionality(el) {
       updateAttendance();
       updateMagnetOutline();
       updateEtcReasonPanel();
+      updatePlaceholderStatusBadges();
       saveState(grade, section);
     }
 
@@ -2637,6 +2708,7 @@ document.getElementById('reasonSave').addEventListener('click', () => {
   closeReasonDialog();
   sortAllSections();
   updateEtcReasonPanel();
+  updatePlaceholderStatusBadges();
   saveState(grade, section);
 
   // 새 이유가 생겼을 수 있으니 버튼 재렌더(모달 외부에서도 최신 유지)
@@ -2647,6 +2719,7 @@ document.getElementById('reasonSave').addEventListener('click', () => {
 document.getElementById('reasonCancel').addEventListener('click', () => {
   closeReasonDialog();
   updateEtcReasonPanel();
+  updatePlaceholderStatusBadges();
   renderReasonButtons();
 });
 
@@ -2655,6 +2728,7 @@ document.getElementById('reasonOverlay').addEventListener('mousedown', (e) => {
   if (e.target.id === 'reasonOverlay') {
     closeReasonDialog();
     updateEtcReasonPanel();
+    updatePlaceholderStatusBadges();
     renderReasonButtons();
   }
 });
@@ -2665,6 +2739,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && overlay && !overlay.hidden) {
     closeReasonDialog();
     updateEtcReasonPanel();
+    updatePlaceholderStatusBadges();
     renderReasonButtons();
   }
 });
