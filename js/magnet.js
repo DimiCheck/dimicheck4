@@ -391,6 +391,10 @@ let magnetQuickDropFrameId = null;
 let magnetMultiSelectToggleButton = null;
 let magnetMultiSelectHint = null;
 let magnetMultiSelectHintTimer = null;
+let etcReasonShortcutButton = null;
+let etcReasonPopover = null;
+let etcReasonPopoverList = null;
+let etcReasonPopoverEntries = [];
 let magnetMultiSelectEnabled = false;
 const magnetMultiSelected = new Set();
 const MAGNET_QUICK_DROP_CANCEL_ACTION = 'cancel';
@@ -681,7 +685,7 @@ function ensureMagnetMultiSelectHint() {
   magnetMultiSelectHint.hidden = true;
   magnetMultiSelectHint.innerHTML = `
     <button type="button" class="magnet-multi-select-hint__close" aria-label="다중 선택 도움말 닫기">&times;</button>
-    <div>자석을 여러 개 선택한 뒤, 선택한 자석 중 하나를 끌어 함께 이동할 수 있습니다.</div>
+    <div>자석을 클릭해 여러 개 선택한 뒤, 선택한 자석 중 하나를 끌어 함께 이동할 수 있습니다.</div>
   `;
   magnetMultiSelectHint.querySelector('.magnet-multi-select-hint__close')?.addEventListener('click', (event) => {
     event.preventDefault();
@@ -1403,6 +1407,7 @@ function applyMagnetQuickDropAction(action, magnets) {
 
 document.addEventListener('visibilitychange', () => {
   hideMagnetQuickDropOverlay();
+  closeEtcReasonPopover();
 });
 
 window.addEventListener('resize', () => {
@@ -1410,15 +1415,33 @@ window.addEventListener('resize', () => {
   if (magnetQuickDropOverlay && !magnetQuickDropOverlay.hidden) {
     positionMagnetQuickDropOverlay(magnetQuickDropOverlay);
   }
+  positionEtcReasonPopover();
 });
 
 document.addEventListener('keydown', (event) => {
-  if (event.key !== 'Escape' || !magnetMultiSelectEnabled) return;
+  if (event.key !== 'Escape') return;
+  if (etcReasonPopover && !etcReasonPopover.hidden) {
+    closeEtcReasonPopover();
+    return;
+  }
+  if (!magnetMultiSelectEnabled) return;
   if (getValidMultiSelectedMagnets().length) {
     clearMagnetMultiSelection();
   } else {
     setMagnetMultiSelectMode(false);
   }
+});
+
+document.addEventListener('click', (event) => {
+  if (!etcReasonPopover || etcReasonPopover.hidden) return;
+  const target = event.target;
+  if (
+    etcReasonPopover.contains(target) ||
+    (etcReasonShortcutButton && etcReasonShortcutButton.contains(target))
+  ) {
+    return;
+  }
+  closeEtcReasonPopover();
 });
 
 function resolveMagnetQuickMenuState(target) {
@@ -1653,6 +1676,173 @@ function sortAllSections() {
   document.querySelectorAll('.section-content').forEach(sortSection);
 }
 
+function formatEtcReasonText(reason) {
+  if (reason === '여우사이') return '🦊 ' + reason;
+  if (reason === '자퇴') return '😭 ' + reason;
+  return reason;
+}
+
+function createReasonRow(reason, nums) {
+  const row = document.createElement('div');
+  row.className = 'reason-item';
+
+  const badges = document.createElement('div');
+  badges.className = 'badges';
+
+  nums.forEach(n => {
+    const b = document.createElement('span');
+    b.className = 'badge';
+    b.textContent = n;
+
+    const mag = document.querySelector(`.magnet[data-number="${n}"]`);
+    if (mag) {
+      mag.classList.forEach(cls => {
+        if (cls.startsWith('color-')) b.classList.add(cls);
+      });
+
+      const cs = getComputedStyle(mag);
+      const bgImg = cs.backgroundImage;
+      const bgCol = cs.backgroundColor;
+      const fgCol = cs.color;
+
+      if (bgImg && bgImg !== 'none') {
+        b.style.backgroundImage = bgImg;
+        b.style.backgroundColor = 'transparent';
+      } else {
+        b.style.backgroundImage = 'none';
+        b.style.backgroundColor = bgCol;
+      }
+      b.style.color = fgCol;
+    }
+
+    badges.appendChild(b);
+  });
+
+  const text = document.createElement('div');
+  text.className = 'reason-text';
+  text.textContent = formatEtcReasonText(reason);
+  text.title = reason;
+
+  row.appendChild(badges);
+  row.appendChild(text);
+  return row;
+}
+
+function ensureEtcReasonShortcut() {
+  if (etcReasonShortcutButton && etcReasonPopover && etcReasonPopoverList) {
+    return true;
+  }
+
+  const section = document.querySelector('.board-section[data-category="etc"]');
+  const title = section?.querySelector('.section-title');
+  if (!section || !title) return false;
+
+  if (!etcReasonShortcutButton) {
+    etcReasonShortcutButton = document.createElement('button');
+    etcReasonShortcutButton.type = 'button';
+    etcReasonShortcutButton.className = 'etc-reason-shortcut';
+    etcReasonShortcutButton.hidden = true;
+    etcReasonShortcutButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (etcReasonPopover && !etcReasonPopover.hidden) {
+        closeEtcReasonPopover();
+      } else {
+        openEtcReasonPopover();
+      }
+    });
+    etcReasonShortcutButton.addEventListener('mousedown', event => event.stopPropagation());
+    etcReasonShortcutButton.addEventListener('touchstart', event => event.stopPropagation(), { passive: true });
+    title.appendChild(etcReasonShortcutButton);
+  }
+
+  if (!etcReasonPopover) {
+    etcReasonPopover = document.createElement('div');
+    etcReasonPopover.className = 'etc-reason-popover';
+    etcReasonPopover.hidden = true;
+    etcReasonPopover.innerHTML = `
+      <div class="etc-reason-popover__title">기타 사유</div>
+      <div class="etc-reason-popover__list"></div>
+    `;
+    etcReasonPopover.addEventListener('click', event => event.stopPropagation());
+    etcReasonPopoverList = etcReasonPopover.querySelector('.etc-reason-popover__list');
+    document.body.appendChild(etcReasonPopover);
+  }
+
+  return Boolean(etcReasonShortcutButton && etcReasonPopover && etcReasonPopoverList);
+}
+
+function renderEtcReasonPopoverList() {
+  if (!etcReasonPopoverList) return;
+  etcReasonPopoverList.innerHTML = '';
+  etcReasonPopoverEntries.forEach(([reason, nums]) => {
+    etcReasonPopoverList.appendChild(createReasonRow(reason, nums));
+  });
+}
+
+function positionEtcReasonPopover() {
+  if (!etcReasonShortcutButton || !etcReasonPopover || etcReasonPopover.hidden) return;
+
+  const buttonRect = etcReasonShortcutButton.getBoundingClientRect();
+  const popoverRect = etcReasonPopover.getBoundingClientRect();
+  const margin = 12;
+  const gap = 10;
+  let left = buttonRect.left + buttonRect.width / 2 - popoverRect.width / 2;
+  let top = buttonRect.top - popoverRect.height - gap;
+
+  left = Math.max(margin, Math.min(left, window.innerWidth - popoverRect.width - margin));
+  if (top < margin) {
+    top = Math.min(window.innerHeight - popoverRect.height - margin, buttonRect.bottom + gap);
+    etcReasonPopover.classList.add('is-below');
+  } else {
+    etcReasonPopover.classList.remove('is-below');
+  }
+  etcReasonPopover.style.left = `${Math.max(margin, left)}px`;
+  etcReasonPopover.style.top = `${Math.max(margin, top)}px`;
+}
+
+function openEtcReasonPopover() {
+  if (!ensureEtcReasonShortcut() || !etcReasonPopoverEntries.length) return;
+  renderEtcReasonPopoverList();
+  etcReasonPopover.hidden = false;
+  etcReasonShortcutButton.classList.add('is-open');
+  etcReasonShortcutButton.setAttribute('aria-expanded', 'true');
+  requestAnimationFrame(() => {
+    positionEtcReasonPopover();
+    etcReasonPopover.classList.add('is-visible');
+  });
+}
+
+function closeEtcReasonPopover() {
+  if (etcReasonShortcutButton) {
+    etcReasonShortcutButton.classList.remove('is-open');
+    etcReasonShortcutButton.setAttribute('aria-expanded', 'false');
+  }
+  if (!etcReasonPopover) return;
+  etcReasonPopover.classList.remove('is-visible', 'is-below');
+  etcReasonPopover.hidden = true;
+}
+
+function renderEtcReasonShortcut(entries) {
+  etcReasonPopoverEntries = Array.isArray(entries) ? entries : [];
+  if (!ensureEtcReasonShortcut()) return;
+
+  const count = etcReasonPopoverEntries.reduce((total, [, nums]) => total + nums.length, 0);
+  if (!count) {
+    etcReasonShortcutButton.hidden = true;
+    closeEtcReasonPopover();
+    return;
+  }
+
+  etcReasonShortcutButton.hidden = false;
+  etcReasonShortcutButton.innerHTML = `<span>사유 ${count}</span><span aria-hidden="true">›</span>`;
+  etcReasonShortcutButton.setAttribute('aria-expanded', String(Boolean(etcReasonPopover && !etcReasonPopover.hidden)));
+  if (etcReasonPopover && !etcReasonPopover.hidden) {
+    renderEtcReasonPopoverList();
+    positionEtcReasonPopover();
+  }
+}
+
 // ✅ 같은 사유끼리 한 줄에: [사유] -> [번호들]로 그룹핑
 // ✅ 기타 사유 패널 렌더링 (배지 색을 자석과 동일하게 동기화)
 function updateEtcReasonPanel() {
@@ -1789,6 +1979,7 @@ function updateEtcReasonPanel() {
   // 렌더링
   list.innerHTML = '';
   if (!entries.length) {
+    renderEtcReasonShortcut(entries);
     const empty = document.createElement('div');
     empty.textContent = '현재 등록된 기타 사유가 없습니다.';
     empty.style.opacity = '0.7';
@@ -1797,60 +1988,9 @@ function updateEtcReasonPanel() {
   }
 
   entries.forEach(([reason, nums]) => {
-    const row = document.createElement('div');
-    row.className = 'reason-item';
-
-    const badges = document.createElement('div');
-    badges.className = 'badges';
-
-    nums.forEach(n => {
-      const b = document.createElement('span');
-      b.className = 'badge';
-      b.textContent = n;
-
-      // 🔗 자석 DOM 찾아서 스타일/클래스 동기화
-      const mag = document.querySelector(`.magnet[data-number="${n}"]`);
-      if (mag) {
-        // 1) color-* 클래스 복사
-        mag.classList.forEach(cls => {
-          if (cls.startsWith('color-')) b.classList.add(cls);
-        });
-
-        // 2) 실제 렌더된 스타일 복사
-        const cs = getComputedStyle(mag);
-        const bgImg = cs.backgroundImage;
-        const bgCol = cs.backgroundColor;
-        const fgCol = cs.color;
-
-        if (bgImg && bgImg !== 'none') {
-          b.style.backgroundImage = bgImg;
-          b.style.backgroundColor = 'transparent';
-        } else {
-          b.style.backgroundImage = 'none';
-          b.style.backgroundColor = bgCol;
-        }
-        b.style.color = fgCol;
-      }
-
-      badges.appendChild(b);
-    });
-
-    const text = document.createElement('div');
-    text.className = 'reason-text';
-
-    if (reason === '여우사이') {
-      text.textContent = '🦊 ' + reason;
-    } else if (reason === '자퇴') {
-      text.textContent = '😭 ' + reason;
-    } else {
-      text.textContent = reason;
-    }
-    text.title = reason;
-
-    row.appendChild(badges);
-    row.appendChild(text);
-    list.appendChild(row);
+    list.appendChild(createReasonRow(reason, nums));
   });
+  renderEtcReasonShortcut(entries);
 }
 
 /* ===================== 유틸: 원래 자리로 스냅 ===================== */
@@ -2038,6 +2178,7 @@ function addDragFunctionality(el) {
 
   function dragStart(e) {
     if (e.type === 'mousedown' && e.button !== 0) return;
+    closeEtcReasonPopover();
 
     const isTouchStart = e.type === 'touchstart';
     const pointerType = e.pointerType || (isTouchStart ? 'touch' : 'mouse');
