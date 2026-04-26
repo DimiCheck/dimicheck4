@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 # .env 파일 로드 (환경 변수)
 load_dotenv()
 
+from pathlib import PurePosixPath
+
 from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for, make_response, abort
 from flask_cors import CORS, cross_origin
 from flask_smorest import Api
@@ -69,7 +71,7 @@ class _NoopSocketIO:
     def run(self, *_args, **_kwargs) -> None:
         raise RuntimeError("Socket.IO backend is unavailable")
 
-app = Flask(__name__, static_folder=".", static_url_path="")
+app = Flask(__name__)
 app.config.from_object(config)
 # Reverse proxy(TLS terminator) headers trust: X-Forwarded-Proto/Host
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
@@ -1099,6 +1101,67 @@ def sitemap():
 @app.route("/robots.txt")
 def robots():
     return send_from_directory(".", "robots.txt", mimetype="text/plain")
+
+
+_PUBLIC_STATIC_EXTENSIONS = {
+    ".css",
+    ".js",
+    ".map",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".webp",
+    ".ico",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".otf",
+    ".mp3",
+    ".wav",
+    ".ogg",
+    ".mp4",
+    ".webm",
+    ".html",
+    ".webmanifest",
+}
+_PUBLIC_STATIC_JSON_FILES = {"wallpaper.json", "timetable-phases.json"}
+_PUBLIC_STATIC_DIRS = {"js", "src", "bsod"}
+_BLOCKED_STATIC_EXTENSIONS = {
+    ".py",
+    ".pyc",
+    ".db",
+    ".sqlite",
+    ".sqlite3",
+    ".env",
+    ".ini",
+    ".toml",
+    ".lock",
+    ".yml",
+    ".yaml",
+}
+
+
+@app.get("/<path:filename>")
+def public_static_file(filename: str):
+    path = PurePosixPath(filename)
+    if path.is_absolute() or ".." in path.parts or any(part.startswith(".") for part in path.parts):
+        abort(404)
+
+    suffix = path.suffix.lower()
+    root_name = path.name
+    is_json_allowlisted = suffix == ".json" and root_name in _PUBLIC_STATIC_JSON_FILES
+    is_public_ext = suffix in _PUBLIC_STATIC_EXTENSIONS
+    is_public_dir = len(path.parts) > 1 and path.parts[0] in _PUBLIC_STATIC_DIRS
+
+    if suffix in _BLOCKED_STATIC_EXTENSIONS:
+        abort(404)
+    if not (is_public_ext or is_json_allowlisted or is_public_dir):
+        abort(404)
+
+    return send_from_directory(".", filename)
 
 if __name__ == "__main__":
     with app.app_context():
