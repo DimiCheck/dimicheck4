@@ -21,6 +21,49 @@ const MAGNET_MENU_OPTIONS = [
   { label: '결석(조퇴)', value: 'absence' }
 ];
 
+const MAGNET_QUICK_DROP_TARGETS = [
+  {
+    label: '교실',
+    value: 'classroom',
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V9.5L12 4l8 5.5V20"/><path d="M9 20v-6h6v6"/><path d="M8 11h.01M16 11h.01"/></svg>'
+  },
+  {
+    label: '화장실(물)',
+    value: 'toilet',
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h8v6a4 4 0 0 1-8 0V5Z"/><path d="M10 2h4"/><path d="M7 15h10"/><path d="M12 15v6"/><path d="M9 21h6"/></svg>'
+  },
+  {
+    label: '복도',
+    value: 'hallway',
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4.5L16 3v18"/><path d="M16 7h3v14"/><path d="M12 13h.01"/></svg>'
+  },
+  {
+    label: '동아리',
+    value: 'club',
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M3.5 20a4.5 4.5 0 0 1 9 0"/><path d="M11.5 20a4.5 4.5 0 0 1 9 0"/></svg>'
+  },
+  {
+    label: '방과후',
+    value: 'afterschool',
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>'
+  },
+  {
+    label: '프로젝트',
+    value: 'project',
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19h12"/><path d="M8 17V7h8v10"/><path d="M10 10h4"/><path d="M10 13h4"/><path d="M9 4h6"/></svg>'
+  },
+  {
+    label: '조기입실',
+    value: 'early',
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16"/><path d="M6 18V9h12v9"/><path d="M8 9V6h8v3"/><path d="M9 14h6"/></svg>'
+  },
+  {
+    label: '결석(조퇴)',
+    value: 'absence',
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V6h14v13"/><path d="M9 19v-5h6v5"/><path d="M8 10h8"/><path d="M12 6V3"/><path d="M9.5 3h5"/></svg>'
+  }
+];
+
 const FAVORITE_STATUS_LABELS = {
   toilet: '화장실(물)',
   hallway: '복도',
@@ -342,6 +385,9 @@ let magnetMenuCurrentTarget = null;
 let magnetMenuKeydownBound = false;
 let magnetMenuActionsHost = null;
 let magnetMenuLastOrigin = null;
+let magnetQuickDropOverlay = null;
+let magnetQuickDropActiveAction = null;
+let magnetQuickDropFrameId = null;
 
 const magnetGroup = {
   leader: null,
@@ -930,6 +976,109 @@ function applyMagnetQuickAction(target, action, options = {}) {
   }
 }
 
+function ensureMagnetQuickDropOverlay() {
+  if (magnetQuickDropOverlay) {
+    return magnetQuickDropOverlay;
+  }
+
+  const container = document.getElementById('magnetContainer');
+  if (!container) return null;
+
+  magnetQuickDropOverlay = document.createElement('div');
+  magnetQuickDropOverlay.id = 'magnetQuickDropOverlay';
+  magnetQuickDropOverlay.className = 'magnet-quick-drop-overlay';
+  magnetQuickDropOverlay.setAttribute('aria-hidden', 'true');
+  magnetQuickDropOverlay.hidden = true;
+
+  MAGNET_QUICK_DROP_TARGETS.forEach(option => {
+    const cell = document.createElement('div');
+    cell.className = 'magnet-quick-drop-cell';
+    cell.dataset.action = option.value;
+    cell.innerHTML = `
+      <span class="magnet-quick-drop-cell__icon">${option.icon}</span>
+      <span class="magnet-quick-drop-cell__label">${option.label}</span>
+    `;
+    magnetQuickDropOverlay.appendChild(cell);
+  });
+
+  container.appendChild(magnetQuickDropOverlay);
+  return magnetQuickDropOverlay;
+}
+
+function showMagnetQuickDropOverlay() {
+  const overlay = ensureMagnetQuickDropOverlay();
+  if (!overlay) return;
+  overlay.hidden = false;
+  if (magnetQuickDropFrameId !== null) {
+    cancelAnimationFrame(magnetQuickDropFrameId);
+  }
+  magnetQuickDropFrameId = requestAnimationFrame(() => {
+    magnetQuickDropFrameId = null;
+    if (!overlay.hidden) {
+      overlay.classList.add('is-visible');
+    }
+  });
+}
+
+function hideMagnetQuickDropOverlay() {
+  if (!magnetQuickDropOverlay) return;
+  if (magnetQuickDropFrameId !== null) {
+    cancelAnimationFrame(magnetQuickDropFrameId);
+    magnetQuickDropFrameId = null;
+  }
+  magnetQuickDropOverlay.classList.remove('is-visible');
+  magnetQuickDropOverlay.querySelectorAll('.magnet-quick-drop-cell.is-hovered').forEach(cell => {
+    cell.classList.remove('is-hovered');
+  });
+  magnetQuickDropOverlay.hidden = true;
+  magnetQuickDropActiveAction = null;
+}
+
+function setMagnetQuickDropHover(action) {
+  if (!magnetQuickDropOverlay || magnetQuickDropOverlay.hidden) return;
+  magnetQuickDropActiveAction = action || null;
+  magnetQuickDropOverlay.querySelectorAll('.magnet-quick-drop-cell').forEach(cell => {
+    cell.classList.toggle('is-hovered', Boolean(action) && cell.dataset.action === action);
+  });
+}
+
+function getMagnetQuickDropActionAt(clientX, clientY) {
+  if (!magnetQuickDropOverlay || magnetQuickDropOverlay.hidden) return null;
+  const cells = magnetQuickDropOverlay.querySelectorAll('.magnet-quick-drop-cell');
+  for (let i = 0; i < cells.length; i++) {
+    const cell = cells[i];
+    const rect = cell.getBoundingClientRect();
+    if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+      return cell.dataset.action || null;
+    }
+  }
+  return null;
+}
+
+function shouldShowMagnetQuickDropFor(magnet) {
+  return Boolean(
+    magnet &&
+    !magnet.classList.contains('placeholder') &&
+    !magnet.classList.contains('attached')
+  );
+}
+
+function applyMagnetQuickDropAction(action, magnets) {
+  if (!action || !Array.isArray(magnets) || !magnets.length) return false;
+  magnets.filter(Boolean).forEach(magnet => {
+    applyMagnetQuickAction(magnet, action, { skipSave: true });
+  });
+  updateAttendance();
+  updateMagnetOutline();
+  updateEtcReasonPanel();
+  saveState(grade, section);
+  return true;
+}
+
+document.addEventListener('visibilitychange', () => {
+  hideMagnetQuickDropOverlay();
+});
+
 function resolveMagnetQuickMenuState(target) {
   if (!target) return 'classroom';
   if (!target.classList.contains('attached')) {
@@ -1454,6 +1603,7 @@ function addDragFunctionality(el) {
   let startLeft = 0;
   let startTop = 0;
   let activeTouchId = null;
+  let quickDropEligible = false;
 
   function getTouchFromList(touchList) {
     if (!touchList || !touchList.length) return null;
@@ -1492,15 +1642,18 @@ function addDragFunctionality(el) {
     isPointerDown = false;
     isDragging = false;
     didPrepareForDrag = false;
+    quickDropEligible = false;
     window.isMagnetDragging = false;
     activeTouchId = null;
     el.classList.remove('dragging');
     document.querySelectorAll('.board-section').forEach(sec => sec.classList.remove('drag-over'));
+    hideMagnetQuickDropOverlay();
   }
 
   function triggerLongPress(x, y) {
     longPressTriggered = true;
     clearLongPressTimer();
+    hideMagnetQuickDropOverlay();
     resetInteractionState();
     openMagnetQuickMenu(el, { clientX: x, clientY: y });
   }
@@ -1582,6 +1735,7 @@ function addDragFunctionality(el) {
     isDragging = false;
     didPrepareForDrag = false;
     longPressTriggered = false;
+    quickDropEligible = shouldShowMagnetQuickDropFor(el);
 
     startClientX = pos.clientX;
     startClientY = pos.clientY;
@@ -1616,6 +1770,9 @@ function addDragFunctionality(el) {
         isDragging = true;
         window.isMagnetDragging = true;
         el.classList.add('dragging');
+        if (quickDropEligible) {
+          showMagnetQuickDropOverlay();
+        }
       } else {
         return;
       }
@@ -1655,6 +1812,9 @@ function addDragFunctionality(el) {
         sec.classList.remove('drag-over');
       }
     });
+    if (quickDropEligible) {
+      setMagnetQuickDropHover(getMagnetQuickDropActionAt(clientX, clientY));
+    }
 
     updateMagnetOutline();
   }
@@ -1674,6 +1834,7 @@ function addDragFunctionality(el) {
 
     const isGroupLeader = magnetGroup.leader === el;
     const magnetsToHandle = isGroupLeader ? getGroupedMagnets(true) : [el];
+    const quickDropAction = quickDropEligible ? magnetQuickDropActiveAction : null;
 
     if (targetSection) {
       const category = targetSection.dataset.category;
@@ -1703,6 +1864,8 @@ function addDragFunctionality(el) {
           openReasonDialog(groupReasonTargets);
         }
       }
+    } else if (applyMagnetQuickDropAction(quickDropAction, magnetsToHandle)) {
+      // Quick-drop handled; keep right-side board sections as the higher-priority drop target.
     } else {
       magnetsToHandle.forEach(magnet => {
         snapToHome(magnet);
@@ -1720,6 +1883,7 @@ function addDragFunctionality(el) {
     if (isGroupLeader) {
       clearMagnetGroup();
     }
+    hideMagnetQuickDropOverlay();
   }
 
   function dragEnd(e) {

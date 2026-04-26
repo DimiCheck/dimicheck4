@@ -1,5 +1,5 @@
 (function () {
-  const WHATS_NEW_VERSION = 'board-whats-new-2026-04-fast-tap';
+  const WHATS_NEW_VERSION = 'board-whats-new-2026-04-quick-drop';
   const WHATS_NEW_SEEN_KEY = 'dimicheck:board-whats-new-seen';
   const WHATS_NEW_MENU_OPENED_KEY = 'dimicheck:board-whats-new-menu-opened';
   const WHATS_NEW_FIRST_EXPOSED_KEY = 'dimicheck:board-whats-new-first-exposed';
@@ -47,9 +47,13 @@
     }
   }
 
+  function getFirstExposedStorageKey() {
+    return `${WHATS_NEW_FIRST_EXPOSED_KEY}:${WHATS_NEW_VERSION}`;
+  }
+
   function getFirstExposedAt() {
     try {
-      const raw = localStorage.getItem(WHATS_NEW_FIRST_EXPOSED_KEY);
+      const raw = localStorage.getItem(getFirstExposedStorageKey());
       const parsed = Number(raw);
       return Number.isFinite(parsed) ? parsed : null;
     } catch (error) {
@@ -60,7 +64,7 @@
 
   function setFirstExposedAt(timestamp) {
     try {
-      localStorage.setItem(WHATS_NEW_FIRST_EXPOSED_KEY, String(timestamp));
+      localStorage.setItem(getFirstExposedStorageKey(), String(timestamp));
     } catch (error) {
       console.warn('[Board info] failed to persist first-exposed timestamp', error);
     }
