@@ -834,11 +834,14 @@ body.fullscreen .fullscreen-btn {
 
 .magnet-quick-drop-overlay {
   position: absolute;
-  inset: 12px;
+  left: 0;
+  top: 0;
+  width: 360px;
+  height: 500px;
   z-index: 850;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(4, minmax(64px, 1fr));
+  grid-template-rows: repeat(4, minmax(54px, 1fr)) 42px;
   gap: 8px;
   padding: 8px;
   border-radius: 24px;
@@ -912,6 +915,27 @@ body.fullscreen .fullscreen-btn {
   font-size: 13px;
   font-weight: 800;
   letter-spacing: -0.02em;
+}
+
+.magnet-quick-drop-cell--cancel {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.68);
+  background: rgba(0, 0, 0, 0.18);
+  border-style: dashed;
+}
+
+.magnet-quick-drop-cell--cancel.is-hovered {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.42);
+  transform: scale(1.01);
+}
+
+.magnet-quick-drop-cell--cancel .magnet-quick-drop-cell__icon {
+  width: 19px;
+  height: 19px;
 }
 
 .badge.color-red {
@@ -2179,11 +2203,10 @@ body.april-fools-fireworks .fireworks {
   }
 
   .magnet-quick-drop-overlay {
-    inset: 8px;
     gap: 6px;
     padding: 6px;
     border-radius: 20px;
-    grid-template-rows: repeat(4, minmax(54px, 1fr));
+    grid-template-rows: repeat(4, minmax(48px, 1fr)) 38px;
   }
 
   .magnet-quick-drop-cell {

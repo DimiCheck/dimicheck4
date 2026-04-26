@@ -1487,7 +1487,9 @@ function connectBoardRealtime() {
     }
     mergeBoardNoticeCache([notice]);
     renderBoardNotices(boardNoticesCache);
-    showBoardNoticePopup(notice);
+    if (notice?.popup) {
+      showBoardNoticePopup(notice);
+    }
   });
 }
 

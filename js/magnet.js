@@ -388,6 +388,7 @@ let magnetMenuLastOrigin = null;
 let magnetQuickDropOverlay = null;
 let magnetQuickDropActiveAction = null;
 let magnetQuickDropFrameId = null;
+const MAGNET_QUICK_DROP_CANCEL_ACTION = 'cancel';
 
 const magnetGroup = {
   leader: null,
@@ -1001,13 +1002,85 @@ function ensureMagnetQuickDropOverlay() {
     magnetQuickDropOverlay.appendChild(cell);
   });
 
+  const cancelCell = document.createElement('div');
+  cancelCell.className = 'magnet-quick-drop-cell magnet-quick-drop-cell--cancel';
+  cancelCell.dataset.action = MAGNET_QUICK_DROP_CANCEL_ACTION;
+  cancelCell.innerHTML = `
+    <span class="magnet-quick-drop-cell__icon">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 5 10l4-4"/><path d="M5 10h9a5 5 0 0 1 0 10h-3"/></svg>
+    </span>
+    <span class="magnet-quick-drop-cell__label">교실로 복귀</span>
+  `;
+  magnetQuickDropOverlay.appendChild(cancelCell);
+
   container.appendChild(magnetQuickDropOverlay);
   return magnetQuickDropOverlay;
+}
+
+function getMagnetClassroomBounds(container) {
+  const nodes = Array.from(container.querySelectorAll('.magnet.placeholder'));
+  const containerRect = container.getBoundingClientRect();
+  let minLeft = Number.POSITIVE_INFINITY;
+  let minTop = Number.POSITIVE_INFINITY;
+  let maxRight = Number.NEGATIVE_INFINITY;
+  let maxBottom = Number.NEGATIVE_INFINITY;
+
+  nodes.forEach(node => {
+    const rect = node.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    minLeft = Math.min(minLeft, rect.left - containerRect.left);
+    minTop = Math.min(minTop, rect.top - containerRect.top);
+    maxRight = Math.max(maxRight, rect.right - containerRect.left);
+    maxBottom = Math.max(maxBottom, rect.bottom - containerRect.top);
+  });
+
+  if (!Number.isFinite(minLeft)) {
+    Object.values(gridPos).forEach(pos => {
+      if (!pos) return;
+      minLeft = Math.min(minLeft, pos.left);
+      minTop = Math.min(minTop, pos.top);
+      maxRight = Math.max(maxRight, pos.left + 56);
+      maxBottom = Math.max(maxBottom, pos.top + 56);
+    });
+  }
+
+  if (!Number.isFinite(minLeft)) return null;
+
+  const padding = 12;
+  const minPanelWidth = 260;
+  const minPanelHeight = 320;
+  const rawLeft = Math.max(0, minLeft - padding);
+  const rawTop = Math.max(0, minTop - padding);
+  const rawWidth = Math.max(0, maxRight - minLeft + padding * 2);
+  const rawHeight = Math.max(0, maxBottom - minTop + padding * 2);
+  const width = Math.min(containerRect.width, Math.max(minPanelWidth, rawWidth));
+  const height = Math.min(containerRect.height, Math.max(minPanelHeight, rawHeight));
+  const left = Math.min(rawLeft, Math.max(0, containerRect.width - width));
+  const top = Math.min(rawTop, Math.max(0, containerRect.height - height));
+
+  return {
+    left,
+    top,
+    width,
+    height,
+  };
+}
+
+function positionMagnetQuickDropOverlay(overlay) {
+  const container = document.getElementById('magnetContainer');
+  if (!container || !overlay) return;
+  const bounds = getMagnetClassroomBounds(container);
+  if (!bounds) return;
+  overlay.style.left = `${bounds.left}px`;
+  overlay.style.top = `${bounds.top}px`;
+  overlay.style.width = `${bounds.width}px`;
+  overlay.style.height = `${bounds.height}px`;
 }
 
 function showMagnetQuickDropOverlay() {
   const overlay = ensureMagnetQuickDropOverlay();
   if (!overlay) return;
+  positionMagnetQuickDropOverlay(overlay);
   overlay.hidden = false;
   if (magnetQuickDropFrameId !== null) {
     cancelAnimationFrame(magnetQuickDropFrameId);
@@ -1065,8 +1138,9 @@ function shouldShowMagnetQuickDropFor(magnet) {
 
 function applyMagnetQuickDropAction(action, magnets) {
   if (!action || !Array.isArray(magnets) || !magnets.length) return false;
+  const nextAction = action === MAGNET_QUICK_DROP_CANCEL_ACTION ? 'classroom' : action;
   magnets.filter(Boolean).forEach(magnet => {
-    applyMagnetQuickAction(magnet, action, { skipSave: true });
+    applyMagnetQuickAction(magnet, nextAction, { skipSave: true });
   });
   updateAttendance();
   updateMagnetOutline();
