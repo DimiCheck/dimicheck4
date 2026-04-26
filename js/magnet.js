@@ -84,6 +84,9 @@ const PLACEHOLDER_STATUS_BADGES = {
   etc: { label: '기타', title: '기타' },
   absence: { label: '결석', title: '결석(조퇴)' }
 };
+const ETC_REASON_HISTORY_KEY = 'dimicheck:board-etc-reason-history:v1';
+const ETC_REASON_HISTORY_LIMIT = 12;
+const ETC_REASON_HISTORY_MAX_LENGTH = 30;
 let boardFavoriteStatusByNumber = Object.create(null);
 
 const thoughtBubbleRegistry = new Map(); // number -> { element, timeoutId, expiresAt, text }
@@ -2607,6 +2610,63 @@ function addDragFunctionality(el) {
 /* ===================== 이유 모달 ===================== */
 let currentReasonTargets = [];
 
+function normalizeReasonHistoryText(reason) {
+  const text = String(reason || '').trim();
+  if (!text || text.length > ETC_REASON_HISTORY_MAX_LENGTH) return '';
+  if (text.startsWith('!')) return '';
+  return text;
+}
+
+function loadReasonHistory() {
+  try {
+    const raw = localStorage.getItem(ETC_REASON_HISTORY_KEY);
+    const parsed = JSON.parse(raw || '[]');
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map(item => {
+        const text = normalizeReasonHistoryText(item?.text);
+        if (!text) return null;
+        const usedAt = Number(item?.usedAt);
+        const count = Number(item?.count);
+        return {
+          text,
+          usedAt: Number.isFinite(usedAt) ? usedAt : 0,
+          count: Number.isFinite(count) && count > 0 ? count : 1
+        };
+      })
+      .filter(Boolean);
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveReasonHistory(history) {
+  try {
+    localStorage.setItem(ETC_REASON_HISTORY_KEY, JSON.stringify(history));
+  } catch (_) {
+    // localStorage can be blocked; reason saving should still succeed.
+  }
+}
+
+function rememberReasonHistory(reason) {
+  const text = normalizeReasonHistoryText(reason);
+  if (!text) return;
+
+  const now = Date.now();
+  const history = loadReasonHistory();
+  const existing = history.find(item => item.text === text);
+  if (existing) {
+    existing.usedAt = now;
+    existing.count += 1;
+  } else {
+    history.push({ text, usedAt: now, count: 1 });
+  }
+
+  history.sort((a, b) => (b.usedAt - a.usedAt) || (b.count - a.count) || a.text.localeCompare(b.text, 'ko'));
+  saveReasonHistory(history.slice(0, ETC_REASON_HISTORY_LIMIT));
+}
+
 /* 현재 DOM에 존재하는 이유 수집(중복 제거 + 정렬) */
 function collectExistingReasons() {
   const set = new Set();
@@ -2616,6 +2676,36 @@ function collectExistingReasons() {
   });
   const collator = new Intl.Collator('ko');
   return Array.from(set).sort((a, b) => collator.compare(a, b));
+}
+
+function collectReasonSuggestions() {
+  const suggestions = [];
+  const seen = new Set();
+
+  collectExistingReasons().forEach(reason => {
+    if (!seen.has(reason)) {
+      seen.add(reason);
+      suggestions.push(reason);
+    }
+  });
+
+  loadReasonHistory()
+    .sort((a, b) => (b.usedAt - a.usedAt) || (b.count - a.count) || a.text.localeCompare(b.text, 'ko'))
+    .forEach(item => {
+      if (!seen.has(item.text)) {
+        seen.add(item.text);
+        suggestions.push(item.text);
+      }
+    });
+
+  return suggestions.slice(0, ETC_REASON_HISTORY_LIMIT);
+}
+
+function setReasonQuickVisibility(host, isVisible) {
+  const wrap = host?.closest?.('.reason-quick');
+  if (wrap) {
+    wrap.hidden = !isVisible;
+  }
 }
 
 /* 모달 내 버튼 호스트를 보장(없으면 생성해서 textarea 아래에 붙임) */
@@ -2666,8 +2756,9 @@ function renderReasonButtons() {
   const host = ensureReasonButtonsHost();
   if (!host) return;
 
-  const list = collectExistingReasons();
+  const list = collectReasonSuggestions();
   host.innerHTML = '';
+  setReasonQuickVisibility(host, list.length > 0);
 
   list.forEach(reason => {
     const btn = document.createElement('button');
@@ -2726,6 +2817,7 @@ function closeReasonDialog() {
 document.getElementById('reasonSave').addEventListener('click', () => {
   const input = document.getElementById('reasonInput');
   const text = input ? input.value.trim() : '';
+  rememberReasonHistory(text);
 
   if (currentReasonTargets.length) {
     currentReasonTargets.forEach(target => {
