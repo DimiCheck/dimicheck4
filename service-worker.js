@@ -186,6 +186,9 @@ self.addEventListener('notificationclick', (event) => {
 
 self.addEventListener('message', (event) => {
   const data = event.data || {};
+  if (data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
   if (data.type === 'TIMETABLE_FORCE_CHECK') {
     event.waitUntil(triggerTimetableNotification());
   }

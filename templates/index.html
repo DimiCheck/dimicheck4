@@ -52,6 +52,7 @@
       let pwaSettled = false;
       let pwaStatusSeen = false;
       let pwaBusy = false;
+      let updatePending = false;
       let reloading = false;
       let hidden = false;
 
@@ -114,6 +115,7 @@
       window.addEventListener('dimicheck:pwa-update', () => {
         pwaStatusSeen = true;
         pwaBusy = true;
+        updatePending = true;
         pwaSettled = false;
         setStatus('새 버전을 준비하는 중...');
       });
@@ -144,7 +146,7 @@
       }, MAX_VISIBLE_MS);
 
       window.setTimeout(() => {
-        if (!reloading && pwaBusy) {
+        if (!reloading && pwaBusy && !updatePending) {
           pwaBusy = false;
           pwaSettled = true;
           maybeHideSplash();

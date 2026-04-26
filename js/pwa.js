@@ -80,6 +80,11 @@
     dispatchPwaStatus('새 버전을 준비하는 중...', 'installing');
     const updateEvent = new CustomEvent('dimicheck:pwa-update', { detail: worker });
     window.dispatchEvent(updateEvent);
+    try {
+      worker.postMessage({ type: 'SKIP_WAITING' });
+    } catch (error) {
+      console.warn('[PWA] failed to request skipWaiting', error);
+    }
   }
 
   registerServiceWorker();
