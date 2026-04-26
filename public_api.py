@@ -355,7 +355,11 @@ def broadcast_public_status_update(grade: int, section: int) -> None:
 @require_api_key
 @enforce_rate_limit
 def api_version():
-    return jsonify({"version": config.ASSET_VERSION})
+    return jsonify({
+        "version": config.ASSET_VERSION,
+        "assetVersion": config.ASSET_VERSION,
+        "appVersion": config.APP_VERSION,
+    })
 
 
 @public_api_bp.get("/api/class/<int:grade>-<int:section>/status")

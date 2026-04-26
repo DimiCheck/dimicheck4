@@ -1,7 +1,10 @@
 (function () {
-  function dispatchPwaStatus(message, phase) {
+  let resolvedAssetVersion = '';
+  let resolvedAppVersion = '';
+
+  function dispatchPwaStatus(message, phase, version = resolvedAssetVersion, appVersion = resolvedAppVersion) {
     window.dispatchEvent(new CustomEvent('dimicheck:pwa-status', {
-      detail: { message, phase }
+      detail: { message, phase, version, appVersion }
     }));
   }
 
@@ -22,6 +25,9 @@
       }
       const data = await res.json();
       const version = data && data.version ? String(data.version) : '';
+      const appVersion = data && data.appVersion ? String(data.appVersion) : '';
+      resolvedAssetVersion = version;
+      resolvedAppVersion = appVersion;
       if (!version) {
         return '/service-worker.js';
       }

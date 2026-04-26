@@ -36,11 +36,13 @@
       <div class="app-splash__brand">DimiCheck</div>
     </div>
     <div id="appSplashStatus" class="app-splash__status">디미체크 준비 중...</div>
+    <div id="appSplashVersion" class="app-splash__version" hidden></div>
   </div>
   <script>
     (function () {
       const splash = document.getElementById('appSplash');
       const status = document.getElementById('appSplashStatus');
+      const version = document.getElementById('appSplashVersion');
       if (!splash || !status) return;
 
       const startedAt = performance.now();
@@ -53,6 +55,21 @@
 
       function setStatus(message) {
         if (message) status.textContent = message;
+      }
+
+      function formatReleaseVersion(value) {
+        const text = String(value || '').trim();
+        if (!text) return '';
+        return text.toLowerCase().startsWith('v') ? text : `v${text}`;
+      }
+
+      function setVersion(systemVersion, appVersion) {
+        if (!version || !systemVersion) return;
+        const releaseVersion = formatReleaseVersion(appVersion);
+        version.textContent = releaseVersion
+          ? `${releaseVersion} (${systemVersion})`
+          : `v${systemVersion}`;
+        version.hidden = false;
       }
 
       function hideSplash() {
@@ -77,6 +94,7 @@
       window.addEventListener('dimicheck:pwa-status', (event) => {
         const detail = event.detail || {};
         setStatus(detail.message);
+        setVersion(detail.version, detail.appVersion);
         if (detail.phase === 'checking' || detail.phase === 'installing') {
           pwaSettled = false;
         } else if (detail.phase === 'ready' || detail.phase === 'unsupported' || detail.phase === 'error') {

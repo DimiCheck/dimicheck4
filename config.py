@@ -111,6 +111,7 @@ class Config:
 
     # Cache busting - use timestamp or version from env
     ASSET_VERSION: str = os.getenv("ASSET_VERSION", _default_asset_version())
+    APP_VERSION: str = os.getenv("APP_VERSION", "4.1")
 
     # Google Analytics (Measurement Protocol)
     GA4_MEASUREMENT_ID: str | None = os.getenv("GA4_MEASUREMENT_ID")

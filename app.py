@@ -252,7 +252,10 @@ def _force_https_for_public_hosts():
 @app.context_processor
 def inject_asset_version():
     """Inject asset version for cache busting"""
-    return {'asset_version': config.ASSET_VERSION}
+    return {
+        'asset_version': config.ASSET_VERSION,
+        'app_version': config.APP_VERSION,
+    }
 
 
 @app.before_request
@@ -1092,7 +1095,11 @@ def reload_configs():
 @app.route("/api/version")
 def get_version():
     """Get current asset version for cache busting"""
-    return jsonify({"version": config.ASSET_VERSION})
+    return jsonify({
+        "version": config.ASSET_VERSION,
+        "assetVersion": config.ASSET_VERSION,
+        "appVersion": config.APP_VERSION,
+    })
 
 @app.route("/sitemap.xml")
 def sitemap():
