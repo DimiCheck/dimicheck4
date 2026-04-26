@@ -69,6 +69,24 @@ def test_static_html_pages_are_not_shadowed_by_short_code_route(monkeypatch):
         assert response.status_code == 200, path
 
 
+def test_public_static_handler_blocks_sensitive_files(monkeypatch):
+    app = _load_app(monkeypatch)
+    client = app.test_client()
+
+    assert client.get("/app.py").status_code == 404
+    assert client.get("/config.py").status_code == 404
+    assert client.get("/app.db").status_code == 404
+
+
+def test_public_static_handler_keeps_frontend_assets_available(monkeypatch):
+    app = _load_app(monkeypatch)
+    client = app.test_client()
+
+    assert client.get("/main.css").status_code == 200
+    assert client.get("/js/pwa.js").status_code == 200
+    assert client.get("/manifest.webmanifest").status_code == 200
+
+
 def test_schoollife_meal_offset_returns_tomorrows_menu(monkeypatch):
     app = _load_app(monkeypatch)
     client = app.test_client()
