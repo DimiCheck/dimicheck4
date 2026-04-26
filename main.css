@@ -2065,20 +2065,6 @@ body.april-fools-fireworks .fireworks {
     0 0 18px var(--ornament-glow);
 }
 
-.magnet.magnet-multi-selected::after {
-  content: "";
-  position: absolute;
-  right: -3px;
-  bottom: -3px;
-  width: 16px;
-  height: 16px;
-  border-radius: 999px;
-  background:
-    linear-gradient(135deg, #fff, #dbeafe);
-  border: 2px solid #2563eb;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.28);
-}
-
 .magnet-group-badge {
   position: absolute;
   top: -8px;
@@ -2096,6 +2082,10 @@ body.april-fools-fireworks .fireworks {
   justify-content: center;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
   pointer-events: none;
+}
+
+.magnet.magnet-group-converging {
+  transition: left 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.16s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 
 .countdown-overlay {

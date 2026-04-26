@@ -582,8 +582,9 @@ function updateMagnetMultiSelectToggle() {
   const selectedCount = getValidMultiSelectedMagnets().length;
   if (magnetMultiSelectToggleButton) {
     magnetMultiSelectToggleButton.classList.toggle('is-active', magnetMultiSelectEnabled);
+    const label = magnetMultiSelectEnabled ? '다중 선택 중' : '다중 선택';
     magnetMultiSelectToggleButton.innerHTML = `
-      <span>다중 선택</span>
+      <span>${label}</span>
       <span class="magnet-multi-select-toggle__count">${selectedCount}</span>
     `;
     magnetMultiSelectToggleButton.setAttribute('aria-pressed', String(magnetMultiSelectEnabled));
@@ -681,25 +682,27 @@ function startMagnetGroupFromMultiSelection(leader) {
   const leaderPos = getMagnetPosition(leader);
   leader.classList.add('magnet-group-leader');
   leader.style.zIndex = '1200';
+  leader.classList.add('magnet-group-converging');
 
   members.forEach((member, index) => {
     storeOriginalState(member);
-    const memberPos = getMagnetPosition(member);
     member.classList.remove('attached');
-    member.classList.add('magnet-group-member');
+    member.classList.add('magnet-group-member', 'magnet-group-converging');
     if (member.parentElement !== container) {
       container.appendChild(member);
     }
-    setMagnetPosition(member, memberPos.left, memberPos.top);
     magnetGroup.members.push(member);
-    magnetGroup.offsets.set(member, {
-      dx: memberPos.left - leaderPos.left,
-      dy: memberPos.top - leaderPos.top
-    });
+    const offset = { dx: (index + 1) * 6, dy: (index + 1) * 8 };
+    magnetGroup.offsets.set(member, offset);
+    setMagnetPosition(member, leaderPos.left + offset.dx, leaderPos.top + offset.dy);
     member.style.zIndex = String(1200 - (index + 1));
   });
 
   updateGroupBadge();
+  window.setTimeout(() => {
+    leader.classList.remove('magnet-group-converging');
+    members.forEach(member => member.classList.remove('magnet-group-converging'));
+  }, 180);
 }
 
 function normalizeFavoriteStatusAction(value) {
