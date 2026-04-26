@@ -832,11 +832,11 @@ async function applyBoardStatePayload(payload, options = {}) {
   const thoughtProcessed = new Set();
 
   Object.entries(magnets).forEach(([num, rawData]) => {
-    let el = document.querySelector(`.magnet[data-number="${num}"]`);
+    let el = document.querySelector(`.magnet[data-number="${num}"]:not(.placeholder)`);
     if (!el) {
       const normalizedNum = String(parseInt(num, 10));
       if (normalizedNum && normalizedNum !== num) {
-        el = document.querySelector(`.magnet[data-number="${normalizedNum}"]`);
+        el = document.querySelector(`.magnet[data-number="${normalizedNum}"]:not(.placeholder)`);
       }
     }
     if (!el) return;
@@ -898,6 +898,9 @@ async function applyBoardStatePayload(payload, options = {}) {
   sortAllSections();
   updateAttendance();
   updateMagnetOutline();
+  if (typeof window.updatePlaceholderStatusBadges === 'function') {
+    window.updatePlaceholderStatusBadges();
+  }
   if (typeof window.repositionThoughtBubbles === 'function') {
     window.repositionThoughtBubbles();
   }

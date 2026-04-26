@@ -102,7 +102,7 @@ const CATEGORY_BURST_EMOJI = {
 
 // Reaction burst effect
 function spawnReactionBurst(number, emoji) {
-  const magnet = document.querySelector(`.magnet[data-number="${number}"]`);
+  const magnet = document.querySelector(`.magnet[data-number="${number}"]:not(.placeholder)`);
   if (!magnet) return;
 
   const rect = magnet.getBoundingClientRect();
@@ -194,7 +194,7 @@ function updateThoughtBubblePositionForMagnet(magnet) {
 function repositionThoughtBubbles() {
   thoughtBubbleRegistry.forEach((entry, number) => {
     if (!entry || !entry.element) return;
-    const magnet = document.querySelector(`.magnet[data-number="${number}"]`);
+    const magnet = document.querySelector(`.magnet[data-number="${number}"]:not(.placeholder)`);
     if (magnet) {
       positionThoughtBubble(magnet, entry.element);
     }
@@ -308,7 +308,7 @@ function removeReactionBadgeForNumber(number) {
   }
 
   // Restore original number text
-  const magnet = document.querySelector(`.magnet[data-number="${number}"]`);
+  const magnet = document.querySelector(`.magnet[data-number="${number}"]:not(.placeholder)`);
   if (magnet && entry.originalText !== undefined) {
     magnet.textContent = entry.originalText;
   }
@@ -1519,7 +1519,7 @@ function returnCategoryToClassroom(category) {
 }
 
 function moveMagnetToCategoryByNumber(number, category) {
-  const magnet = document.querySelector(`.magnet[data-number="${number}"]`);
+  const magnet = document.querySelector(`.magnet[data-number="${number}"]:not(.placeholder)`);
   if (!magnet) {
     console.warn('[routine] magnet not found for number', number);
     return false;
@@ -1547,7 +1547,7 @@ function createPlaceholder(num) {
   const p = document.createElement('div');
   p.className = 'magnet placeholder';
   p.textContent = num;
-  p.dataset.number = String(num);
+  p.dataset.placeholderNumber = String(num);
   p.style.left = pos.left + 'px';
   p.style.top  = pos.top  + 'px';
   p.setAttribute('role', 'button');
@@ -1709,7 +1709,7 @@ function createReasonRow(reason, nums) {
     b.className = 'badge';
     b.textContent = n;
 
-    const mag = document.querySelector(`.magnet[data-number="${n}"]`);
+    const mag = document.querySelector(`.magnet[data-number="${n}"]:not(.placeholder)`);
     if (mag) {
       mag.classList.forEach(cls => {
         if (cls.startsWith('color-')) b.classList.add(cls);
@@ -1752,7 +1752,7 @@ function clearPlaceholderStatusBadge(placeholder) {
   if (badge) {
     badge.remove();
   }
-  const number = placeholder.dataset.number || placeholder.textContent.trim();
+  const number = placeholder.dataset.placeholderNumber || placeholder.textContent.trim();
   if (number) {
     placeholder.setAttribute('aria-label', `${number}번 자석을 교실로 복귀`);
   }
@@ -1768,7 +1768,7 @@ function setPlaceholderStatusBadge(placeholder, category, magnet) {
     placeholder.appendChild(badge);
   }
 
-  const number = placeholder.dataset.number || placeholder.textContent.trim();
+  const number = placeholder.dataset.placeholderNumber || placeholder.textContent.trim();
   const reason = category === 'etc' ? (magnet?.dataset?.reason || '').trim() : '';
   const title = reason ? `${config.title} · ${reason}` : config.title;
 
@@ -1795,6 +1795,8 @@ function updatePlaceholderStatusBadges() {
     });
   });
 }
+
+window.updatePlaceholderStatusBadges = updatePlaceholderStatusBadges;
 
 function ensureEtcReasonShortcut() {
   if (etcReasonShortcutButton && etcReasonPopover && etcReasonPopoverList) {
@@ -1947,7 +1949,7 @@ function updateEtcReasonPanel() {
         setTimeout(() => fireworks.stop(true), 7000);
       }
       nums.forEach(n => {
-        const mag = document.querySelector(`.magnet[data-number="${n}"][data-reason="${reason}"]`);
+        const mag = document.querySelector(`.magnet[data-number="${n}"][data-reason="${reason}"]:not(.placeholder)`);
         if (mag) {
           delete mag.dataset.reason;
           mag.classList.remove('has-reason');
@@ -1977,7 +1979,7 @@ function updateEtcReasonPanel() {
         setTimeout(() => { img.remove(); }, 3000);
       }
       nums.forEach(n => {
-        const mag = document.querySelector(`.magnet[data-number="${n}"][data-reason="${reason}"]`);
+        const mag = document.querySelector(`.magnet[data-number="${n}"][data-reason="${reason}"]:not(.placeholder)`);
         if (mag) {
           delete mag.dataset.reason;
           mag.classList.remove('has-reason');
@@ -2006,7 +2008,7 @@ function updateEtcReasonPanel() {
         setTimeout(() => { img.remove(); }, 60000);
       }
       nums.forEach(n => {
-        const mag = document.querySelector(`.magnet[data-number="${n}"][data-reason="${reason}"]`);
+        const mag = document.querySelector(`.magnet[data-number="${n}"][data-reason="${reason}"]:not(.placeholder)`);
         if (mag) {
           delete mag.dataset.reason;
           mag.classList.remove('has-reason');
@@ -2019,7 +2021,7 @@ function updateEtcReasonPanel() {
     // Deprecated seasonal commands: remove reason tag only (no visual effect).
     else if (reason === '!snow' || reason === '!christmas') {
       nums.forEach(n => {
-        const mag = document.querySelector(`.magnet[data-number="${n}"][data-reason="${reason}"]`);
+        const mag = document.querySelector(`.magnet[data-number="${n}"][data-reason="${reason}"]:not(.placeholder)`);
         if (mag) {
           delete mag.dataset.reason;
           mag.classList.remove('has-reason');
