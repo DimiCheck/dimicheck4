@@ -174,6 +174,29 @@ def test_arcade_manager_assigns_balanced_teams_and_claims_spawn_cells(monkeypatc
     assert third.contribution == 0
 
 
+def test_arcade_requires_minimum_players_before_start(monkeypatch):
+    arcade_routes = importlib.import_module("arcade_routes")
+    monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: _allowed_window())
+
+    manager = arcade_routes.ArcadeSessionManager()
+    session_obj, _error = manager.create_session(2, 4)
+    assert session_obj is not None
+    first, _error = manager.join_player(session_obj.code, "p1", "하나", 0)
+    assert first is not None
+
+    session_obj.scheduled_start_at = time.time() - 1
+    with manager._lock:
+        manager._advance_locked(session_obj)
+    assert session_obj.status == "waiting"
+    assert manager.start_now(session_obj.code) is None
+
+    second, _error = manager.join_player(session_obj.code, "p2", "둘둘", 1)
+    assert second is not None
+    with manager._lock:
+        manager._advance_locked(session_obj)
+    assert session_obj.status == "countdown"
+
+
 def test_arcade_manager_moves_players_and_broadcasts_manual_end(monkeypatch):
     arcade_routes = importlib.import_module("arcade_routes")
     monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: _allowed_window())

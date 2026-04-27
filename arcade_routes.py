@@ -300,6 +300,9 @@ class ArcadeSessionManager:
     def bind_socketio(self, socketio: Any) -> None:
         self._socketio = socketio
 
+    def _has_enough_players_locked(self, session_obj: ArcadeSession) -> bool:
+        return len(session_obj.players) >= max(1, config.ARCADE_MIN_PLAYERS)
+
     def create_session(self, grade: int, section: int, allow_any_time: bool = False) -> tuple[ArcadeSession | None, str | None]:
         if not config.ARCADE_ENABLED:
             return None, "Arcade가 비활성화되어 있습니다."
@@ -417,6 +420,8 @@ class ArcadeSessionManager:
         with self._lock:
             session_obj = self._sessions.get(str(code or "").upper())
             if not session_obj or session_obj.status == "ended":
+                return None
+            if not self._has_enough_players_locked(session_obj):
                 return None
             now_ts = _now()
             session_obj.scheduled_start_at = now_ts
@@ -648,7 +653,11 @@ class ArcadeSessionManager:
 
     def _advance_locked(self, session_obj: ArcadeSession) -> list[list[Any]]:
         now_ts = _now()
-        if session_obj.status == "waiting" and now_ts >= session_obj.scheduled_start_at:
+        if (
+            session_obj.status == "waiting"
+            and now_ts >= session_obj.scheduled_start_at
+            and self._has_enough_players_locked(session_obj)
+        ):
             session_obj.status = "countdown"
         if session_obj.status == "countdown" and now_ts >= session_obj.starts_at:
             session_obj.status = "running"
@@ -775,7 +784,7 @@ def start_arcade_session(code: str):
         return jsonify({"error": "not allowed"}), 403
     updated = arcade_manager.start_now(code)
     if not updated:
-        return jsonify({"error": "not found"}), 404
+        return jsonify({"error": f"최소 {config.ARCADE_MIN_PLAYERS}명이 필요합니다."}), 400
     return jsonify(arcade_manager.snapshot(updated))
 
 

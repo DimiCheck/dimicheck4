@@ -119,6 +119,7 @@ class Config:
     APP_VERSION: str = os.getenv("APP_VERSION", "4.1")
     ARCADE_ENABLED: bool = _env_bool("ARCADE_ENABLED", True)
     ARCADE_MAX_ACTIVE_SESSIONS: int = int(os.getenv("ARCADE_MAX_ACTIVE_SESSIONS", "6"))
+    ARCADE_MIN_PLAYERS: int = int(os.getenv("ARCADE_MIN_PLAYERS", "2"))
     ARCADE_MAX_PLAYERS: int = int(os.getenv("ARCADE_MAX_PLAYERS", "60"))
     ARCADE_SESSION_TTL_SECONDS: int = int(os.getenv("ARCADE_SESSION_TTL_SECONDS", "1200"))
     ARCADE_TICK_MS: int = int(os.getenv("ARCADE_TICK_MS", "320"))

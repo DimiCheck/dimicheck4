@@ -37,12 +37,12 @@
   }
 
   function getOrCreatePlayerId() {
-    var key = 'dimicheck:arcade-player-id';
+    var key = 'dimicheck:arcade-player-id:' + code;
     try {
-      var existing = localStorage.getItem(key);
+      var existing = sessionStorage.getItem(key);
       if (existing) return existing;
       var generated = 'p-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
-      localStorage.setItem(key, generated);
+      sessionStorage.setItem(key, generated);
       return generated;
     } catch (error) {
       console.warn('[Arcade] failed to persist player id', error);
