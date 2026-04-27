@@ -40,62 +40,74 @@
   </div>
   <script>
     (function () {
-      const splash = document.getElementById('appSplash');
-      const status = document.getElementById('appSplashStatus');
-      const version = document.getElementById('appSplashVersion');
+      var splash = document.getElementById('appSplash');
+      var status = document.getElementById('appSplashStatus');
+      var version = document.getElementById('appSplashVersion');
       if (!splash || !status) return;
 
-      const startedAt = performance.now();
-      const MIN_VISIBLE_MS = 450;
-      const MAX_VISIBLE_MS = 2800;
-      let boardReady = false;
-      let pwaSettled = false;
-      let pwaStatusSeen = false;
-      let pwaBusy = false;
-      let updatePending = false;
-      let reloading = false;
-      let hidden = false;
+      var MIN_VISIBLE_MS = 450;
+      var MAX_VISIBLE_MS = 2800;
+      var boardReady = false;
+      var pwaSettled = false;
+      var pwaStatusSeen = false;
+      var pwaBusy = false;
+      var updatePending = false;
+      var reloading = false;
+      var hidden = false;
+      var startedAt = nowMs();
+
+      function nowMs() {
+        if (window.performance && typeof window.performance.now === 'function') {
+          return window.performance.now();
+        }
+        return Date.now ? Date.now() : new Date().getTime();
+      }
 
       function setStatus(message) {
         if (message) status.textContent = message;
       }
 
       function formatReleaseVersion(value) {
-        const text = String(value || '').trim();
+        var text = String(value || '').trim();
         if (!text) return '';
-        return text.toLowerCase().startsWith('v') ? text : `v${text}`;
+        return text.toLowerCase().indexOf('v') === 0 ? text : 'v' + text;
       }
 
       function setVersion(systemVersion, appVersion) {
         if (!version || !systemVersion) return;
-        const releaseVersion = formatReleaseVersion(appVersion);
+        var releaseVersion = formatReleaseVersion(appVersion);
         version.textContent = releaseVersion
-          ? `${releaseVersion} (${systemVersion})`
-          : `v${systemVersion}`;
+          ? releaseVersion + ' (' + systemVersion + ')'
+          : 'v' + systemVersion;
         version.hidden = false;
       }
 
       function hideSplash() {
         if (hidden || reloading) return;
         hidden = true;
-        splash.classList.add('is-hiding');
-        window.setTimeout(() => {
+        if (splash.classList && typeof splash.classList.add === 'function') {
+          splash.classList.add('is-hiding');
+        } else {
+          splash.className += ' is-hiding';
+        }
+        window.setTimeout(function () {
           splash.hidden = true;
+          splash.style.display = 'none';
         }, 280);
       }
 
       function maybeHideSplash() {
         if (hidden || reloading || !boardReady || !pwaSettled) return;
-        const elapsed = performance.now() - startedAt;
+        var elapsed = nowMs() - startedAt;
         window.setTimeout(hideSplash, Math.max(0, MIN_VISIBLE_MS - elapsed));
       }
 
-      window.addEventListener('dimicheck:splash-status', (event) => {
+      window.addEventListener('dimicheck:splash-status', function (event) {
         setStatus(event.detail && event.detail.message);
       });
 
-      window.addEventListener('dimicheck:pwa-status', (event) => {
-        const detail = event.detail || {};
+      window.addEventListener('dimicheck:pwa-status', function (event) {
+        var detail = event.detail || {};
         pwaStatusSeen = true;
         setStatus(detail.message);
         setVersion(detail.version, detail.appVersion);
@@ -112,7 +124,7 @@
         }
       });
 
-      window.addEventListener('dimicheck:pwa-update', () => {
+      window.addEventListener('dimicheck:pwa-update', function () {
         pwaStatusSeen = true;
         pwaBusy = true;
         updatePending = true;
@@ -120,24 +132,24 @@
         setStatus('새 버전을 준비하는 중...');
       });
 
-      window.addEventListener('dimicheck:pwa-controllerchange', () => {
+      window.addEventListener('dimicheck:pwa-controllerchange', function () {
         setStatus('업데이트를 확인하는 중...');
       });
 
-      window.addEventListener('dimicheck:board-ready', () => {
+      window.addEventListener('dimicheck:board-ready', function () {
         boardReady = true;
         if (!reloading && pwaSettled) setStatus('디미체크 준비 완료');
         maybeHideSplash();
       });
 
-      window.setTimeout(() => {
+      window.setTimeout(function () {
         if (!pwaStatusSeen) {
           pwaSettled = true;
           maybeHideSplash();
         }
       }, 1400);
 
-      window.setTimeout(() => {
+      window.setTimeout(function () {
         boardReady = true;
         if (!pwaBusy) {
           pwaSettled = true;
@@ -145,7 +157,7 @@
         maybeHideSplash();
       }, MAX_VISIBLE_MS);
 
-      window.setTimeout(() => {
+      window.setTimeout(function () {
         if (!reloading && pwaBusy && !updatePending) {
           pwaBusy = false;
           pwaSettled = true;
