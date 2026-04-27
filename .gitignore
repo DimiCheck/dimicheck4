@@ -46,6 +46,7 @@ coverage.xml
 *.swo
 nohup.out
 .cache/
+.class_config_cache.json
 
 # ======================
 # Flask / App data
