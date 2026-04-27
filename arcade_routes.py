@@ -1883,6 +1883,33 @@ class TurtleRaceSessionManager:
                     self._end_locked(session_obj)
             return session_obj, None
 
+    def trigger_reset_trap(self, code: str, player_id: str) -> tuple[TurtleSession | None, str | None]:
+        with self._lock:
+            session_obj = self._sessions.get(str(code or "").upper())
+            if not session_obj:
+                return None, "세션을 찾을 수 없습니다."
+            if session_obj.status != "racing":
+                return session_obj, None
+            player = session_obj.players.get(player_id)
+            if not player or player.role != "player" or player.finished_at is not None:
+                return session_obj, None
+            now_ts = _now()
+            if player.fake_reset_until <= now_ts:
+                return session_obj, None
+            player.progress = 0.0
+            player.fake_reset_until = 0.0
+            player.last_seen_at = now_ts
+            session_obj.recent_events.append({
+                "at": int(now_ts * 1000),
+                "targetId": player.id,
+                "targetNickname": player.nickname,
+                "itemId": "fake_reset",
+                "itemLabel": "초기화 함정",
+                "message": f"{player.nickname} 출발선으로 복귀",
+            })
+            session_obj.recent_events = session_obj.recent_events[-8:]
+            return session_obj, None
+
     def end_session(self, code: str) -> TurtleSession | None:
         normalized_code = str(code or "").upper()
         with self._lock:
@@ -2057,7 +2084,7 @@ class TurtleRaceSessionManager:
             target.shrink_until = max(target.shrink_until, now_ts + 2)
             note = f"{target.nickname} 버튼 축소"
         elif item_id == "fake_reset":
-            target.fake_reset_until = max(target.fake_reset_until, now_ts + 2)
+            target.fake_reset_until = max(target.fake_reset_until, now_ts + 1)
             note = f"{target.nickname} 초기화 함정"
         else:
             return
@@ -2608,7 +2635,10 @@ class ArcadeNamespace(Namespace):
         payload = data or {}
         code = str(payload.get("code") or "").upper()
         player_id = str(payload.get("playerId") or "").strip()
-        session_obj, error = turtle_manager.add_taps(code, player_id, payload.get("count") or 1)
+        if payload.get("trapReset"):
+            session_obj, error = turtle_manager.trigger_reset_trap(code, player_id)
+        else:
+            session_obj, error = turtle_manager.add_taps(code, player_id, payload.get("count") or 1)
         if error and not session_obj:
             emit("turtle:error", {"message": error})
             return

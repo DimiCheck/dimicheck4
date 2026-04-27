@@ -197,6 +197,7 @@
       els.tapCount.textContent = '아이템 투표';
       els.tapButton.hidden = true;
       if (els.fakeResetButton) els.fakeResetButton.classList.remove('is-active');
+      els.tapButton.classList.remove('is-fake-reset');
     } else {
       els.tapButton.hidden = false;
     }
@@ -204,12 +205,15 @@
     var shrinkActive = effects.shrink && effects.shrink > currentServerNow();
     var fakeResetActive = effects.fakeReset && effects.fakeReset > currentServerNow();
     els.tapButton.classList.toggle('is-shrunk', !!shrinkActive);
-    if (els.fakeResetButton) {
-      els.fakeResetButton.classList.toggle('is-active', !!fakeResetActive && !isSaboteur && sessionState && sessionState.status === 'racing');
-    }
+    els.tapButton.classList.toggle('is-fake-reset', !!fakeResetActive && !isSaboteur && sessionState && sessionState.status === 'racing');
+    if (els.fakeResetButton) els.fakeResetButton.classList.remove('is-active');
     if (!isSaboteur && sessionState && sessionState.status === 'racing' && player && !player.finished) {
       els.tapButton.disabled = false;
-      els.tapButton.innerHTML = '<img src="' + turtleSkinUrl(selectedSkin) + '" alt="">전진';
+      if (fakeResetActive) {
+        els.tapButton.textContent = '초기화';
+      } else {
+        els.tapButton.innerHTML = '<img src="' + turtleSkinUrl(selectedSkin) + '" alt="">전진';
+      }
     } else {
       els.tapButton.disabled = true;
       els.tapButton.textContent = sessionState && sessionState.status === 'countdown' ? '준비' : '대기';
@@ -245,6 +249,11 @@
 
   function flushTaps() {
     if (!pendingTaps || !socket || !socket.connected || !sessionState || sessionState.status !== 'racing') {
+      pendingTaps = 0;
+      return;
+    }
+    var effects = (player && player.effects) || {};
+    if (effects.fakeReset && effects.fakeReset > currentServerNow()) {
       pendingTaps = 0;
       return;
     }
@@ -400,6 +409,24 @@
 
   els.tapButton.addEventListener('click', function () {
     if (!sessionState || sessionState.status !== 'racing' || (player && player.finished)) return;
+    var effects = (player && player.effects) || {};
+    if (effects.fakeReset && effects.fakeReset > currentServerNow()) {
+      pendingTaps = 0;
+      if (player) {
+        player.progress = 0;
+        player.progressPercent = 0;
+        renderPlayer();
+      }
+      if (socket && socket.connected) {
+        socket.emit('turtle_tap', {
+          code: code,
+          playerId: playerId,
+          trapReset: true
+        });
+      }
+      els.myRank.textContent = '초기화 함정. 출발선으로 돌아갔어요.';
+      return;
+    }
     pendingTaps += 1;
     if (player) {
       player.taps += 1;

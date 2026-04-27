@@ -28,3 +28,5 @@ Original prompt: 구현 시작
 - Turtle Race now uses `turtle-01.png` through `turtle-03.png` skins instead of emoji, randomly preselects a skin on mobile entry, and lets players change it until the race starts with server-synced host rendering.
 - Turtle Race now runs longer/slower (`40s`, `0.7%` per tap), requires 2 connected racers to start, and supports player/saboteur roles. Saboteurs vote every 5 seconds to apply banana, swap-last, shrink-button, or fake-reset effects to racers.
 - Fixed Turtle Race debug start: `TurtleDebug.allowAnyTime()` now refreshes a short same-class lobby into a full test window instead of reusing its old `safe_end_at`.
+- Improved Turtle sabotage feedback: host now shows banana impact/slip and active shrink/fake-reset effects, while mobile turns the forward button itself into a short red reset trap and makes shrink movement much harder to chase.
+- Made the Turtle fake-reset trap real: pressing the red reset-state forward button now resets that racer to the starting line on the server and broadcasts the result.

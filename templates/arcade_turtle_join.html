@@ -156,6 +156,7 @@
       color: #17301b;
       font-size: 34px;
       touch-action: manipulation;
+      transition: min-height 0.14s ease, width 0.14s ease, transform 0.14s ease, background 0.14s ease;
     }
     .tap-button img {
       width: 74px;
@@ -166,10 +167,24 @@
       filter: drop-shadow(0 7px 0 rgba(33,48,71,0.1));
     }
     .tap-button.is-shrunk {
-      min-height: 142px;
-      width: 70%;
+      min-height: 92px;
+      width: 42%;
       justify-self: center;
-      animation: turtle-dodge 0.7s ease-in-out infinite alternate;
+      border-radius: 30px;
+      font-size: 22px;
+      animation: turtle-dodge 0.38s cubic-bezier(.33,0,.2,1) infinite alternate;
+    }
+    .tap-button.is-shrunk img {
+      width: 46px;
+      height: 46px;
+    }
+    .tap-button.is-fake-reset {
+      background:
+        radial-gradient(circle at 38% 28%, rgba(255,255,255,0.35), transparent 20%),
+        linear-gradient(135deg, #ff3b30, #bf1b12);
+      color: #fff;
+      box-shadow: 0 10px 0 rgba(160,30,24,0.24);
+      animation: fake-reset-alarm 0.18s linear infinite alternate;
     }
     .fake-reset {
       display: none;
@@ -203,8 +218,14 @@
     .tap-button:disabled { opacity: 0.5; }
     .error { margin-top: 12px; padding: 12px; border-radius: 18px; background: #ffe1e8; color: #bf3751; font-weight: 850; }
     @keyframes turtle-dodge {
-      from { transform: translateX(-18px) rotate(-1deg); }
-      to { transform: translateX(18px) rotate(1deg); }
+      0% { transform: translate(-38px, -6px) rotate(-5deg); }
+      28% { transform: translate(42px, 14px) rotate(6deg); }
+      58% { transform: translate(-16px, -18px) rotate(3deg); }
+      100% { transform: translate(32px, 7px) rotate(-7deg); }
+    }
+    @keyframes fake-reset-alarm {
+      from { transform: translateX(-2px) scale(0.99); }
+      to { transform: translateX(2px) scale(1.01); }
     }
   </style>
 </head>
@@ -250,7 +271,7 @@
         </div>
       </div>
       <button id="tapButton" class="tap-button" type="button" disabled>대기</button>
-      <button id="fakeResetButton" class="fake-reset" type="button">초기화</button>
+      <button id="fakeResetButton" class="fake-reset" type="button" hidden>초기화</button>
       <div class="status-card sabotage-panel" id="sabotagePanel">
         <p class="muted" id="sabotageStatus">5초마다 훼방 아이템을 투표합니다.</p>
         <div class="choice-grid" id="sabotageTargets"></div>

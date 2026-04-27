@@ -10,6 +10,7 @@
   var sessionState = null;
   var socket = null;
   var serverOffsetMs = 0;
+  var trackRefreshTimer = 0;
 
   var els = {
     error: document.getElementById('hostError'),
@@ -134,13 +135,17 @@
     els.playerCount.textContent = '플레이어 ' + racers + '명 · 훼방 ' + saboteurs + '명';
     els.startButton.disabled = state.status !== 'lobby' || racers < Number(state.minRacers || 2);
     els.endButton.disabled = state.status === 'ended';
-    renderTrack(state.players || []);
+    renderTrack(state);
+    scheduleTrackRefreshForEffects(state);
     renderRankings(state);
     updateClock();
   }
 
-  function renderTrack(players) {
+  function renderTrack(state) {
     els.track.querySelectorAll('.lane').forEach(function (node) { node.remove(); });
+    var players = state.players || [];
+    var recentEffects = recentEffectByTarget(state.recentEvents || []);
+    var now = currentServerNow();
     var racers = players.filter(function (player) { return player.role === 'player'; });
     if (!racers.length) {
       var empty = document.createElement('div');
@@ -162,16 +167,73 @@
       turtleImage.src = turtleSkinUrl(player.skin);
       turtleImage.alt = player.nickname + ' 거북이';
       turtle.appendChild(turtleImage);
+      var effects = player.effects || {};
+      var recentEffect = recentEffects[player.id];
+      if (recentEffect) {
+        turtle.classList.toggle('is-banana-hit', recentEffect.itemId === 'banana');
+        turtle.classList.toggle('is-fake-reset', recentEffect.itemId === 'fake_reset');
+      }
+      turtle.classList.toggle('is-shrunk', !!(effects.shrink && effects.shrink > now));
       if (player.finished) {
         var flag = document.createElement('span');
         flag.className = 'finish-flag';
         flag.textContent = '🏁';
         turtle.appendChild(flag);
       }
+      if (recentEffect && recentEffect.itemId === 'banana') {
+        var banana = document.createElement('span');
+        banana.className = 'banana-effect';
+        banana.style.setProperty('--effect-progress', String(Math.min(0.9, player.progress || 0)));
+        banana.textContent = '🍌';
+        lane.appendChild(banana);
+      }
       lane.appendChild(name);
       lane.appendChild(turtle);
       els.track.appendChild(lane);
     });
+  }
+
+  function recentEffectByTarget(events) {
+    var byTarget = {};
+    var now = currentServerNow();
+    events.forEach(function (event) {
+      if (!event || !event.targetId || !event.at) return;
+      if (now - Number(event.at) > 2200) return;
+      var previous = byTarget[event.targetId];
+      if (!previous || Number(event.at) > Number(previous.at || 0)) {
+        byTarget[event.targetId] = event;
+      }
+    });
+    return byTarget;
+  }
+
+  function scheduleTrackRefreshForEffects(state) {
+    if (trackRefreshTimer) {
+      window.clearTimeout(trackRefreshTimer);
+      trackRefreshTimer = 0;
+    }
+    if (!state || state.status !== 'racing') return;
+    var now = currentServerNow();
+    var nextAt = 0;
+    (state.players || []).forEach(function (player) {
+      var effects = player.effects || {};
+      ['shrink', 'fakeReset'].forEach(function (key) {
+        var until = Number(effects[key] || 0);
+        if (until > now && (!nextAt || until < nextAt)) nextAt = until;
+      });
+    });
+    (state.recentEvents || []).forEach(function (event) {
+      var until = Number(event.at || 0) + 2200;
+      if (until > now && (!nextAt || until < nextAt)) nextAt = until;
+    });
+    if (!nextAt) return;
+    trackRefreshTimer = window.setTimeout(function () {
+      trackRefreshTimer = 0;
+      if (sessionState) {
+        renderTrack(sessionState);
+        scheduleTrackRefreshForEffects(sessionState);
+      }
+    }, Math.max(80, nextAt - now + 40));
   }
 
   function renderRankings(state) {
@@ -271,8 +333,16 @@
       mode: 'turtle-host',
       status: sessionState ? sessionState.status : 'loading',
       code: sessionState ? sessionState.code : null,
+      recentEvents: sessionState ? sessionState.recentEvents : [],
       players: sessionState ? sessionState.players.map(function (player) {
-        return { nickname: player.nickname, skin: player.skin, progress: player.progressPercent, taps: player.taps, rank: player.rank };
+        return {
+          nickname: player.nickname,
+          skin: player.skin,
+          progress: player.progressPercent,
+          taps: player.taps,
+          rank: player.rank,
+          effects: player.effects
+        };
       }) : []
     });
   };

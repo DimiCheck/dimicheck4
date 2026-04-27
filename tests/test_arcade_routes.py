@@ -508,6 +508,20 @@ def test_turtle_requires_two_racers_and_applies_saboteur_votes(monkeypatch):
     session_obj.sabotage_vote_ends_at = time.time() - 1
     assert manager._advance_locked(session_obj) is True
     assert session_obj.players["p2"].shrink_until > time.time()
+    updated, reset_error = manager.submit_sabotage_vote(session_obj.code, "s1", "p2", "fake_reset")
+    assert reset_error is None
+    assert updated is session_obj
+    session_obj.sabotage_vote_ends_at = time.time() - 1
+    assert manager._advance_locked(session_obj) is True
+    remaining_reset = session_obj.players["p2"].fake_reset_until - time.time()
+    assert 0 < remaining_reset <= 1.5
+    session_obj.players["p2"].progress = 0.5
+    reset_session, trap_error = manager.trigger_reset_trap(session_obj.code, "p2")
+    assert trap_error is None
+    assert reset_session is session_obj
+    assert session_obj.players["p2"].progress == 0.0
+    assert session_obj.players["p2"].fake_reset_until == 0.0
+    assert session_obj.recent_events[-1]["message"] == "둘둘 출발선으로 복귀"
     snapshot = manager.snapshot(session_obj)
     assert snapshot["connectedRacers"] == 2
     assert snapshot["connectedSaboteurs"] == 1

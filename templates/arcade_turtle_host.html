@@ -132,7 +132,8 @@
       position: absolute;
       left: 0;
       top: 30px;
-      transform: translateX(calc(var(--progress, 0) * (100vw - 520px))) translateY(-50%);
+      --track-distance: calc(100vw - 520px);
+      transform: translateX(calc(var(--progress, 0) * var(--track-distance))) translateY(-50%);
       transition: transform 0.18s ease-out;
       width: 58px;
       height: 58px;
@@ -141,6 +142,25 @@
       filter: drop-shadow(0 8px 0 rgba(33,48,71,0.12));
     }
     .turtle img { width: 100%; height: 100%; object-fit: contain; }
+    .turtle.is-banana-hit {
+      animation: turtle-slip 0.78s cubic-bezier(.18,.92,.28,1.08);
+    }
+    .turtle.is-shrunk {
+      animation: turtle-shrink-panic 0.52s ease-in-out infinite alternate;
+    }
+    .turtle.is-fake-reset {
+      animation: turtle-danger-pop 0.5s ease-in-out 2;
+    }
+    .banana-effect {
+      position: absolute;
+      z-index: 4;
+      left: calc((var(--effect-progress, 0) * (100vw - 520px)) + 84px);
+      top: 18px;
+      font-size: 42px;
+      pointer-events: none;
+      filter: drop-shadow(0 7px 0 rgba(33,48,71,0.13));
+      animation: banana-impact 0.82s cubic-bezier(.14,.9,.24,1) both;
+    }
     .finish-flag {
       position: absolute;
       right: -14px;
@@ -160,7 +180,29 @@
     @media (max-width: 900px) {
       body { overflow: auto; }
       .page { grid-template-columns: 1fr; height: auto; min-height: 100vh; }
-      .turtle { transform: translateX(calc(var(--progress, 0) * (100vw - 130px))) translateY(-50%); }
+      .turtle { --track-distance: calc(100vw - 130px); }
+      .banana-effect { left: calc((var(--effect-progress, 0) * (100vw - 130px)) + 72px); }
+    }
+    @keyframes banana-impact {
+      0% { transform: translate(130px, -54px) rotate(-32deg) scale(0.72); opacity: 0; }
+      22% { opacity: 1; }
+      66% { transform: translate(4px, 4px) rotate(12deg) scale(1.08); opacity: 1; }
+      100% { transform: translate(-18px, 20px) rotate(92deg) scale(0.9); opacity: 0; }
+    }
+    @keyframes turtle-slip {
+      0% { transform: translateX(calc((var(--progress, 0) * var(--track-distance)) + 92px)) translateY(-50%) rotate(0deg) scale(1); }
+      35% { transform: translateX(calc((var(--progress, 0) * var(--track-distance)) + 32px)) translateY(-56%) rotate(-10deg) scale(1.04); }
+      68% { transform: translateX(calc((var(--progress, 0) * var(--track-distance)) - 10px)) translateY(-45%) rotate(8deg) scale(0.98); }
+      100% { transform: translateX(calc(var(--progress, 0) * var(--track-distance))) translateY(-50%) rotate(0deg) scale(1); }
+    }
+    @keyframes turtle-shrink-panic {
+      0% { transform: translateX(calc((var(--progress, 0) * var(--track-distance)) - 8px)) translateY(-50%) scale(0.54) rotate(-4deg); }
+      50% { transform: translateX(calc((var(--progress, 0) * var(--track-distance)) + 18px)) translateY(-66%) scale(0.44) rotate(5deg); }
+      100% { transform: translateX(calc((var(--progress, 0) * var(--track-distance)) - 18px)) translateY(-38%) scale(0.58) rotate(-6deg); }
+    }
+    @keyframes turtle-danger-pop {
+      0%, 100% { filter: drop-shadow(0 8px 0 rgba(33,48,71,0.12)); }
+      50% { filter: drop-shadow(0 0 16px rgba(255,59,48,0.8)); transform: translateX(calc(var(--progress, 0) * var(--track-distance))) translateY(-50%) scale(1.12); }
     }
   </style>
 </head>
