@@ -652,6 +652,7 @@ def board():
         pin = request.form.get("pin")
         if str(config["pin"]) == pin:
             session[f"board_verified_{grade}_{section}"] = True
+            session.permanent = True
             pin_guard_reset(guard_key)
             return render_template("index.html")
 
