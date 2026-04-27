@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, redirect, render_template, request
 from flask_socketio import Namespace, emit, join_room, leave_room
 
 from config import config
@@ -743,6 +743,37 @@ def _host_allowed(grade: int, section: int) -> bool:
 
 @blueprint.get("/arcade/host")
 def arcade_host():
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+    query = []
+    if grade:
+        query.append(f"grade={grade}")
+    if section:
+        query.append(f"section={section}")
+    suffix = f"?{'&'.join(query)}" if query else ""
+    return redirect(f"/arcade/turf/host{suffix}", code=302)
+
+
+@blueprint.get("/arcade")
+def arcade_home():
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+    host_allowed = bool(grade and section and _host_allowed(grade, section))
+    board_url = f"/board?grade={grade}&section={section}" if grade and section else "/"
+    turf_url = f"/arcade/turf/host?grade={grade}&section={section}" if grade and section else ""
+    return render_template(
+        "arcade_home.html",
+        arcade_enabled=config.ARCADE_ENABLED,
+        host_allowed=host_allowed,
+        grade=grade,
+        section=section,
+        board_url=board_url,
+        turf_url=turf_url,
+    )
+
+
+@blueprint.get("/arcade/turf/host")
+def arcade_turf_host():
     grade = request.args.get("grade", type=int)
     section = request.args.get("section", type=int)
     if not grade or not section or not _host_allowed(grade, section):

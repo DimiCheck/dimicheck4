@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DimiCheck Arcade</title>
+  <style>
+    :root {
+      --paper: #fff8e8;
+      --ink: #243044;
+      --muted: #728097;
+      --line: rgba(36, 48, 68, 0.12);
+      --card: rgba(255, 255, 255, 0.86);
+      --red: #ff5f7a;
+      --blue: #35a7ff;
+      --gold: #ffb703;
+      --green: #75d66f;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 12%, rgba(255, 191, 105, 0.52), transparent 24%),
+        radial-gradient(circle at 86% 20%, rgba(123, 214, 255, 0.48), transparent 28%),
+        radial-gradient(circle at 74% 88%, rgba(255, 121, 156, 0.3), transparent 28%),
+        linear-gradient(145deg, #fff8e8 0%, #effbff 48%, #fff1f6 100%);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: radial-gradient(circle, rgba(36, 48, 68, 0.08) 1.5px, transparent 1.5px);
+      background-size: 28px 28px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,0.62), transparent 82%);
+    }
+
+    a { color: inherit; }
+
+    .shell {
+      position: relative;
+      width: min(1180px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 34px 0 46px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: center;
+      margin-bottom: 24px;
+      padding: 26px;
+      border: 1px solid var(--line);
+      border-radius: 36px;
+      background: var(--card);
+      box-shadow: 0 18px 0 rgba(36, 48, 68, 0.08), 0 28px 70px rgba(53, 167, 255, 0.13);
+      backdrop-filter: blur(14px);
+      animation: cardIn 0.55s cubic-bezier(.2, 1.2, .2, 1) both;
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(18px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand img {
+      width: 58px;
+      height: 58px;
+      border-radius: 20px;
+      box-shadow: 0 8px 20px rgba(36, 48, 68, 0.14);
+    }
+
+    h1, h2, h3, p { margin: 0; }
+
+    h1 {
+      font-size: clamp(40px, 6vw, 72px);
+      line-height: 0.92;
+      letter-spacing: -0.07em;
+    }
+
+    .subtitle {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.55;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 16px;
+      background: #ffffff;
+      color: var(--ink);
+      box-shadow: 0 7px 0 rgba(36, 48, 68, 0.13);
+      font-weight: 900;
+      text-decoration: none;
+      transition: transform 0.16s cubic-bezier(.2, 1.4, .2, 1), box-shadow 0.16s ease;
+    }
+
+    .pill:hover { transform: translateY(-2px); }
+    .pill:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(36, 48, 68, 0.13); }
+
+    .section {
+      margin-top: 26px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .section-title h2 {
+      font-size: clamp(24px, 3vw, 34px);
+      letter-spacing: -0.05em;
+    }
+
+    .section-title p {
+      color: var(--muted);
+      font-weight: 750;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .game-card {
+      position: relative;
+      min-height: 230px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 34px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: inset 0 -10px 0 rgba(36, 48, 68, 0.05), 0 16px 0 rgba(36, 48, 68, 0.07);
+      animation: cardIn 0.55s cubic-bezier(.2, 1.2, .2, 1) both;
+    }
+
+    .game-card::after {
+      content: "";
+      position: absolute;
+      width: 180px;
+      height: 180px;
+      right: -54px;
+      top: -58px;
+      border-radius: 999px;
+      background: var(--accent, rgba(255, 183, 3, 0.25));
+      opacity: 0.7;
+    }
+
+    .game-card.live {
+      --accent: rgba(255, 95, 122, 0.24);
+      grid-column: span 2;
+      background: linear-gradient(135deg, #ffffff 0%, #fff2d1 100%);
+    }
+
+    .game-card.disabled {
+      opacity: 0.64;
+    }
+
+    .badge {
+      align-self: flex-start;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: #fff0b5;
+      font-size: 13px;
+      font-weight: 950;
+      box-shadow: inset 0 -3px 0 rgba(255, 183, 3, 0.16);
+    }
+
+    .game-card h3 {
+      position: relative;
+      z-index: 1;
+      font-size: clamp(28px, 4vw, 48px);
+      line-height: 0.95;
+      letter-spacing: -0.06em;
+    }
+
+    .game-card p {
+      position: relative;
+      z-index: 1;
+      color: var(--muted);
+      line-height: 1.55;
+      font-weight: 700;
+    }
+
+    .card-actions {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .primary {
+      background: linear-gradient(135deg, var(--green), #ffde59);
+    }
+
+    .locked {
+      color: #bf3751;
+      background: #ffe1e8;
+    }
+
+    .small-note {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    @media (max-width: 860px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-actions {
+        justify-content: flex-start;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .game-card.live {
+        grid-column: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="brand">
+        <img src="/logo.png" alt="">
+        <div>
+          <h1>Arcade</h1>
+          <p class="subtitle">
+            {% if grade and section %}{{ grade }}학년 {{ section }}반에서 사용할 수 있는 아케이드입니다.{% else %}DimiCheck에서 실행할 수 있는 아케이드입니다.{% endif %}
+          </p>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <a class="pill" href="{{ board_url }}">Board로 돌아가기</a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">
+        <div>
+          <h2>라이브 아케이드</h2>
+          <p>전자칠판과 휴대폰이 함께 움직이는 실시간 게임</p>
+        </div>
+      </div>
+      <div class="grid">
+        <article class="game-card live">
+          <span class="badge">LIVE</span>
+          <div>
+            <h3>땅따먹기 Live</h3>
+            <p>QR로 참여해 팀을 나누고, 움직이며 땅을 차지합니다. 아이템과 피버 타임으로 짧고 강하게 진행됩니다.</p>
+          </div>
+          <div class="card-actions">
+            {% if arcade_enabled and host_allowed %}
+              <a class="pill primary" href="{{ turf_url }}">전자칠판에서 시작</a>
+              <span class="small-note">최소 2명부터 시작</span>
+            {% else %}
+              <span class="pill locked">Board 인증 후 사용 가능</span>
+            {% endif %}
+          </div>
+        </article>
+
+        <article class="game-card disabled">
+          <span class="badge">NEXT</span>
+          <div>
+            <h3>라이브 퀴즈</h3>
+            <p>반 전체가 휴대폰으로 답하는 빠른 퀴즈 모드. 아직 준비 중입니다.</p>
+          </div>
+          <div class="card-actions">
+            <span class="pill locked">준비 중</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">
+        <div>
+          <h2>일반 아케이드</h2>
+          <p>정적 HTML 기반으로 가볍게 실행할 수 있는 미니 게임</p>
+        </div>
+      </div>
+      <div class="grid">
+        <article class="game-card disabled">
+          <span class="badge">HTML</span>
+          <div>
+            <h3>반응속도</h3>
+            <p>초록색이 되는 순간 눌러 기록을 비교하는 짧은 게임.</p>
+          </div>
+          <div class="card-actions"><span class="pill locked">준비 중</span></div>
+        </article>
+        <article class="game-card disabled">
+          <span class="badge">HTML</span>
+          <div>
+            <h3>메모리 카드</h3>
+            <p>카드를 뒤집어 같은 그림을 찾는 집중력 게임.</p>
+          </div>
+          <div class="card-actions"><span class="pill locked">준비 중</span></div>
+        </article>
+        <article class="game-card disabled">
+          <span class="badge">STUDENT</span>
+          <div>
+            <h3>학생 제작</h3>
+            <p>학생이 만든 HTML 게임을 승인 후 전시하는 공간으로 확장 예정.</p>
+          </div>
+          <div class="card-actions"><span class="pill locked">준비 중</span></div>
+        </article>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

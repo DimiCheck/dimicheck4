@@ -166,7 +166,7 @@
     if (!grade || !section) {
       return;
     }
-    window.location.href = `/arcade/host?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}`;
+    window.location.href = `/arcade?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}`;
   });
 
   whatsNewClose?.addEventListener('click', closeWhatsNewModal);

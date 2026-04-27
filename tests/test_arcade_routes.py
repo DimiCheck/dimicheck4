@@ -114,9 +114,17 @@ def test_arcade_session_routes_require_board_session_and_create(monkeypatch, tmp
     assert second_response.status_code == 200
     assert second_response.get_json()["code"] == payload["code"]
 
-    host = client.get("/arcade/host?grade=2&section=4")
-    assert host.status_code == 200
-    assert b"Arcade" in host.data
+    home = client.get("/arcade?grade=2&section=4")
+    assert home.status_code == 200
+    assert "땅따먹기 Live".encode() in home.data
+
+    legacy_host = client.get("/arcade/host?grade=2&section=4")
+    assert legacy_host.status_code == 302
+    assert legacy_host.headers["Location"].endswith("/arcade/turf/host?grade=2&section=4")
+
+    turf_host = client.get("/arcade/turf/host?grade=2&section=4")
+    assert turf_host.status_code == 200
+    assert b"Arcade" in turf_host.data
 
 
 def test_arcade_debug_any_time_requires_explicit_server_flag(monkeypatch, tmp_path):
