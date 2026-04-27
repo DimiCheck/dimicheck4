@@ -11,6 +11,8 @@
   var serverOffsetMs = 0;
   var pendingTaps = 0;
   var flushTimer = 0;
+  var turtleSkins = ['turtle-01.png', 'turtle-02.png', 'turtle-03.png'];
+  var selectedSkin = turtleSkins[Math.floor(Math.random() * turtleSkins.length)];
 
   var els = {
     entryPanel: document.getElementById('entryPanel'),
@@ -26,10 +28,14 @@
     tapButton: document.getElementById('tapButton'),
     myRank: document.getElementById('myRank'),
     tapCount: document.getElementById('tapCount'),
-    errorBox: document.getElementById('errorBox')
+    errorBox: document.getElementById('errorBox'),
+    skinOptions: Array.prototype.slice.call(document.querySelectorAll('[data-turtle-skin]')),
+    gameSkinPicker: document.getElementById('gameSkinPicker')
   };
 
   restoreNickname();
+  bindSkinPicker();
+  updateSkinSelection();
 
   function getOrCreatePlayerId() {
     var key = 'dimicheck:turtle-player-id:' + code;
@@ -95,7 +101,8 @@
         code: code,
         playerId: playerId,
         nickname: nickname,
-        avatar: avatarId()
+        avatar: avatarId(),
+        skin: selectedSkin
       });
     });
     socket.on('turtle:joined', function (payload) {
@@ -137,7 +144,13 @@
     sessionState = state;
     serverOffsetMs = state.now - Date.now();
     var fresh = findMe(state);
-    if (fresh) player = fresh;
+    if (fresh) {
+      player = fresh;
+      if (player.skin && player.skin !== selectedSkin) {
+        selectedSkin = sanitizeSkin(player.skin) || selectedSkin;
+        updateSkinSelection();
+      }
+    }
     els.statusText.textContent = statusLabel(state.status);
     renderPlayer();
     updateClock();
@@ -156,9 +169,14 @@
     els.myProgress.textContent = progress + '%';
     els.progressBar.style.setProperty('--progress', progress + '%');
     els.tapCount.textContent = (player ? player.taps : 0) + ' taps';
+    if (els.gameSkinPicker) {
+      var canChoose = sessionState && (sessionState.status === 'lobby' || sessionState.status === 'countdown');
+      els.gameSkinPicker.hidden = !canChoose;
+      els.gameSkinPicker.classList.toggle('is-locked', !canChoose);
+    }
     if (sessionState && sessionState.status === 'racing' && player && !player.finished) {
       els.tapButton.disabled = false;
-      els.tapButton.textContent = '🐢 전진';
+      els.tapButton.innerHTML = '<img src="' + turtleSkinUrl(selectedSkin) + '" alt="">전진';
     } else {
       els.tapButton.disabled = true;
       els.tapButton.textContent = sessionState && sessionState.status === 'countdown' ? '준비' : '대기';
@@ -200,6 +218,40 @@
     });
   }
 
+  function bindSkinPicker() {
+    els.skinOptions.forEach(function (button) {
+      button.addEventListener('click', function () {
+        var nextSkin = sanitizeSkin(button.getAttribute('data-turtle-skin'));
+        if (!nextSkin) return;
+        selectedSkin = nextSkin;
+        updateSkinSelection();
+        if (socket && socket.connected && sessionState && (sessionState.status === 'lobby' || sessionState.status === 'countdown')) {
+          socket.emit('turtle_select_skin', {
+            code: code,
+            playerId: playerId,
+            skin: selectedSkin
+          });
+        }
+      });
+    });
+  }
+
+  function updateSkinSelection() {
+    els.skinOptions.forEach(function (button) {
+      button.classList.toggle('is-selected', button.getAttribute('data-turtle-skin') === selectedSkin);
+      button.setAttribute('aria-pressed', button.getAttribute('data-turtle-skin') === selectedSkin ? 'true' : 'false');
+    });
+  }
+
+  function sanitizeSkin(skin) {
+    var file = String(skin || '').split('/').pop();
+    return turtleSkins.indexOf(file) === -1 ? '' : file;
+  }
+
+  function turtleSkinUrl(skin) {
+    return '/' + (sanitizeSkin(skin) || 'turtle-01.png');
+  }
+
   els.tapButton.addEventListener('click', function () {
     if (!sessionState || sessionState.status !== 'racing' || (player && player.finished)) return;
     pendingTaps += 1;
@@ -235,6 +287,7 @@
       status: sessionState ? sessionState.status : 'entry',
       player: player ? {
         nickname: player.nickname,
+        skin: player.skin,
         progress: player.progressPercent,
         taps: player.taps,
         rank: player.rank

@@ -314,12 +314,14 @@ def test_turtle_session_routes_create_join_start_and_rank(monkeypatch, tmp_path)
     assert "거북이 경주".encode() in join_page.data
 
     session_obj = arcade_routes.turtle_manager.get(code)
-    first, first_error = arcade_routes.turtle_manager.join_player(code, "p1", "하나", 0)
+    first, first_error = arcade_routes.turtle_manager.join_player(code, "p1", "하나", 0, "turtle-02.png")
     second, second_error = arcade_routes.turtle_manager.join_player(code, "p2", "둘둘", 1)
     assert first_error is None
     assert second_error is None
     assert first is not None and first.lane == 0
     assert second is not None and second.lane == 1
+    assert first.skin == "turtle-02.png"
+    assert second.skin in arcade_routes.TURTLE_SKINS
 
     started = client.post(f"/api/arcade/turtle/sessions/{code}/start")
     assert started.status_code == 200
@@ -344,6 +346,81 @@ def test_turtle_session_routes_create_join_start_and_rank(monkeypatch, tmp_path)
     assert ended.status_code == 200
     ranking = ended.get_json()["rankings"]
     assert ranking[0]["id"] == "p1"
+
+
+def test_turtle_create_session_replaces_elapsed_active_session(monkeypatch):
+    arcade_routes = importlib.import_module("arcade_routes")
+    monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: _allowed_window())
+
+    manager = arcade_routes.TurtleRaceSessionManager()
+    stale, error = manager.create_session(2, 4)
+    assert error is None
+    assert stale is not None
+    player, join_error = manager.join_player(stale.code, "p1", "하나", 0)
+    assert join_error is None
+    assert player is not None
+
+    stale.status = "racing"
+    stale.starts_at = time.time() - 30
+    stale.ends_at = time.time() - 1
+
+    fresh, fresh_error = manager.create_session(2, 4)
+    assert fresh_error is None
+    assert fresh is not None
+    assert stale.status == "ended"
+    assert fresh.status == "lobby"
+    assert fresh.code != stale.code
+
+
+def test_turtle_start_with_short_remaining_window_does_not_end_lobby(monkeypatch):
+    arcade_routes = importlib.import_module("arcade_routes")
+    monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: _allowed_window())
+
+    manager = arcade_routes.TurtleRaceSessionManager()
+    session_obj, error = manager.create_session(2, 4)
+    assert error is None
+    assert session_obj is not None
+    player, join_error = manager.join_player(session_obj.code, "p1", "하나", 0)
+    assert join_error is None
+    assert player is not None
+
+    session_obj.safe_end_at = time.time() + arcade_routes.TURTLE_WAIT_SECONDS + 5
+    updated, start_error = manager.start_now(session_obj.code)
+
+    assert updated is session_obj
+    assert start_error == "남은 시간이 부족합니다."
+    assert session_obj.status == "lobby"
+    assert session_obj.ended_at is None
+
+
+def test_turtle_skin_can_change_only_before_race(monkeypatch):
+    arcade_routes = importlib.import_module("arcade_routes")
+    monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: _allowed_window())
+
+    manager = arcade_routes.TurtleRaceSessionManager()
+    session_obj, error = manager.create_session(2, 4)
+    assert error is None
+    assert session_obj is not None
+    player, join_error = manager.join_player(session_obj.code, "p1", "하나", 0, "turtle-01.png")
+    assert join_error is None
+    assert player is not None
+    assert player.public()["skin"] == "turtle-01.png"
+
+    updated, select_error = manager.select_skin(session_obj.code, "p1", "turtle-03.png")
+    assert select_error is None
+    assert updated is session_obj
+    assert session_obj.players["p1"].skin == "turtle-03.png"
+
+    updated, invalid_error = manager.select_skin(session_obj.code, "p1", "../bad.png")
+    assert updated is session_obj
+    assert invalid_error == "알 수 없는 거북이입니다."
+    assert session_obj.players["p1"].skin == "turtle-03.png"
+
+    session_obj.status = "racing"
+    updated, late_error = manager.select_skin(session_obj.code, "p1", "turtle-02.png")
+    assert updated is session_obj
+    assert late_error == "시작 후에는 거북이를 바꿀 수 없습니다."
+    assert session_obj.players["p1"].skin == "turtle-03.png"
 
 
 def test_party_round_scores_and_late_join_waits_for_next_round(monkeypatch):
@@ -462,6 +539,14 @@ def test_party_minigame_pack_covers_engine_types():
     assert any(game["id"] == "stroop" and game["config"].get("cueColor") for game in games)
     assert any(game["id"] == "forbidden_color" and game["config"].get("forbidden") for game in games)
     assert any(game["id"] == "balloon_pop" and game["engine"] == "mash" for game in games)
+    memory_lengths = {
+        game["id"]: game["config"]["length"]
+        for game in games
+        if game["engine"] == "memory"
+    }
+    assert memory_lengths["color_memory"] >= 7
+    assert memory_lengths["direction_memory"] >= 7
+    assert memory_lengths["number_memory"] >= 8
 
 
 def test_party_score_engines_handle_common_round_types():
@@ -595,6 +680,44 @@ def test_party_target_prompt_has_moving_schedule():
     assert prompt["label"] == "별"
     assert len(prompt["targets"]) >= 8
     assert all(0 <= item["cell"] < 9 for item in prompt["targets"])
+
+
+def test_party_memory_and_luck_prompts_hide_then_reveal_sensitive_values():
+    arcade_routes = importlib.import_module("arcade_routes")
+    manager = arcade_routes.PartySessionManager()
+    now = time.time()
+
+    memory_prompt = manager._make_prompt(
+        {"id": "memory-test", "engine": "memory", "config": {"kind": "numbers", "length": 8}},
+        now,
+        now + 7,
+    )
+    assert memory_prompt["hideAfterMs"] == 2200
+    assert len(memory_prompt["sequence"]) == 8
+
+    luck_prompt = manager._make_prompt(
+        {"id": "luck-test", "engine": "luck", "config": {"options": ["문1", "문2", "문3", "문4"]}},
+        now,
+        now + 7,
+    )
+    assert set(luck_prompt["outcomes"]) == {"문1", "문2", "문3", "문4"}
+    assert 100 in luck_prompt["outcomes"].values()
+
+    round_obj = arcade_routes.PartyRound(
+        id="luck-round",
+        index=1,
+        definition={"id": "luck-test", "engine": "luck", "title": "운명의 문", "instruction": "문을 고르세요."},
+        status="playing",
+        intro_at=now,
+        starts_at=now,
+        ends_at=now + 7,
+        result_at=now + 10,
+        participants=["p1"],
+        prompt=luck_prompt,
+    )
+    assert "outcomes" not in round_obj.public()["prompt"]
+    round_obj.status = "round_result"
+    assert "outcomes" in round_obj.public()["prompt"]
 
 
 def test_party_prompt_and_selection_add_varied_input_modes():

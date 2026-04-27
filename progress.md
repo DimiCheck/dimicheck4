@@ -23,3 +23,6 @@ Original prompt: 구현 시작
 - Added new Live Arcade `거북이 경주`: separate host/join pages, server-authoritative turtle sessions, batched mobile tap events, countdown/race/end states, finish-line progress, and final rankings.
 - Party pacing/visibility pass: shortened wait/intro/result timings and minigame durations, added balloon visuals plus explicit submit for mash games, highlighted live top rankings, and made the final ranking screen much larger.
 - Rebalanced Turtle Race from 0.6% to 1.2% progress per tap so finishing is realistic, and changed the mobile action label from `밀기` to `전진`.
+- Party fairness pass: memory games now show the sequence briefly before hiding it and opening input, luck/risk outcomes are revealed on results instead of during choice, and target-style games schedule redundant early auto-submit attempts to avoid accidental `미제출`.
+- Fixed Turtle Race stale-session handling: elapsed countdown/racing sessions are finalized before reuse, fresh host creation no longer inherits an already-expired race, and short remaining play windows reject start without flipping the lobby to ended.
+- Turtle Race now uses `turtle-01.png` through `turtle-03.png` skins instead of emoji, randomly preselects a skin on mobile entry, and lets players change it until the race starts with server-synced host rendering.

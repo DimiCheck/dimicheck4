@@ -137,7 +137,7 @@
     if (!players.length) {
       var empty = document.createElement('div');
       empty.className = 'lane';
-      empty.innerHTML = '<span class="lane-name">QR로 참가자를 기다리는 중</span><span class="turtle">🐢</span>';
+      empty.innerHTML = '<span class="lane-name">QR로 참가자를 기다리는 중</span><span class="turtle"><img src="/turtle-01.png" alt=""></span>';
       els.track.appendChild(empty);
       return;
     }
@@ -149,8 +149,17 @@
       name.textContent = (player.rank ? player.rank + '위 · ' : '') + player.nickname + ' · ' + Math.round(player.progressPercent) + '%';
       var turtle = document.createElement('span');
       turtle.className = 'turtle';
-      turtle.textContent = player.finished ? '🏁🐢' : '🐢';
       turtle.style.setProperty('--progress', String(Math.min(0.9, player.progress || 0)));
+      var turtleImage = document.createElement('img');
+      turtleImage.src = turtleSkinUrl(player.skin);
+      turtleImage.alt = player.nickname + ' 거북이';
+      turtle.appendChild(turtleImage);
+      if (player.finished) {
+        var flag = document.createElement('span');
+        flag.className = 'finish-flag';
+        flag.textContent = '🏁';
+        turtle.appendChild(flag);
+      }
       lane.appendChild(name);
       lane.appendChild(turtle);
       els.track.appendChild(lane);
@@ -165,6 +174,12 @@
       chip.textContent = (index + 1) + '위 ' + player.nickname + ' · ' + Math.round(player.progressPercent) + '% · ' + player.taps + '탭';
       els.rankings.appendChild(chip);
     });
+  }
+
+  function turtleSkinUrl(skin) {
+    var file = String(skin || 'turtle-01.png').split('/').pop();
+    if (!/^turtle-0[1-3]\.png$/.test(file)) file = 'turtle-01.png';
+    return '/' + file;
   }
 
   function updateClock() {
@@ -234,7 +249,7 @@
       status: sessionState ? sessionState.status : 'loading',
       code: sessionState ? sessionState.code : null,
       players: sessionState ? sessionState.players.map(function (player) {
-        return { nickname: player.nickname, progress: player.progressPercent, taps: player.taps, rank: player.rank };
+        return { nickname: player.nickname, skin: player.skin, progress: player.progressPercent, taps: player.taps, rank: player.rank };
       }) : []
     });
   };

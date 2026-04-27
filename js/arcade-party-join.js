@@ -14,7 +14,7 @@
   var answerBuffer = [];
   var liveActionButton = null;
   var liveActionRound = null;
-  var autoSubmitTimer = 0;
+  var autoSubmitTimers = [];
   var targetGrid = null;
   var targetStats = null;
 
@@ -127,7 +127,6 @@
       if (payload && payload.session) {
         renderState(payload.session);
       }
-      lockControls('제출 완료');
     });
     socket.on('party:error', function (payload) {
       els.joinButton.disabled = false;
@@ -476,6 +475,26 @@
 
   function renderMemoryControls(round) {
     els.controls.innerHTML = '';
+    var hideAt = Number(round.startsAt || 0) + (Number(round.prompt && round.prompt.hideAfterMs) || 2200);
+    var waitMs = Math.max(0, Math.min(hideAt - currentServerNow(), 3200));
+    var wait = document.createElement('div');
+    wait.className = 'sequence-answer';
+    wait.textContent = '전자칠판의 순서를 기억하세요. 곧 입력이 열립니다.';
+    els.controls.appendChild(wait);
+    if (waitMs <= 80) {
+      renderMemoryInput(round);
+      return;
+    }
+    window.setTimeout(function () {
+      if (submittedRoundId === round.id || !sessionState || !sessionState.currentRound || sessionState.currentRound.id !== round.id || sessionState.status !== 'playing') {
+        return;
+      }
+      renderMemoryInput(round);
+    }, waitMs);
+  }
+
+  function renderMemoryInput(round) {
+    els.controls.innerHTML = '';
     var answer = document.createElement('div');
     answer.className = 'sequence-answer';
     answer.textContent = '입력: ';
@@ -515,6 +534,9 @@
       var button = document.createElement('button');
       button.type = 'button';
       button.textContent = option;
+      if ((round.engine === 'luck' || round.engine === 'risk') && round.prompt && round.prompt.outcomes) {
+        button.setAttribute('aria-label', option + ' 선택');
+      }
       applyTokenStyle(button, option);
       if (round.prompt && round.prompt.forbidden === option) {
         button.classList.add('forbidden-choice');
@@ -640,16 +662,20 @@
 
   function autoSubmitAtRoundEnd(round, callback) {
     clearAutoSubmitTimer();
-    autoSubmitTimer = window.setTimeout(function () {
-      if (submittedRoundId === round.id) return;
-      callback();
-    }, Math.max(300, round.endsAt - currentServerNow() - 550));
+    [1800, 1100, 550].forEach(function (leadMs) {
+      var delay = round.endsAt - currentServerNow() - leadMs;
+      if (delay < 0 && leadMs !== 550) return;
+      autoSubmitTimers.push(window.setTimeout(function () {
+        if (submittedRoundId === round.id) return;
+        callback();
+      }, Math.max(180, delay)));
+    });
   }
 
   function clearAutoSubmitTimer() {
-    if (!autoSubmitTimer) return;
-    window.clearTimeout(autoSubmitTimer);
-    autoSubmitTimer = 0;
+    while (autoSubmitTimers.length) {
+      window.clearTimeout(autoSubmitTimers.pop());
+    }
   }
 
   function applyTokenStyle(element, token) {

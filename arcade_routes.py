@@ -72,6 +72,7 @@ TURTLE_TAP_PROGRESS = 0.012
 TURTLE_MAX_TAPS_PER_EVENT = 12
 TURTLE_MAX_TAPS_PER_SECOND = 18
 TURTLE_ROOM_PREFIX = "arcade:turtle:"
+TURTLE_SKINS = ("turtle-01.png", "turtle-02.png", "turtle-03.png")
 PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
     {
         "id": "reaction_green",
@@ -212,28 +213,28 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "id": "color_memory",
         "engine": "memory",
         "title": "색 순서 기억",
-        "instruction": "보이는 색 순서를 그대로 입력하세요.",
+        "instruction": "잠깐 보이는 색 순서를 기억해 입력하세요.",
         "minPlayers": 1,
         "duration": 7,
-        "config": {"kind": "colors", "length": 5},
+        "config": {"kind": "colors", "length": 7},
     },
     {
         "id": "direction_memory",
         "engine": "memory",
         "title": "방향 기억",
-        "instruction": "화살표 순서를 기억해 그대로 누르세요.",
+        "instruction": "잠깐 보이는 방향 순서를 기억해 누르세요.",
         "minPlayers": 1,
         "duration": 7,
-        "config": {"kind": "directions", "length": 5},
+        "config": {"kind": "directions", "length": 7},
     },
     {
         "id": "number_memory",
         "engine": "memory",
         "title": "숫자 기억",
-        "instruction": "숫자열을 기억해서 입력하세요.",
+        "instruction": "잠깐 보이는 숫자열을 기억해 입력하세요.",
         "minPlayers": 1,
         "duration": 7,
-        "config": {"kind": "numbers", "length": 6},
+        "config": {"kind": "numbers", "length": 8},
     },
     {
         "id": "forbidden_color",
@@ -985,6 +986,8 @@ class PartyRound:
         if not include_answer:
             prompt.pop("answer", None)
             prompt.pop("answers", None)
+            if self.status != "round_result":
+                prompt.pop("outcomes", None)
         return {
             "id": self.id,
             "index": self.index,
@@ -1323,6 +1326,7 @@ class PartySessionManager:
             prompt.update({"targetMs": int(config_data.get("targetMs") or 4000), "hold": bool(config_data.get("hold"))})
         elif engine == "memory":
             prompt["sequence"] = self._make_memory_sequence(config_data)
+            prompt["hideAfterMs"] = int(config_data.get("hideAfterMs") or 2200)
         elif engine == "choice":
             options = list(config_data.get("options") or ["A", "B", "C", "D"])
             correct = config_data.get("correct")
@@ -1341,7 +1345,9 @@ class PartySessionManager:
             prompt.update({"options": list(config_data.get("options") or ["A", "B"]), "unique": bool(config_data.get("unique"))})
         elif engine == "luck":
             options = list(config_data.get("options") or ["A", "B", "C"])
-            prompt.update({"options": options, "outcomes": {option: random.choice([0, 30, 60, 100]) for option in options}})
+            scores = [0, 30, 60, 100]
+            random.shuffle(scores)
+            prompt.update({"options": options, "outcomes": {option: scores[index % len(scores)] for index, option in enumerate(options)}})
         elif engine == "mash":
             prompt.update({"label": config_data.get("label") or "연타"})
         elif engine == "target":
@@ -1569,6 +1575,7 @@ class TurtlePlayer:
     nickname: str
     avatar: int
     lane: int
+    skin: str
     progress: float = 0.0
     taps: int = 0
     connected: bool = True
@@ -1584,6 +1591,7 @@ class TurtlePlayer:
             "id": self.id,
             "nickname": self.nickname,
             "avatar": self.avatar,
+            "skin": self.skin,
             "lane": self.lane,
             "progress": round(max(0.0, min(1.0, self.progress)), 4),
             "progressPercent": round(max(0.0, min(1.0, self.progress)) * 100, 1),
@@ -1638,13 +1646,15 @@ class TurtleRaceSessionManager:
 
         with self._lock:
             self._cleanup_locked()
+            now_ts = _now()
+            for existing in self._sessions.values():
+                self._expire_elapsed_locked(existing, now_ts)
             active = [s for s in self._sessions.values() if s.status != "ended"]
             for existing in active:
                 if existing.grade == grade and existing.section == section:
                     return existing, None
             if len(active) >= config.ARCADE_MAX_ACTIVE_SESSIONS:
                 return None, "현재 열린 Arcade가 너무 많습니다."
-            now_ts = _now()
             starts_at = now_ts + TURTLE_WAIT_SECONDS
             ends_at = min(starts_at + TURTLE_RACE_SECONDS, float(window["safeEndAt"]))
             if ends_at - starts_at < 10:
@@ -1667,19 +1677,26 @@ class TurtleRaceSessionManager:
     def get(self, code: str) -> TurtleSession | None:
         with self._lock:
             self._cleanup_locked()
-            return self._sessions.get(str(code or "").upper())
+            session_obj = self._sessions.get(str(code or "").upper())
+            if session_obj:
+                self._expire_elapsed_locked(session_obj, _now())
+            return session_obj
 
-    def join_player(self, code: str, player_id: str, nickname: str, avatar: int) -> tuple[TurtlePlayer | None, str | None]:
+    def join_player(self, code: str, player_id: str, nickname: str, avatar: int, skin: Any = None) -> tuple[TurtlePlayer | None, str | None]:
         with self._lock:
             session_obj = self._sessions.get(str(code or "").upper())
             if not session_obj:
                 return None, "존재하지 않는 경주입니다."
+            self._expire_elapsed_locked(session_obj, _now())
             if session_obj.status == "ended":
                 return None, "이미 종료된 경주입니다."
             if player_id in session_obj.players:
                 player = session_obj.players[player_id]
                 player.connected = True
                 player.last_seen_at = _now()
+                normalized_skin = self._normalize_skin(skin)
+                if normalized_skin and session_obj.status in {"lobby", "countdown"}:
+                    player.skin = normalized_skin
                 return player, None
             if len(session_obj.players) >= config.ARCADE_MAX_PLAYERS:
                 return None, "참가 인원이 가득 찼습니다."
@@ -1693,9 +1710,28 @@ class TurtleRaceSessionManager:
                 nickname=clean_name,
                 avatar=avatar_id % AVATAR_COUNT,
                 lane=len(session_obj.players),
+                skin=self._normalize_skin(skin) or random.choice(TURTLE_SKINS),
             )
             session_obj.players[player_id] = player
             return player, None
+
+    def select_skin(self, code: str, player_id: str, skin: Any) -> tuple[TurtleSession | None, str | None]:
+        with self._lock:
+            session_obj = self._sessions.get(str(code or "").upper())
+            if not session_obj:
+                return None, "세션을 찾을 수 없습니다."
+            self._expire_elapsed_locked(session_obj, _now())
+            if session_obj.status not in {"lobby", "countdown"}:
+                return session_obj, "시작 후에는 거북이를 바꿀 수 없습니다."
+            player = session_obj.players.get(str(player_id or "").strip())
+            if not player:
+                return None, "참가자를 찾을 수 없습니다."
+            normalized_skin = self._normalize_skin(skin)
+            if not normalized_skin:
+                return session_obj, "알 수 없는 거북이입니다."
+            player.skin = normalized_skin
+            player.last_seen_at = _now()
+            return session_obj, None
 
     def mark_connected(self, code: str, player_id: str | None, connected: bool) -> None:
         if not player_id:
@@ -1711,15 +1747,20 @@ class TurtleRaceSessionManager:
             session_obj = self._sessions.get(str(code or "").upper())
             if not session_obj or session_obj.status == "ended":
                 return None, "not found"
+            if self._expire_elapsed_locked(session_obj, _now()):
+                return session_obj, "이미 종료된 경주입니다."
+            if session_obj.status != "lobby":
+                return session_obj, "이미 진행 중인 경주입니다."
             if not any(player.connected for player in session_obj.players.values()):
                 return None, "참가자가 1명 이상 필요합니다."
             now_ts = _now()
-            session_obj.status = "countdown"
-            session_obj.starts_at = now_ts + TURTLE_WAIT_SECONDS
-            session_obj.ends_at = min(session_obj.starts_at + TURTLE_RACE_SECONDS, session_obj.safe_end_at)
-            if session_obj.ends_at - session_obj.starts_at < 10:
-                self._end_locked(session_obj)
+            starts_at = now_ts + TURTLE_WAIT_SECONDS
+            ends_at = min(starts_at + TURTLE_RACE_SECONDS, session_obj.safe_end_at)
+            if ends_at - starts_at < 10:
                 return session_obj, "남은 시간이 부족합니다."
+            session_obj.status = "countdown"
+            session_obj.starts_at = starts_at
+            session_obj.ends_at = ends_at
             for player in session_obj.players.values():
                 player.progress = 0.0
                 player.taps = 0
@@ -1777,6 +1818,7 @@ class TurtleRaceSessionManager:
 
     def snapshot(self, session_obj: TurtleSession) -> dict[str, Any]:
         with self._lock:
+            self._expire_elapsed_locked(session_obj, _now())
             return self._snapshot_locked(session_obj)
 
     def run_loop(self, code: str) -> None:
@@ -1813,6 +1855,14 @@ class TurtleRaceSessionManager:
             session_obj.status = "racing"
             return True
         if session_obj.status == "racing" and now_ts >= session_obj.ends_at:
+            self._end_locked(session_obj)
+            return True
+        return False
+
+    def _expire_elapsed_locked(self, session_obj: TurtleSession, now_ts: float) -> bool:
+        if session_obj.status == "ended":
+            return False
+        if session_obj.status in {"countdown", "racing"} and now_ts >= session_obj.ends_at:
             self._end_locked(session_obj)
             return True
         return False
@@ -1872,10 +1922,15 @@ class TurtleRaceSessionManager:
         if now_ts - self._last_cleanup < SESSION_CLEANUP_INTERVAL_SECONDS:
             return
         self._last_cleanup = now_ts
-        cutoff = now_ts - config.ARCADE_SESSION_TTL_SECONDS
-        for code, session_obj in list(self._sessions.items()):
-            if session_obj.status == "ended" and (session_obj.ended_at or session_obj.created_at) < cutoff:
-                self._sessions.pop(code, None)
+        expired = []
+        for code, session_obj in self._sessions.items():
+            self._expire_elapsed_locked(session_obj, now_ts)
+            ttl_expired = now_ts - session_obj.created_at > config.ARCADE_SESSION_TTL_SECONDS
+            ended_expired = session_obj.status == "ended" and session_obj.ended_at and now_ts - session_obj.ended_at > 120
+            if ttl_expired or ended_expired:
+                expired.append(code)
+        for code in expired:
+            self._sessions.pop(code, None)
 
     def _dedupe_nickname_locked(self, session_obj: TurtleSession, nickname: str) -> str:
         existing = {player.nickname for player in session_obj.players.values()}
@@ -1886,6 +1941,10 @@ class TurtleRaceSessionManager:
             if candidate not in existing:
                 return candidate
         return f"{nickname}{random.randrange(100, 999)}"
+
+    def _normalize_skin(self, skin: Any) -> str | None:
+        value = str(skin or "").strip().split("/")[-1]
+        return value if value in TURTLE_SKINS else None
 
     def _emit(self, event: str, payload: dict[str, Any], code: str) -> None:
         if self._socketio:
@@ -2169,8 +2228,11 @@ def start_turtle_session(code: str):
     if not session_obj or not _host_allowed(session_obj.grade, session_obj.section):
         return jsonify({"error": "not allowed"}), 403
     updated, error = turtle_manager.start_now(code)
-    if error and not updated:
-        return jsonify({"error": error}), 400
+    if error:
+        payload = {"error": error}
+        if updated:
+            payload["session"] = turtle_manager.snapshot(updated)
+        return jsonify(payload), 400
     snapshot = turtle_manager.snapshot(updated)
     turtle_manager._emit("turtle:state", snapshot, str(code or "").upper())
     return jsonify(snapshot)
@@ -2317,6 +2379,7 @@ class ArcadeNamespace(Namespace):
             player_id,
             payload.get("nickname") or "",
             payload.get("avatar") or 0,
+            payload.get("skin"),
         )
         if error or not player:
             emit("turtle:error", {"message": error or "입장할 수 없습니다."})
@@ -2330,6 +2393,20 @@ class ArcadeNamespace(Namespace):
         emit("turtle:joined", {"player": player.public(), "session": snapshot})
         turtle_manager._emit("turtle:state", snapshot, code)
         self._ensure_turtle_loop(code)
+
+    def on_turtle_select_skin(self, data):  # type: ignore[override]
+        payload = data or {}
+        code = str(payload.get("code") or "").upper()
+        player_id = str(payload.get("playerId") or "").strip()
+        session_obj, error = turtle_manager.select_skin(code, player_id, payload.get("skin"))
+        if error:
+            emit("turtle:error", {"message": error})
+        if error and not session_obj:
+            return
+        if session_obj:
+            snapshot = turtle_manager.snapshot(session_obj)
+            emit("turtle:submitted", {"ok": not error, "session": snapshot})
+            turtle_manager._emit("turtle:state", snapshot, code)
 
     def on_turtle_tap(self, data):  # type: ignore[override]
         payload = data or {}

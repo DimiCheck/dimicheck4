@@ -150,6 +150,15 @@
     });
   }
 
+  function renderOutcomeReveal(round) {
+    var outcomes = round && round.prompt ? round.prompt.outcomes : null;
+    if (!outcomes) return;
+    var items = Object.keys(outcomes).map(function (option) {
+      return option + ' = ' + outcomes[option] + '점';
+    });
+    renderSequence(items);
+  }
+
   function renderFinalResults(state) {
     els.results.innerHTML = '';
     var ranking = ((state.rankings || {}).total || []).slice(0, 5);
@@ -230,8 +239,7 @@
     } else if (round.engine === 'timing') {
       setPromptText('목표 ' + Math.round((round.prompt.targetMs || 0) / 1000 * 10) / 10 + '초', '');
     } else if (round.engine === 'memory') {
-      setPromptText('순서를 기억하세요', '');
-      renderSequence(round.prompt.sequence || []);
+      renderMemoryPrompt(round);
     } else if (round.engine === 'choice') {
       if (round.prompt.forbidden) {
         setPromptText('금지: ' + round.prompt.forbidden, 'waiting', round.prompt.forbidden);
@@ -260,8 +268,23 @@
       renderSequence(round.prompt.options || []);
     }
     if (round.status === 'round_result') {
+      if (round.engine === 'luck' || round.engine === 'risk') {
+        renderOutcomeReveal(round);
+      }
       renderResults(round.results || []);
     }
+  }
+
+  function renderMemoryPrompt(round) {
+    var now = currentServerNow();
+    var hideAt = Number(round.startsAt || 0) + Number(round.prompt && round.prompt.hideAfterMs || 2200);
+    if (round.status === 'playing' && now >= hideAt) {
+      setPromptText('이제 입력하세요', 'waiting');
+      els.sequence.innerHTML = '';
+      return;
+    }
+    setPromptText('순서를 기억하세요', '');
+    renderSequence(round.prompt.sequence || []);
   }
 
   function renderMashVisual(round) {
@@ -336,6 +359,9 @@
     if (!round || sessionState.status === 'ended') {
       els.progressBar.style.setProperty('--progress', sessionState.status === 'ended' ? '100%' : '0%');
       return;
+    }
+    if (round.engine === 'memory' && sessionState.status === 'playing') {
+      renderMemoryPrompt(round);
     }
     var start = round.startsAt;
     var end = round.endsAt;
