@@ -348,11 +348,12 @@ def test_party_round_scores_and_late_join_waits_for_next_round(monkeypatch):
 def test_party_minigame_pack_covers_engine_types():
     arcade_routes = importlib.import_module("arcade_routes")
     games = arcade_routes.PARTY_MINIGAMES
-    assert len(games) >= 16
+    assert len(games) >= 21
     engines = {game["engine"] for game in games}
-    assert {"reaction", "timing", "memory", "choice", "majority", "luck"} <= engines
+    assert {"reaction", "timing", "memory", "choice", "majority", "luck", "mash", "target", "risk"} <= engines
     assert all(game["title"] and game["instruction"] for game in games)
     assert any(game["id"] == "reaction_fake" and game["config"].get("fake") for game in games)
+    assert any(game["id"] == "stroop" and game["config"].get("cueColor") for game in games)
 
 
 def test_party_score_engines_handle_common_round_types():
@@ -432,6 +433,46 @@ def test_party_score_engines_handle_common_round_types():
         {"p1": {"value": "문1", "submittedAt": now + 4}, "p2": {"value": "문2", "submittedAt": now + 5}},
     )
     assert manager._score_round_locked(session_obj, luck_round)[0]["playerId"] == "p2"
+
+    mash_round = make_round(
+        "mash",
+        {},
+        {"p1": {"value": 12, "submittedAt": now + 6}, "p2": {"value": 24, "submittedAt": now + 6}},
+    )
+    mash_scores = {result["playerId"]: result["score"] for result in manager._score_round_locked(session_obj, mash_round)}
+    assert mash_scores == {"p1": 50, "p2": 100}
+
+    target_round = make_round(
+        "target",
+        {},
+        {
+            "p1": {"value": {"hits": 7, "misses": 1}, "submittedAt": now + 6},
+            "p2": {"value": {"hits": 4, "misses": 2}, "submittedAt": now + 6},
+        },
+    )
+    assert manager._score_round_locked(session_obj, target_round)[0]["playerId"] == "p1"
+
+    risk_round = make_round(
+        "risk",
+        {"outcomes": {"안전": 35, "도전": 100}},
+        {"p1": {"value": "안전", "submittedAt": now + 4}, "p2": {"value": "도전", "submittedAt": now + 5}},
+    )
+    assert manager._score_round_locked(session_obj, risk_round)[0]["playerId"] == "p2"
+
+
+def test_party_target_prompt_has_moving_schedule():
+    arcade_routes = importlib.import_module("arcade_routes")
+    manager = arcade_routes.PartySessionManager()
+    now = time.time()
+    prompt = manager._make_prompt(
+        {"id": "target-test", "engine": "target", "config": {"cells": 9, "stepMs": 700, "label": "별"}},
+        now,
+        now + 8,
+    )
+    assert prompt["cells"] == 9
+    assert prompt["label"] == "별"
+    assert len(prompt["targets"]) >= 8
+    assert all(0 <= item["cell"] < 9 for item in prompt["targets"])
 
 
 def test_arcade_manager_assigns_balanced_teams_and_claims_spawn_cells(monkeypatch):

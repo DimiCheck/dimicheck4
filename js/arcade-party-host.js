@@ -42,6 +42,14 @@
 
   els.boardLink.href = boardUrl;
 
+  var colorStyles = {
+    '빨강': { background: '#ff5a6f', color: '#fff' },
+    '파랑': { background: '#2f8cff', color: '#fff' },
+    '노랑': { background: '#ffd84d', color: '#2a2400' },
+    '초록': { background: '#45c96f', color: '#072414' },
+    '보라': { background: '#9b72ff', color: '#fff' }
+  };
+
   function setError(message) {
     els.error.textContent = message || '';
     els.error.hidden = !message;
@@ -116,8 +124,20 @@
       var chip = document.createElement('div');
       chip.className = 'seq-chip';
       chip.textContent = item;
+      applyTokenStyle(chip, item);
       els.sequence.appendChild(chip);
     });
+  }
+
+  function applyTokenStyle(element, token) {
+    var style = colorStyles[String(token || '').replace(/\s*(상자|문)$/g, '')];
+    element.style.background = '';
+    element.style.color = '';
+    element.style.borderColor = '';
+    if (!style) return;
+    element.style.background = style.background;
+    element.style.color = style.color;
+    element.style.borderColor = 'rgba(255,255,255,0.9)';
   }
 
   function renderResults(results) {
@@ -157,12 +177,18 @@
     els.rankings.appendChild(group);
   }
 
-  function setPromptText(text, cueState) {
-    if (latestCueText === text && els.promptText.dataset.cueState === String(cueState || '')) return;
+  function setPromptText(text, cueState, styleToken) {
+    if (
+      latestCueText === text &&
+      els.promptText.dataset.cueState === String(cueState || '') &&
+      els.promptText.dataset.styleToken === String(styleToken || '')
+    ) return;
     latestCueText = text;
     els.promptText.textContent = text || '';
     els.promptText.dataset.cueState = String(cueState || '');
+    els.promptText.dataset.styleToken = String(styleToken || '');
     els.promptText.className = 'prompt' + (cueState ? ' cue ' + cueState : '');
+    applyTokenStyle(els.promptText, styleToken);
   }
 
   function renderRound(state) {
@@ -188,13 +214,20 @@
       setPromptText('순서를 기억하세요', '');
       renderSequence(round.prompt.sequence || []);
     } else if (round.engine === 'choice') {
-      setPromptText(round.prompt.cue ? '표시: ' + round.prompt.cue : '정답을 고르세요', '');
+      setPromptText(round.prompt.cue ? String(round.prompt.cue) : '정답을 고르세요', round.prompt.cueColor ? 'cue' : '', round.prompt.cueColor);
       renderSequence(round.prompt.options || []);
     } else if (round.engine === 'majority') {
       setPromptText(round.prompt.unique ? '겹치지 않는 선택' : '적게 고른 쪽 승리', '');
       renderSequence(round.prompt.options || []);
     } else if (round.engine === 'luck') {
       setPromptText('운을 골라 보세요', '');
+      renderSequence(round.prompt.options || []);
+    } else if (round.engine === 'mash') {
+      setPromptText('연타!', 'ready');
+    } else if (round.engine === 'target') {
+      setPromptText('빛나는 칸을 잡으세요', 'ready');
+    } else if (round.engine === 'risk') {
+      setPromptText('위험할수록 큰 점수', '');
       renderSequence(round.prompt.options || []);
     }
     if (round.status === 'round_result') {
@@ -339,6 +372,12 @@
     if (!round) return 'tap';
     if (round.engine === 'timing') {
       return Math.floor((round.prompt.targetMs || 4000) + (Math.random() * 1000 - 500));
+    }
+    if (round.engine === 'mash') {
+      return 12 + Math.floor(Math.random() * 24);
+    }
+    if (round.engine === 'target') {
+      return { hits: 2 + Math.floor(Math.random() * 8), misses: Math.floor(Math.random() * 3) };
     }
     if (round.engine === 'memory') {
       return (round.prompt.sequence || []).slice();

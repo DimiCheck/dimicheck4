@@ -14,6 +14,9 @@
   var answerBuffer = [];
   var liveActionButton = null;
   var liveActionRound = null;
+  var autoSubmitTimer = 0;
+  var targetGrid = null;
+  var targetStats = null;
 
   var els = {
     entryPanel: document.getElementById('entryPanel'),
@@ -32,6 +35,14 @@
   };
 
   restoreNickname();
+
+  var colorStyles = {
+    '빨강': { background: '#ff5a6f', color: '#fff' },
+    '파랑': { background: '#2f8cff', color: '#fff' },
+    '노랑': { background: '#ffd84d', color: '#2a2400' },
+    '초록': { background: '#45c96f', color: '#072414' },
+    '보라': { background: '#9b72ff', color: '#fff' }
+  };
 
   function showError(message, entry) {
     var box = entry ? els.entryErrorBox : els.errorBox;
@@ -194,6 +205,7 @@
     if (key !== renderedRoundKey) {
       renderedRoundKey = key;
       answerBuffer = [];
+      clearAutoSubmitTimer();
       if (state.status === 'playing' && round.participants.indexOf(playerId) !== -1 && submittedRoundId !== round.id) {
         renderInputControls(round);
       } else if (state.status === 'round_result') {
@@ -207,6 +219,9 @@
   function renderWaitingControls(state) {
     liveActionButton = null;
     liveActionRound = null;
+    targetGrid = null;
+    targetStats = null;
+    clearAutoSubmitTimer();
     var text = '다음 라운드를 기다려 주세요.';
     if (state.status === 'countdown') text = '곧 라운드가 시작됩니다.';
     if (state.status === 'round_intro') text = '설명을 보고 준비하세요.';
@@ -217,6 +232,9 @@
   function renderResultControls(round) {
     liveActionButton = null;
     liveActionRound = null;
+    targetGrid = null;
+    targetStats = null;
+    clearAutoSubmitTimer();
     var myResult = null;
     for (var i = 0; i < (round.results || []).length; i += 1) {
       if (round.results[i].playerId === playerId) {
@@ -234,6 +252,8 @@
   function renderInputControls(round) {
     liveActionButton = null;
     liveActionRound = null;
+    targetGrid = null;
+    targetStats = null;
     if (round.engine === 'reaction') {
       renderBigSubmit(round, round.prompt && round.prompt.late ? '마지막에 누르기' : '신호 보고 누르기', 'tap');
       return;
@@ -242,11 +262,19 @@
       renderTimingSubmit(round);
       return;
     }
+    if (round.engine === 'mash') {
+      renderMashControls(round);
+      return;
+    }
+    if (round.engine === 'target') {
+      renderTargetControls(round);
+      return;
+    }
     if (round.engine === 'memory') {
       renderMemoryControls(round);
       return;
     }
-    if (round.engine === 'choice' || round.engine === 'majority' || round.engine === 'luck') {
+    if (round.engine === 'choice' || round.engine === 'majority' || round.engine === 'luck' || round.engine === 'risk') {
       renderChoiceControls(round);
       return;
     }
@@ -298,6 +326,67 @@
     updateLiveControls();
   }
 
+  function renderMashControls(round) {
+    els.controls.innerHTML = '';
+    var count = 0;
+    var counter = document.createElement('div');
+    counter.className = 'sequence-answer';
+    counter.textContent = '0회';
+    var button = document.createElement('button');
+    button.className = 'big-button ready';
+    button.type = 'button';
+    button.textContent = (round.prompt && round.prompt.label ? round.prompt.label : '연타') + '!';
+    button.addEventListener('click', function () {
+      count += 1;
+      counter.textContent = count + '회';
+      button.style.transform = 'translateY(5px) scale(0.98)';
+      window.setTimeout(function () {
+        button.style.transform = '';
+      }, 60);
+    });
+    els.controls.appendChild(counter);
+    els.controls.appendChild(button);
+    autoSubmitAtRoundEnd(round, function () {
+      submitRound(round, count);
+    });
+  }
+
+  function renderTargetControls(round) {
+    els.controls.innerHTML = '';
+    targetStats = { hits: 0, misses: 0 };
+    var score = document.createElement('div');
+    score.className = 'sequence-answer';
+    score.textContent = '성공 0 · 실수 0';
+    var grid = document.createElement('div');
+    grid.className = 'choice-grid target-grid';
+    var cells = Math.max(4, Math.min(Number(round.prompt && round.prompt.cells) || 9, 16));
+    for (var i = 0; i < cells; i += 1) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.cell = String(i);
+      button.textContent = '';
+      button.addEventListener('click', function (event) {
+        var activeCell = currentTargetCell(round);
+        var cell = Number(event.currentTarget.dataset.cell || -1);
+        if (cell === activeCell) {
+          targetStats.hits += 1;
+        } else {
+          targetStats.misses += 1;
+        }
+        score.textContent = '성공 ' + targetStats.hits + ' · 실수 ' + targetStats.misses;
+      });
+      grid.appendChild(button);
+    }
+    targetGrid = grid;
+    els.controls.appendChild(score);
+    els.controls.appendChild(grid);
+    liveActionRound = round;
+    updateLiveControls();
+    autoSubmitAtRoundEnd(round, function () {
+      submitRound(round, { hits: targetStats.hits, misses: targetStats.misses });
+    });
+  }
+
   function renderMemoryControls(round) {
     els.controls.innerHTML = '';
     var answer = document.createElement('div');
@@ -310,6 +399,7 @@
       var button = document.createElement('button');
       button.type = 'button';
       button.textContent = option;
+      applyTokenStyle(button, option);
       button.addEventListener('click', function () {
         answerBuffer.push(option);
         answer.textContent = '입력: ' + answerBuffer.join(' ');
@@ -331,6 +421,7 @@
       var button = document.createElement('button');
       button.type = 'button';
       button.textContent = option;
+      applyTokenStyle(button, option);
       button.addEventListener('click', function () {
         submitRound(round, option);
       });
@@ -353,6 +444,9 @@
   function lockControls(message) {
     liveActionButton = null;
     liveActionRound = null;
+    targetGrid = null;
+    targetStats = null;
+    clearAutoSubmitTimer();
     var buttons = els.controls.querySelectorAll('button');
     for (var i = 0; i < buttons.length; i += 1) {
       buttons[i].disabled = true;
@@ -375,16 +469,20 @@
       if (sessionState.status === 'playing') target = sessionState.currentRound.endsAt;
       if (sessionState.status === 'round_result') target = sessionState.nextTransitionAt;
     }
-    els.remainingTime.textContent = sessionState.status === 'ended' ? '끝' : formatSeconds((target - now) / 1000);
+    if (sessionState.status === 'playing' && sessionState.currentRound && sessionState.currentRound.engine === 'timing') {
+      els.remainingTime.textContent = '감으로';
+    } else {
+      els.remainingTime.textContent = sessionState.status === 'ended' ? '끝' : formatSeconds((target - now) / 1000);
+    }
     updateLiveControls();
   }
 
   function updateLiveControls() {
-    if (!sessionState || !liveActionButton || !liveActionRound || submittedRoundId === liveActionRound.id) {
+    if (!sessionState || !liveActionRound || submittedRoundId === liveActionRound.id) {
       return;
     }
     var now = currentServerNow();
-    if (liveActionRound.engine === 'reaction') {
+    if (liveActionRound.engine === 'reaction' && liveActionButton) {
       if (liveActionRound.prompt && liveActionRound.prompt.late) {
         liveActionButton.className = 'big-button danger';
         liveActionButton.textContent = '마지막까지 버티기 · ' + formatSeconds((liveActionRound.endsAt - now) / 1000);
@@ -406,10 +504,61 @@
       }
       return;
     }
-    if (liveActionRound.engine === 'timing' && !(liveActionRound.prompt && liveActionRound.prompt.hold)) {
-      var elapsed = Math.max(0, (now - liveActionRound.startsAt) / 1000);
-      liveActionButton.textContent = '멈추기 · ' + elapsed.toFixed(1) + '초';
+    if (liveActionRound.engine === 'timing' && liveActionButton) {
+      liveActionButton.textContent = liveActionRound.prompt && liveActionRound.prompt.hold ? liveActionButton.textContent : '멈추기';
     }
+    if (liveActionRound.engine === 'target' && targetGrid) {
+      renderActiveTarget(liveActionRound);
+    }
+  }
+
+  function currentTargetCell(round) {
+    var targets = (round.prompt && round.prompt.targets) || [];
+    if (!targets.length) return -1;
+    var elapsed = Math.max(0, currentServerNow() - round.startsAt);
+    var active = targets[0];
+    for (var i = 0; i < targets.length; i += 1) {
+      if (elapsed >= Number(targets[i].atMs || 0)) {
+        active = targets[i];
+      } else {
+        break;
+      }
+    }
+    return Number(active.cell);
+  }
+
+  function renderActiveTarget(round) {
+    var activeCell = currentTargetCell(round);
+    var buttons = targetGrid.querySelectorAll('button');
+    for (var i = 0; i < buttons.length; i += 1) {
+      var isActive = Number(buttons[i].dataset.cell || -1) === activeCell;
+      buttons[i].className = isActive ? 'target-active' : '';
+      buttons[i].textContent = isActive ? (round.prompt && round.prompt.label === '안전' ? '안전' : '★') : '';
+    }
+  }
+
+  function autoSubmitAtRoundEnd(round, callback) {
+    clearAutoSubmitTimer();
+    autoSubmitTimer = window.setTimeout(function () {
+      if (submittedRoundId === round.id) return;
+      callback();
+    }, Math.max(300, round.endsAt - currentServerNow() - 120));
+  }
+
+  function clearAutoSubmitTimer() {
+    if (!autoSubmitTimer) return;
+    window.clearTimeout(autoSubmitTimer);
+    autoSubmitTimer = 0;
+  }
+
+  function applyTokenStyle(element, token) {
+    var key = String(token || '').replace(/\s*(상자|문)$/g, '');
+    var style = colorStyles[key];
+    element.style.background = '';
+    element.style.color = '';
+    if (!style) return;
+    element.style.background = style.background;
+    element.style.color = style.color;
   }
 
   function unique(items) {

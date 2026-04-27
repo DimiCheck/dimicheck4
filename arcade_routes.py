@@ -131,6 +131,42 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "config": {"targetMs": 4200, "toleranceMs": 2000, "hold": True},
     },
     {
+        "id": "lunch_rush",
+        "engine": "mash",
+        "title": "급식 러시",
+        "instruction": "제한 시간 동안 버튼을 최대한 많이 눌러 급식 줄을 뚫으세요.",
+        "minPlayers": 1,
+        "duration": 6,
+        "config": {"label": "달리기"},
+    },
+    {
+        "id": "balloon_pop",
+        "engine": "mash",
+        "title": "풍선 터뜨리기",
+        "instruction": "빠르게 연타해서 풍선을 먼저 터뜨리세요.",
+        "minPlayers": 1,
+        "duration": 6,
+        "config": {"label": "펑!"},
+    },
+    {
+        "id": "star_catch",
+        "engine": "target",
+        "title": "별사탕 캐치",
+        "instruction": "반짝이는 칸이 바뀔 때마다 정확히 눌러 점수를 모으세요.",
+        "minPlayers": 1,
+        "duration": 8,
+        "config": {"cells": 9, "stepMs": 760, "label": "별"},
+    },
+    {
+        "id": "bomb_dodge",
+        "engine": "target",
+        "title": "폭탄 피하기",
+        "instruction": "안전한 칸만 빠르게 누르세요. 폭탄 칸은 감점입니다.",
+        "minPlayers": 1,
+        "duration": 8,
+        "config": {"cells": 9, "stepMs": 700, "label": "안전"},
+    },
+    {
         "id": "color_memory",
         "engine": "memory",
         "title": "색 순서 기억",
@@ -173,7 +209,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "instruction": "글자 뜻이 아니라 실제 색을 고르세요.",
         "minPlayers": 1,
         "duration": 8,
-        "config": {"options": ["빨강", "파랑", "노랑", "초록"], "correct": "파랑", "cue": "빨강"},
+        "config": {"options": ["빨강", "파랑", "노랑", "초록"], "correct": "파랑", "cue": "빨강", "cueColor": "파랑"},
     },
     {
         "id": "minority_vote",
@@ -210,6 +246,15 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "minPlayers": 1,
         "duration": 7,
         "config": {"options": ["빨강 상자", "파랑 상자", "노랑 상자", "초록 상자"]},
+    },
+    {
+        "id": "danger_bridge",
+        "engine": "risk",
+        "title": "위험한 다리",
+        "instruction": "안전한 길은 적은 점수, 위험한 길은 큰 점수입니다.",
+        "minPlayers": 1,
+        "duration": 7,
+        "config": {"options": ["안전한 길", "흔들리는 길", "수상한 지름길"]},
     },
 )
 
@@ -1226,12 +1271,39 @@ class PartySessionManager:
                 correct_options = [option for option in options if option != config_data["forbidden"]]
             else:
                 correct_options = [correct or random.choice(options)]
-            prompt.update({"options": options, "cue": config_data.get("cue"), "forbidden": config_data.get("forbidden"), "answers": correct_options})
+            prompt.update({
+                "options": options,
+                "cue": config_data.get("cue"),
+                "cueColor": config_data.get("cueColor"),
+                "forbidden": config_data.get("forbidden"),
+                "answers": correct_options,
+            })
         elif engine == "majority":
             prompt.update({"options": list(config_data.get("options") or ["A", "B"]), "unique": bool(config_data.get("unique"))})
         elif engine == "luck":
             options = list(config_data.get("options") or ["A", "B", "C"])
             prompt.update({"options": options, "outcomes": {option: random.choice([0, 30, 60, 100]) for option in options}})
+        elif engine == "mash":
+            prompt.update({"label": config_data.get("label") or "연타"})
+        elif engine == "target":
+            cells = max(4, min(int(config_data.get("cells") or 9), 16))
+            step_ms = max(450, min(int(config_data.get("stepMs") or 750), 1200))
+            duration_ms = int((ends_at - starts_at) * 1000)
+            slots = []
+            previous = -1
+            for at_ms in range(0, duration_ms, step_ms):
+                cell = random.randrange(cells)
+                if cells > 1 and cell == previous:
+                    cell = (cell + random.randrange(1, cells)) % cells
+                previous = cell
+                slots.append({"atMs": at_ms, "cell": cell})
+            prompt.update({"cells": cells, "stepMs": step_ms, "label": config_data.get("label") or "목표", "targets": slots})
+        elif engine == "risk":
+            options = list(config_data.get("options") or ["안전", "도전", "위험"])
+            shuffled_scores = random.sample([35, 65, 100], k=min(3, len(options)))
+            if len(options) > len(shuffled_scores):
+                shuffled_scores.extend(random.choice([0, 45, 75, 100]) for _ in range(len(options) - len(shuffled_scores)))
+            prompt.update({"options": options, "outcomes": dict(zip(options, shuffled_scores, strict=False))})
         return prompt
 
     def _make_memory_sequence(self, config_data: dict[str, Any]) -> list[str]:
@@ -1267,6 +1339,26 @@ class PartySessionManager:
             for submission in round_obj.submissions.values():
                 value = str(submission.get("value") or "")
                 counts[value] = counts.get(value, 0) + 1
+        if engine == "mash":
+            max_count = 0
+            for submission in round_obj.submissions.values():
+                try:
+                    max_count = max(max_count, int(submission.get("value") or 0))
+                except (TypeError, ValueError):
+                    continue
+            counts["__max__"] = max_count
+        if engine == "target":
+            max_net = 0
+            for submission in round_obj.submissions.values():
+                raw_value = submission.get("value") or {}
+                if not isinstance(raw_value, dict):
+                    continue
+                try:
+                    net = max(0, int(raw_value.get("hits") or 0) - int(raw_value.get("misses") or 0))
+                    max_net = max(max_net, net)
+                except (TypeError, ValueError):
+                    continue
+            counts["__max_net__"] = max_net
         for player_id in round_obj.participants:
             player = session_obj.players.get(player_id)
             submission = round_obj.submissions.get(player_id)
@@ -1330,6 +1422,28 @@ class PartySessionManager:
             outcomes = prompt.get("outcomes") or {}
             score = int(outcomes.get(str(value), 0))
             return score, f"{score}점"
+        if engine == "mash":
+            try:
+                count = max(0, int(value))
+            except (TypeError, ValueError):
+                count = 0
+            max_count = max(1, int(counts.get("__max__") or count or 1))
+            return int((count / max_count) * 100), f"{count}회"
+        if engine == "target":
+            raw_value = value if isinstance(value, dict) else {}
+            try:
+                hits = max(0, int(raw_value.get("hits") or 0))
+                misses = max(0, int(raw_value.get("misses") or 0))
+            except (TypeError, ValueError):
+                hits = 0
+                misses = 0
+            net = max(0, hits - misses)
+            max_net = max(1, int(counts.get("__max_net__") or net or 1))
+            return int((net / max_net) * 100), f"{hits}회 성공 · {misses}회 실수"
+        if engine == "risk":
+            outcomes = prompt.get("outcomes") or {}
+            score = int(outcomes.get(str(value), 0))
+            return score, f"{score}점 선택"
         return 0, "채점 불가"
 
     def _end_locked(self, session_obj: PartySession) -> None:

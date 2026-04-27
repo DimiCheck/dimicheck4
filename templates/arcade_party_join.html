@@ -173,6 +173,21 @@
       transform: translateY(3px);
       box-shadow: 0 4px 0 rgba(36, 48, 68, 0.13);
     }
+    .target-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .target-grid button {
+      min-height: 78px;
+      border-radius: 24px;
+      background: #eef3ff;
+      font-size: 30px;
+    }
+    .target-grid button.target-active {
+      background: radial-gradient(circle at 35% 28%, #fff7a6 0 18%, #ffcd4d 19% 48%, #ff7a59 49% 100%);
+      color: #271400;
+      transform: translateY(-4px) scale(1.03);
+      box-shadow: 0 12px 0 rgba(255, 122, 89, 0.22);
+    }
     .sequence-answer {
       min-height: 42px;
       border-radius: 18px;

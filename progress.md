@@ -16,3 +16,4 @@ Original prompt: 구현 시작
 - Playwright visual client could not run because the local environment does not have the `playwright` package installed; avoided adding a new dependency and used route/JS/test verification instead.
 - Fixed Party debug entry: `ARCADE_DEBUG_ALLOW_ANY_TIME=1` now marks host pages so initial session creation bypasses time limits, and Party exposes `ArcadeDebug` as an alias of `PartyDebug` for console testing.
 - Made debug-disabled 400 responses explicit and changed `allowAnyTime()` console helpers to return an object with the actual server error instead of a misleading immediate success string.
+- Party game-design pass after Mario Party reference review: added mash/target/risk engines, colored color-game chips/buttons, hid precise timing-game seconds on phones, and added score tests for the new engines.
