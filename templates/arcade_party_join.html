@@ -173,6 +173,23 @@
       transform: translateY(3px);
       box-shadow: 0 4px 0 rgba(36, 48, 68, 0.13);
     }
+    .choice-grid button.forbidden-choice {
+      outline: 4px solid rgba(36, 48, 68, 0.22);
+      filter: grayscale(0.2) brightness(0.82);
+      position: relative;
+    }
+    .choice-grid button.forbidden-choice::after {
+      content: "금지";
+      position: absolute;
+      right: 8px;
+      top: 8px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: rgba(36, 48, 68, 0.88);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 950;
+    }
     .target-grid {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
@@ -187,6 +204,24 @@
       color: #271400;
       transform: translateY(-4px) scale(1.03);
       box-shadow: 0 12px 0 rgba(255, 122, 89, 0.22);
+    }
+    .order-grid button:disabled {
+      opacity: 0.42;
+      transform: translateY(4px);
+    }
+    .slider-control {
+      border-radius: 28px;
+      padding: 22px;
+      background: #fff;
+      box-shadow: inset 0 -8px 0 rgba(36, 48, 68, 0.06);
+    }
+    .slider-control input {
+      width: 100%;
+      accent-color: #ff8a3d;
+    }
+    .compact-submit {
+      min-height: 88px;
+      font-size: 24px;
     }
     .sequence-answer {
       min-height: 42px;

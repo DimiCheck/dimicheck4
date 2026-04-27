@@ -270,6 +270,14 @@
       renderTargetControls(round);
       return;
     }
+    if (round.engine === 'slider') {
+      renderSliderControls(round);
+      return;
+    }
+    if (round.engine === 'order') {
+      renderOrderControls(round);
+      return;
+    }
     if (round.engine === 'memory') {
       renderMemoryControls(round);
       return;
@@ -387,6 +395,63 @@
     });
   }
 
+  function renderSliderControls(round) {
+    els.controls.innerHTML = '';
+    var value = 50;
+    var readout = document.createElement('div');
+    readout.className = 'sequence-answer';
+    readout.textContent = (round.prompt && round.prompt.label ? round.prompt.label : '값') + ' ' + value + (round.prompt && round.prompt.unit ? round.prompt.unit : '');
+    var sliderWrap = document.createElement('div');
+    sliderWrap.className = 'slider-control';
+    var slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = '0';
+    slider.max = '100';
+    slider.value = String(value);
+    slider.addEventListener('input', function () {
+      value = Number(slider.value || 0);
+      readout.textContent = (round.prompt && round.prompt.label ? round.prompt.label : '값') + ' ' + value + (round.prompt && round.prompt.unit ? round.prompt.unit : '');
+    });
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'big-button ready compact-submit';
+    button.textContent = '이 값으로 제출';
+    button.addEventListener('click', function () {
+      submitRound(round, value);
+    });
+    sliderWrap.appendChild(slider);
+    els.controls.appendChild(readout);
+    els.controls.appendChild(sliderWrap);
+    els.controls.appendChild(button);
+  }
+
+  function renderOrderControls(round) {
+    els.controls.innerHTML = '';
+    answerBuffer = [];
+    var answer = document.createElement('div');
+    answer.className = 'sequence-answer';
+    answer.textContent = '순서: ';
+    var grid = document.createElement('div');
+    grid.className = 'choice-grid order-grid';
+    (round.prompt.options || []).forEach(function (option) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = option;
+      button.addEventListener('click', function () {
+        if (button.disabled) return;
+        button.disabled = true;
+        answerBuffer.push(option);
+        answer.textContent = '순서: ' + answerBuffer.join(' → ');
+        if (answerBuffer.length >= (round.prompt.options || []).length) {
+          submitRound(round, answerBuffer.slice());
+        }
+      });
+      grid.appendChild(button);
+    });
+    els.controls.appendChild(answer);
+    els.controls.appendChild(grid);
+  }
+
   function renderMemoryControls(round) {
     els.controls.innerHTML = '';
     var answer = document.createElement('div');
@@ -415,6 +480,13 @@
 
   function renderChoiceControls(round) {
     els.controls.innerHTML = '';
+    var hint = choiceHint(round);
+    if (hint) {
+      var hintCard = document.createElement('div');
+      hintCard.className = 'sequence-answer';
+      hintCard.textContent = hint;
+      els.controls.appendChild(hintCard);
+    }
     var grid = document.createElement('div');
     grid.className = 'choice-grid';
     (round.prompt.options || []).forEach(function (option) {
@@ -422,6 +494,10 @@
       button.type = 'button';
       button.textContent = option;
       applyTokenStyle(button, option);
+      if (round.prompt && round.prompt.forbidden === option) {
+        button.classList.add('forbidden-choice');
+        button.setAttribute('aria-label', option + ' 금지 색');
+      }
       button.addEventListener('click', function () {
         submitRound(round, option);
       });
@@ -432,10 +508,13 @@
 
   function submitRound(round, value) {
     if (!socket || !socket.connected || submittedRoundId === round.id) return;
+    if (sessionState && sessionState.currentRound && sessionState.currentRound.id !== round.id) return;
+    if (currentServerNow() > round.endsAt + 250) return;
     submittedRoundId = round.id;
     socket.emit('party_submit', {
       code: code,
       playerId: playerId,
+      roundId: round.id,
       value: value
     });
     lockControls('제출 완료');
@@ -559,6 +638,17 @@
     if (!style) return;
     element.style.background = style.background;
     element.style.color = style.color;
+  }
+
+  function choiceHint(round) {
+    var prompt = round.prompt || {};
+    if (prompt.forbidden) {
+      return '금지: ' + prompt.forbidden + ' · 나머지 색 중 하나를 누르세요.';
+    }
+    if (prompt.cue && prompt.cueColor) {
+      return '글자 뜻 "' + prompt.cue + '"은 무시하고, 칠해진 색 "' + prompt.cueColor + '"을 누르세요.';
+    }
+    return '';
   }
 
   function unique(items) {

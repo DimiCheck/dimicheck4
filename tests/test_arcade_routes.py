@@ -345,15 +345,55 @@ def test_party_round_scores_and_late_join_waits_for_next_round(monkeypatch):
         assert "p3" in session_obj.current_round.participants
 
 
+def test_party_late_or_stale_submit_is_ignored_without_error():
+    arcade_routes = importlib.import_module("arcade_routes")
+    manager = arcade_routes.PartySessionManager()
+    now = time.time()
+    round_obj = arcade_routes.PartyRound(
+        id="round-current",
+        index=1,
+        definition={"id": "mash", "engine": "mash", "title": "mash", "instruction": "mash"},
+        status="round_result",
+        intro_at=now,
+        starts_at=now,
+        ends_at=now + 6,
+        result_at=now + 11,
+        participants=["p1"],
+        prompt={},
+    )
+    session_obj = arcade_routes.PartySession(
+        code="STALE",
+        grade=2,
+        section=4,
+        status="round_result",
+        created_at=now,
+        ends_at=now + 120,
+        phase_label="테스트",
+        players={"p1": arcade_routes.PartyPlayer(id="p1", nickname="하나", avatar=0)},
+        current_round=round_obj,
+    )
+    manager._sessions[session_obj.code] = session_obj
+
+    ignored, error = manager.submit(session_obj.code, "p1", 12, "round-current")
+    assert ignored is session_obj
+    assert error is None
+    assert round_obj.submissions == {}
+
+    stale, stale_error = manager.submit(session_obj.code, "p1", 12, "round-old")
+    assert stale is session_obj
+    assert stale_error is None
+
+
 def test_party_minigame_pack_covers_engine_types():
     arcade_routes = importlib.import_module("arcade_routes")
     games = arcade_routes.PARTY_MINIGAMES
-    assert len(games) >= 21
+    assert len(games) >= 25
     engines = {game["engine"] for game in games}
-    assert {"reaction", "timing", "memory", "choice", "majority", "luck", "mash", "target", "risk"} <= engines
+    assert {"reaction", "timing", "memory", "choice", "majority", "luck", "mash", "target", "risk", "slider", "order"} <= engines
     assert all(game["title"] and game["instruction"] for game in games)
     assert any(game["id"] == "reaction_fake" and game["config"].get("fake") for game in games)
     assert any(game["id"] == "stroop" and game["config"].get("cueColor") for game in games)
+    assert any(game["id"] == "forbidden_color" and game["config"].get("forbidden") for game in games)
 
 
 def test_party_score_engines_handle_common_round_types():
@@ -459,6 +499,20 @@ def test_party_score_engines_handle_common_round_types():
     )
     assert manager._score_round_locked(session_obj, risk_round)[0]["playerId"] == "p2"
 
+    slider_round = make_round(
+        "slider",
+        {"target": 70},
+        {"p1": {"value": 72, "submittedAt": now + 4}, "p2": {"value": 40, "submittedAt": now + 5}},
+    )
+    assert manager._score_round_locked(session_obj, slider_round)[0]["playerId"] == "p1"
+
+    order_round = make_round(
+        "order",
+        {"answer": ["밥", "국", "반찬"]},
+        {"p1": {"value": ["밥", "국", "반찬"], "submittedAt": now + 4}, "p2": {"value": ["국", "밥", "반찬"], "submittedAt": now + 5}},
+    )
+    assert manager._score_round_locked(session_obj, order_round)[0]["score"] == 100
+
 
 def test_party_target_prompt_has_moving_schedule():
     arcade_routes = importlib.import_module("arcade_routes")
@@ -473,6 +527,41 @@ def test_party_target_prompt_has_moving_schedule():
     assert prompt["label"] == "별"
     assert len(prompt["targets"]) >= 8
     assert all(0 <= item["cell"] < 9 for item in prompt["targets"])
+
+
+def test_party_prompt_and_selection_add_varied_input_modes():
+    arcade_routes = importlib.import_module("arcade_routes")
+    manager = arcade_routes.PartySessionManager()
+    now = time.time()
+
+    slider_prompt = manager._make_prompt(
+        {"id": "slider-test", "engine": "slider", "config": {"target": 63, "label": "위치", "unit": "%"}},
+        now,
+        now + 9,
+    )
+    assert slider_prompt["target"] == 63
+    assert slider_prompt["unit"] == "%"
+
+    order_prompt = manager._make_prompt(
+        {"id": "order-test", "engine": "order", "config": {"items": ["3", "1", "2"], "direction": "asc"}},
+        now,
+        now + 9,
+    )
+    assert order_prompt["answer"] == ["1", "2", "3"]
+    assert sorted(order_prompt["options"]) == ["1", "2", "3"]
+
+    session_obj = arcade_routes.PartySession(
+        code="VARIE",
+        grade=2,
+        section=4,
+        status="lobby",
+        created_at=now,
+        ends_at=now + 120,
+        phase_label="테스트",
+        recent_game_ids=["reaction_green", "reaction_fake", "late_tap"],
+    )
+    selected = manager._select_game_locked(session_obj, 4)
+    assert selected["engine"] != "reaction"
 
 
 def test_arcade_manager_assigns_balanced_teams_and_claims_spawn_cells(monkeypatch):

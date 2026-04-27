@@ -167,6 +167,42 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "config": {"cells": 9, "stepMs": 700, "label": "안전"},
     },
     {
+        "id": "perfect_position",
+        "engine": "slider",
+        "title": "눈대중 슬라이더",
+        "instruction": "목표 위치에 최대한 가깝게 슬라이더를 맞추세요.",
+        "minPlayers": 1,
+        "duration": 9,
+        "config": {"label": "위치", "unit": "%"},
+    },
+    {
+        "id": "volume_match",
+        "engine": "slider",
+        "title": "볼륨 맞추기",
+        "instruction": "전자칠판의 목표 볼륨과 가장 비슷하게 맞추세요.",
+        "minPlayers": 1,
+        "duration": 9,
+        "config": {"label": "볼륨", "unit": "%"},
+    },
+    {
+        "id": "height_order",
+        "engine": "order",
+        "title": "줄 세우기",
+        "instruction": "낮은 숫자부터 차례대로 눌러 순서를 완성하세요.",
+        "minPlayers": 1,
+        "duration": 12,
+        "config": {"items": ["142", "156", "163", "171"], "direction": "asc", "label": "작은 숫자부터"},
+    },
+    {
+        "id": "lunch_order",
+        "engine": "order",
+        "title": "급식 순서",
+        "instruction": "급식판에 올릴 순서를 기억해 차례대로 누르세요.",
+        "minPlayers": 1,
+        "duration": 12,
+        "config": {"items": ["밥", "국", "반찬", "후식"], "direction": "given", "label": "왼쪽부터"},
+    },
+    {
         "id": "color_memory",
         "engine": "memory",
         "title": "색 순서 기억",
@@ -197,7 +233,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "id": "forbidden_color",
         "engine": "choice",
         "title": "금지 색 피하기",
-        "instruction": "금지 색을 제외하고 정답 색을 고르세요.",
+        "instruction": "화면에 표시된 금지 색만 피하세요. 금지 색이 아닌 아무 색이나 누르면 됩니다.",
         "minPlayers": 1,
         "duration": 8,
         "config": {"options": ["빨강", "파랑", "노랑", "초록"], "forbidden": "빨강"},
@@ -205,8 +241,8 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
     {
         "id": "stroop",
         "engine": "choice",
-        "title": "스트룹 테스트",
-        "instruction": "글자 뜻이 아니라 실제 색을 고르세요.",
+        "title": "글자색 고르기",
+        "instruction": "글자가 무슨 색이라고 쓰여 있는지는 무시하고, 실제로 칠해진 색을 누르세요.",
         "minPlayers": 1,
         "duration": 8,
         "config": {"options": ["빨강", "파랑", "노랑", "초록"], "correct": "파랑", "cue": "빨강", "cueColor": "파랑"},
@@ -1080,12 +1116,18 @@ class PartySessionManager:
             session_obj.next_transition_at = now_ts + PARTY_WAIT_SECONDS
             return session_obj, None
 
-    def submit(self, code: str, player_id: str, value: Any) -> tuple[PartySession | None, str | None]:
+    def submit(self, code: str, player_id: str, value: Any, round_id: str | None = None) -> tuple[PartySession | None, str | None]:
         with self._lock:
             session_obj = self._sessions.get(str(code or "").upper())
-            if not session_obj or session_obj.status != "playing" or not session_obj.current_round:
+            if not session_obj:
                 return None, "지금은 제출할 수 없습니다."
             round_obj = session_obj.current_round
+            if not round_obj:
+                return session_obj, None
+            if round_id and str(round_id) != round_obj.id:
+                return session_obj, None
+            if session_obj.status != "playing":
+                return session_obj, None
             if player_id not in round_obj.participants:
                 return None, "다음 라운드부터 참여할 수 있습니다."
             if player_id in round_obj.submissions:
@@ -1237,11 +1279,18 @@ class PartySessionManager:
         del session_obj.recent_game_ids[:-3]
 
     def _select_game_locked(self, session_obj: PartySession, player_count: int) -> dict[str, Any]:
+        recent_engines = {
+            definition["engine"]
+            for recent_id in session_obj.recent_game_ids[-3:]
+            for definition in PARTY_MINIGAMES
+            if definition["id"] == recent_id
+        }
         candidates = [
             definition
             for definition in PARTY_MINIGAMES
             if player_count >= int(definition.get("minPlayers") or 1)
             and definition["id"] not in session_obj.recent_game_ids
+            and definition["engine"] not in recent_engines
         ]
         if not candidates:
             candidates = [definition for definition in PARTY_MINIGAMES if player_count >= int(definition.get("minPlayers") or 1)]
@@ -1304,6 +1353,16 @@ class PartySessionManager:
             if len(options) > len(shuffled_scores):
                 shuffled_scores.extend(random.choice([0, 45, 75, 100]) for _ in range(len(options) - len(shuffled_scores)))
             prompt.update({"options": options, "outcomes": dict(zip(options, shuffled_scores, strict=False))})
+        elif engine == "slider":
+            target = int(config_data.get("target") or random.randrange(15, 86))
+            prompt.update({"target": target, "label": config_data.get("label") or "목표", "unit": config_data.get("unit") or ""})
+        elif engine == "order":
+            answer = [str(item) for item in config_data.get("items") or ["1", "2", "3", "4"]]
+            if config_data.get("direction") == "asc":
+                answer = sorted(answer, key=lambda item: int(item) if item.isdigit() else item)
+            options = answer[:]
+            random.shuffle(options)
+            prompt.update({"options": options, "answer": answer, "label": config_data.get("label") or "순서대로"})
         return prompt
 
     def _make_memory_sequence(self, config_data: dict[str, Any]) -> list[str]:
@@ -1444,6 +1503,18 @@ class PartySessionManager:
             outcomes = prompt.get("outcomes") or {}
             score = int(outcomes.get(str(value), 0))
             return score, f"{score}점 선택"
+        if engine == "slider":
+            try:
+                selected = int(value)
+            except (TypeError, ValueError):
+                selected = 0
+            diff = abs(selected - int(prompt.get("target") or 0))
+            return max(0, 100 - diff * 3), f"{diff} 차이"
+        if engine == "order":
+            answer = [str(item) for item in prompt.get("answer", [])]
+            given = [str(item) for item in (value if isinstance(value, list) else [])]
+            correct = sum(1 for idx, item in enumerate(answer) if idx < len(given) and given[idx] == item)
+            return int((correct / max(1, len(answer))) * 100), f"{correct}/{len(answer)}"
         return 0, "채점 불가"
 
     def _end_locked(self, session_obj: PartySession) -> None:
@@ -1794,7 +1865,7 @@ class ArcadeNamespace(Namespace):
         payload = data or {}
         code = str(payload.get("code") or "").upper()
         player_id = str(payload.get("playerId") or "").strip()
-        session_obj, error = party_manager.submit(code, player_id, payload.get("value"))
+        session_obj, error = party_manager.submit(code, player_id, payload.get("value"), str(payload.get("roundId") or ""))
         if error and not session_obj:
             emit("party:error", {"message": error})
             return

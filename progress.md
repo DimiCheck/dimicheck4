@@ -17,3 +17,6 @@ Original prompt: 구현 시작
 - Fixed Party debug entry: `ARCADE_DEBUG_ALLOW_ANY_TIME=1` now marks host pages so initial session creation bypasses time limits, and Party exposes `ArcadeDebug` as an alias of `PartyDebug` for console testing.
 - Made debug-disabled 400 responses explicit and changed `allowAnyTime()` console helpers to return an object with the actual server error instead of a misleading immediate success string.
 - Party game-design pass after Mario Party reference review: added mash/target/risk engines, colored color-game chips/buttons, hid precise timing-game seconds on phones, and added score tests for the new engines.
+- Removed noisy stale-submit errors in Party by sending `roundId` with submissions and ignoring late/old round submissions; clarified color-game instructions and mobile hints.
+- Fixed forbidden-color visibility: host now shows `금지: <색>` as the main prompt and mobile marks the forbidden color button with a small `금지` badge.
+- Added more distinct Party inputs: slider games (`눈대중 슬라이더`, `볼륨 맞추기`) and ordering games (`줄 세우기`, `급식 순서`), plus engine-aware round selection to avoid repeating the same input style back-to-back.

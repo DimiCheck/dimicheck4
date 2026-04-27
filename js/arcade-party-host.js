@@ -214,7 +214,11 @@
       setPromptText('순서를 기억하세요', '');
       renderSequence(round.prompt.sequence || []);
     } else if (round.engine === 'choice') {
-      setPromptText(round.prompt.cue ? String(round.prompt.cue) : '정답을 고르세요', round.prompt.cueColor ? 'cue' : '', round.prompt.cueColor);
+      if (round.prompt.forbidden) {
+        setPromptText('금지: ' + round.prompt.forbidden, 'waiting', round.prompt.forbidden);
+      } else {
+        setPromptText(round.prompt.cue ? String(round.prompt.cue) : '정답을 고르세요', round.prompt.cueColor ? 'cue' : '', round.prompt.cueColor);
+      }
       renderSequence(round.prompt.options || []);
     } else if (round.engine === 'majority') {
       setPromptText(round.prompt.unique ? '겹치지 않는 선택' : '적게 고른 쪽 승리', '');
@@ -228,6 +232,11 @@
       setPromptText('빛나는 칸을 잡으세요', 'ready');
     } else if (round.engine === 'risk') {
       setPromptText('위험할수록 큰 점수', '');
+      renderSequence(round.prompt.options || []);
+    } else if (round.engine === 'slider') {
+      setPromptText((round.prompt.label || '목표') + ' ' + round.prompt.target + (round.prompt.unit || ''), 'ready');
+    } else if (round.engine === 'order') {
+      setPromptText(round.prompt.label || '순서대로', '');
       renderSequence(round.prompt.options || []);
     }
     if (round.status === 'round_result') {
@@ -379,8 +388,14 @@
     if (round.engine === 'target') {
       return { hits: 2 + Math.floor(Math.random() * 8), misses: Math.floor(Math.random() * 3) };
     }
+    if (round.engine === 'slider') {
+      return Math.max(0, Math.min(100, Math.round((round.prompt.target || 50) + (Math.random() * 30 - 15))));
+    }
     if (round.engine === 'memory') {
       return (round.prompt.sequence || []).slice();
+    }
+    if (round.engine === 'order') {
+      return (round.prompt.options || []).slice().sort();
     }
     var options = round.prompt.options || ['A', 'B'];
     return options[Math.floor(Math.random() * options.length)];
@@ -410,6 +425,7 @@
         botSocket.emit('party_submit', {
           code: code,
           playerId: playerId,
+          roundId: round.id,
           value: randomValueForRound(round)
         });
       }, 300 + Math.floor(Math.random() * 1800));
