@@ -1056,39 +1056,39 @@ body.fullscreen .fullscreen-btn {
 
 /* 색상 군 */
 .magnet.color-red {
-  --ornament-base: #b83b3b;
-  --ornament-sheen: #ef7777;
-  --ornament-glow: rgba(184, 59, 59, 0.48);
+  --ornament-base: #e30517;
+  --ornament-sheen: #e76345;
+  --ornament-glow: rgba(242, 71, 83, 0.6);
 }
 
 .magnet.color-orange {
-  --ornament-base: #c06a24;
-  --ornament-sheen: #f2a35a;
-  --ornament-glow: rgba(192, 106, 36, 0.46);
+  --ornament-base: #ff8000;
+  --ornament-sheen: #ffb44a;
+  --ornament-glow: rgba(251, 149, 24, 0.58);
 }
 
 .magnet.color-yellow {
-  --ornament-base: #c39a24;
-  --ornament-sheen: #f1cf6a;
-  --ornament-glow: rgba(195, 154, 36, 0.43);
+  --ornament-base: #ffbb00;
+  --ornament-sheen: #ffc342;
+  --ornament-glow: rgba(255, 187, 0, 0.54);
 }
 /* wtf */
 .magnet.color-green {
-  --ornament-base: #2f8a58;
-  --ornament-sheen: #6fcf97;
-  --ornament-glow: rgba(47, 138, 88, 0.45);
+  --ornament-base: #5be98d;
+  --ornament-sheen: #8afda5;
+  --ornament-glow: rgba(84, 170, 114, 0.57);
 }
 
 .magnet.color-blue {
-  --ornament-base: #2f67b1;
-  --ornament-sheen: #74a7e8;
-  --ornament-glow: rgba(47, 103, 177, 0.46);
+  --ornament-base: #1781eb;
+  --ornament-sheen: #90b9ff;
+  --ornament-glow: rgba(96, 142, 210, 0.56);
 }
 
 .magnet.color-purple {
-  --ornament-base: #7047a8;
-  --ornament-sheen: #a985df;
-  --ornament-glow: rgba(112, 71, 168, 0.46);
+  --ornament-base: #a838dc;
+  --ornament-sheen: #c583e6;
+  --ornament-glow: rgba(148, 53, 199, 0.56);
 }
 
 .magnet-quick-drop-overlay {
@@ -1315,28 +1315,28 @@ body.fullscreen .fullscreen-btn {
 }
 
 .badge.color-red {
-  background: linear-gradient(135deg, #ef7777, #b83b3b);
+  background: linear-gradient(135deg, #ff4444, #cc0000);
 }
 
 .badge.color-orange {
-  background: linear-gradient(135deg, #f2a35a, #c06a24);
+  background: linear-gradient(135deg, #ff8c1a, #ff5e00);
 }
 
 .badge.color-yellow {
-  background: linear-gradient(135deg, #f1cf6a, #c39a24);
+  background: linear-gradient(135deg, #ffd84d, #ffb300);
   color: #333;
 }
 
 .badge.color-green {
-  background: linear-gradient(135deg, #6fcf97, #2f8a58);
+  background: linear-gradient(135deg, #0e8837, #0fb957);
 }
 
 .badge.color-blue {
-  background: linear-gradient(135deg, #74a7e8, #2f67b1);
+  background: linear-gradient(135deg, #3aa1ff, #0066ff);
 }
 
 .badge.color-purple {
-  background: linear-gradient(135deg, #a985df, #7047a8);
+  background: linear-gradient(135deg, #b36bff, #7a2cff);
 }
 
 .magnet-quick-menu-overlay {
