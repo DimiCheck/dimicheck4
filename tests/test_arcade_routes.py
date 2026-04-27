@@ -106,6 +106,9 @@ def test_arcade_session_routes_require_board_session_and_create(monkeypatch, tmp
     assert len(payload["code"]) == 5
     assert payload["gridWidth"] == 28
     assert payload["gridHeight"] == 16
+    assert payload["scores"] == {"red": 224, "blue": 224}
+    assert all(cell == "red" for row in payload["grid"] for cell in row[:14])
+    assert all(cell == "blue" for row in payload["grid"] for cell in row[14:])
 
     second_response = client.post("/api/arcade/sessions", json={"grade": 2, "section": 4})
     assert second_response.status_code == 200
@@ -164,8 +167,11 @@ def test_arcade_manager_assigns_balanced_teams_and_claims_spawn_cells(monkeypatc
     assert second_error is None
     assert third_error is None
     assert [first.team, second.team, third.team] == ["red", "blue", "red"]
-    assert session_obj.scores["red"] == 2
-    assert session_obj.scores["blue"] == 1
+    assert session_obj.scores["red"] == 224
+    assert session_obj.scores["blue"] == 224
+    assert first.contribution == 0
+    assert second.contribution == 0
+    assert third.contribution == 0
 
 
 def test_arcade_manager_moves_players_and_broadcasts_manual_end(monkeypatch):
@@ -185,15 +191,73 @@ def test_arcade_manager_moves_players_and_broadcasts_manual_end(monkeypatch):
     before_x = player.x
     assert manager.set_input(session_obj.code, player.id, "right") is True
     with manager._lock:
+        session_obj.grid[player.y][player.x + 1] = "blue"
+        session_obj.scores["red"] -= 1
+        session_obj.scores["blue"] += 1
         changed = manager._advance_locked(session_obj)
 
     assert player.x == before_x + 1
     assert changed == [[player.x, player.y, "red"]]
+    assert player.contribution == 1
+    assert session_obj.scores == {"red": 224, "blue": 224}
 
     ended = manager.end_session(session_obj.code)
     assert ended is session_obj
     assert session_obj.status == "ended"
     assert [event[0] for event in fake_socketio.events[-2:]] == ["arcade:state", "arcade:ended"]
+
+
+def test_arcade_items_create_area_claims_and_speed_boost(monkeypatch):
+    arcade_routes = importlib.import_module("arcade_routes")
+    monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: _allowed_window())
+
+    manager = arcade_routes.ArcadeSessionManager()
+    session_obj, _error = manager.create_session(2, 4)
+    assert session_obj is not None
+    player, _error = manager.join_player(session_obj.code, "p1", "하나", 0)
+    assert player is not None
+
+    session_obj.status = "running"
+    session_obj.ends_at = time.time() + 60
+    player.x = 13
+    player.y = 8
+    player.pending_direction = "right"
+    session_obj.items["star-test"] = arcade_routes.ArcadeItem(
+        id="star-test",
+        type="star",
+        x=14,
+        y=8,
+        spawned_at=time.time(),
+        expires_at=time.time() + 10,
+    )
+
+    with manager._lock:
+        changed = manager._advance_locked(session_obj)
+
+    assert "star-test" not in session_obj.items
+    assert changed
+    assert player.contribution > 1
+    assert session_obj.grid[7][15] == "red"
+    assert session_obj.recent_events[-1]["itemType"] == "star"
+
+    player.x = 10
+    player.y = 8
+    player.pending_direction = "right"
+    session_obj.items["speed-test"] = arcade_routes.ArcadeItem(
+        id="speed-test",
+        type="speed",
+        x=11,
+        y=8,
+        spawned_at=time.time(),
+        expires_at=time.time() + 10,
+    )
+    with manager._lock:
+        manager._advance_locked(session_obj)
+        boosted_until = player.speed_until
+        manager._advance_locked(session_obj)
+
+    assert boosted_until > time.time()
+    assert player.x == 13
 
 
 def test_arcade_play_window_includes_regular_class_breaks(monkeypatch):

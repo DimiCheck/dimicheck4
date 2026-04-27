@@ -7,17 +7,18 @@
   <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
   <style>
     :root {
-      --bg: #090b12;
-      --panel: rgba(255, 255, 255, 0.08);
-      --panel-strong: rgba(255, 255, 255, 0.14);
-      --text: #f8fafc;
-      --muted: #aeb7c8;
-      --red: #ff6b7a;
-      --red-soft: rgba(255, 107, 122, 0.78);
-      --blue: #5bbcff;
-      --blue-soft: rgba(91, 188, 255, 0.78);
-      --line: rgba(255, 255, 255, 0.14);
-      --gold: #ffd166;
+      --bg: #fff8e8;
+      --panel: rgba(255, 255, 255, 0.82);
+      --panel-strong: #fff1bd;
+      --text: #243044;
+      --muted: #728097;
+      --red: #ff5f7a;
+      --red-soft: rgba(255, 116, 138, 0.74);
+      --blue: #35a7ff;
+      --blue-soft: rgba(75, 184, 255, 0.74);
+      --line: rgba(36, 48, 68, 0.12);
+      --gold: #ffb703;
+      --green: #75d66f;
       font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
@@ -28,10 +29,22 @@
       margin: 0;
       color: var(--text);
       background:
-        radial-gradient(circle at 10% 10%, rgba(255, 107, 122, 0.22), transparent 28%),
-        radial-gradient(circle at 85% 18%, rgba(91, 188, 255, 0.22), transparent 30%),
-        linear-gradient(140deg, #070811 0%, #111827 52%, #090b12 100%);
+        radial-gradient(circle at 12% 12%, rgba(255, 191, 105, 0.46), transparent 23%),
+        radial-gradient(circle at 84% 18%, rgba(123, 214, 255, 0.5), transparent 26%),
+        radial-gradient(circle at 78% 86%, rgba(255, 121, 156, 0.32), transparent 24%),
+        linear-gradient(145deg, #fff8e8 0%, #effbff 46%, #fff1f6 100%);
       overflow: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        radial-gradient(circle, rgba(36, 48, 68, 0.08) 1.5px, transparent 1.5px);
+      background-size: 28px 28px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,0.65), transparent 82%);
     }
 
     .page {
@@ -44,10 +57,16 @@
 
     .panel {
       border: 1px solid var(--line);
-      border-radius: 28px;
+      border-radius: 34px;
       background: var(--panel);
-      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.28);
-      backdrop-filter: blur(18px);
+      box-shadow: 0 18px 0 rgba(36, 48, 68, 0.08), 0 28px 70px rgba(53, 167, 255, 0.13);
+      backdrop-filter: blur(14px);
+      animation: cardIn 0.55s cubic-bezier(.2, 1.2, .2, 1) both;
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(18px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
     }
 
     .side {
@@ -66,7 +85,8 @@
     .brand img {
       width: 48px;
       height: 48px;
-      border-radius: 15px;
+      border-radius: 18px;
+      box-shadow: 0 8px 20px rgba(36, 48, 68, 0.14);
     }
 
     h1, h2, p { margin: 0; }
@@ -86,25 +106,34 @@
       display: grid;
       gap: 14px;
       padding: 18px;
-      border-radius: 24px;
-      background: rgba(255, 255, 255, 0.1);
+      border: 3px solid #fff;
+      border-radius: 30px;
+      background: linear-gradient(180deg, #ffffff 0%, #fff4cf 100%);
+      box-shadow: inset 0 -8px 0 rgba(255, 183, 3, 0.13), 0 16px 28px rgba(255, 183, 3, 0.16);
     }
 
     .code {
       font-size: clamp(42px, 9vw, 78px);
-      font-weight: 900;
+      font-weight: 950;
       line-height: 0.95;
       letter-spacing: 0.05em;
       text-align: center;
-      color: var(--gold);
-      text-shadow: 0 10px 30px rgba(255, 209, 102, 0.22);
+      color: #1f2a44;
+      text-shadow: 0 4px 0 rgba(255, 183, 3, 0.24);
+      animation: softBounce 1.8s ease-in-out infinite;
+    }
+
+    @keyframes softBounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
     }
 
     .qr-wrap {
       display: grid;
       place-items: center;
       min-height: 238px;
-      border-radius: 22px;
+      border: 2px dashed rgba(36, 48, 68, 0.18);
+      border-radius: 28px;
       background: #fff;
       padding: 16px;
     }
@@ -117,7 +146,7 @@
 
     .join-link {
       overflow: hidden;
-      color: #dbeafe;
+      color: #5c6b84;
       text-overflow: ellipsis;
       white-space: nowrap;
       font-size: 13px;
@@ -132,23 +161,28 @@
 
     button, .button-link {
       border: 0;
-      border-radius: 18px;
+      border-radius: 999px;
       padding: 14px 16px;
       color: var(--text);
       background: var(--panel-strong);
       font: inherit;
-      font-weight: 800;
+      font-weight: 900;
       text-align: center;
       text-decoration: none;
       cursor: pointer;
-      transition: transform 0.18s ease, background 0.18s ease, opacity 0.18s ease;
+      box-shadow: 0 7px 0 rgba(36, 48, 68, 0.13);
+      transition: transform 0.16s cubic-bezier(.2, 1.4, .2, 1), box-shadow 0.16s ease, background 0.18s ease, opacity 0.18s ease;
     }
 
-    button:hover, .button-link:hover { transform: translateY(-1px); }
+    button:hover, .button-link:hover { transform: translateY(-2px); }
+    button:active, .button-link:active {
+      transform: translateY(3px);
+      box-shadow: 0 3px 0 rgba(36, 48, 68, 0.13);
+    }
     button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
-    .primary { background: linear-gradient(135deg, #ff6b7a, #ffb86b); color: #17110d; }
-    .danger { background: rgba(255, 255, 255, 0.1); color: #ffd4d9; }
+    .primary { background: linear-gradient(135deg, #7bd66f, #ffde59); color: #1f2a44; }
+    .danger { background: #ffe1e8; color: #bf3751; }
 
     .stats {
       display: grid;
@@ -158,8 +192,10 @@
 
     .stat {
       padding: 14px;
-      border-radius: 18px;
-      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(36, 48, 68, 0.08);
+      border-radius: 24px;
+      background: #ffffff;
+      box-shadow: inset 0 -5px 0 rgba(36, 48, 68, 0.05);
     }
 
     .stat b {
@@ -189,27 +225,30 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      border: 2px solid #fff;
       border-radius: 999px;
       padding: 9px 13px;
-      background: rgba(255, 255, 255, 0.11);
-      color: #e5e7eb;
+      background: #ffffff;
+      color: #2f3b52;
       font-weight: 800;
+      box-shadow: 0 8px 18px rgba(36, 48, 68, 0.09);
     }
 
     .game-board {
       position: relative;
       flex: 1;
       min-height: 0;
-      border: 1px solid var(--line);
-      border-radius: 30px;
+      border: 5px solid #ffffff;
+      border-radius: 34px;
       overflow: hidden;
       background:
-        linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px),
-        rgba(3, 7, 18, 0.68);
+        linear-gradient(rgba(36,48,68,0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(36,48,68,0.08) 1px, transparent 1px),
+        linear-gradient(180deg, #faffff 0%, #ecf8ff 100%);
       background-size: calc(100% / 28) calc(100% / 16), calc(100% / 28) calc(100% / 16), auto;
       aspect-ratio: 28 / 16;
       max-height: calc(100vh - 150px);
+      box-shadow: inset 0 -14px 0 rgba(53, 167, 255, 0.08), 0 18px 0 rgba(36, 48, 68, 0.08);
     }
 
     .cell-layer {
@@ -220,13 +259,54 @@
       grid-template-rows: repeat(16, 1fr);
     }
 
-    .cell.red { background: var(--red-soft); }
-    .cell.blue { background: var(--blue-soft); }
+    .cell.red, .cell.blue {
+      animation: cellPop 0.26s cubic-bezier(.2, 1.7, .2, 1);
+    }
+
+    .cell.red { background: var(--red-soft); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22); }
+    .cell.blue { background: var(--blue-soft); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22); }
+
+    @keyframes cellPop {
+      from { transform: scale(0.76); border-radius: 9px; opacity: 0.6; }
+      to { transform: scale(1); border-radius: 0; opacity: 1; }
+    }
 
     .player-layer {
       position: absolute;
       inset: 0;
       pointer-events: none;
+      z-index: 3;
+    }
+
+    .item-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .item {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      width: clamp(30px, 3vw, 48px);
+      height: clamp(30px, 3vw, 48px);
+      border: 4px solid #fff;
+      border-radius: 18px;
+      transform: translate(-50%, -50%);
+      background: #fff5c2;
+      box-shadow: 0 9px 0 rgba(36, 48, 68, 0.13), 0 14px 24px rgba(36, 48, 68, 0.18);
+      font-size: clamp(17px, 1.7vw, 26px);
+      animation: itemBob 1.05s ease-in-out infinite;
+    }
+
+    .item.star { background: linear-gradient(135deg, #fff4a8, #ffd23f); }
+    .item.bomb { background: linear-gradient(135deg, #ffd1df, #ff6f91); }
+    .item.speed { background: linear-gradient(135deg, #d7ffc8, #78dd71); }
+
+    @keyframes itemBob {
+      0%, 100% { translate: 0 0; rotate: -3deg; }
+      50% { translate: 0 -7px; rotate: 4deg; }
     }
 
     .player {
@@ -235,16 +315,24 @@
       place-items: center;
       width: clamp(26px, 2.7vw, 42px);
       height: clamp(26px, 2.7vw, 42px);
-      border: 3px solid rgba(255, 255, 255, 0.86);
+      border: 4px solid rgba(255, 255, 255, 0.96);
       border-radius: 50%;
       transform: translate(-50%, -50%);
-      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.26);
+      box-shadow: 0 9px 0 rgba(36, 48, 68, 0.13), 0 14px 24px rgba(36, 48, 68, 0.18);
       font-size: clamp(15px, 1.5vw, 22px);
       font-weight: 900;
+      transition: left 0.22s linear, top 0.22s linear;
+      animation: playerPulse 1.4s ease-in-out infinite;
     }
 
-    .player.red { background: linear-gradient(135deg, #ff8793, #ff4f67); }
-    .player.blue { background: linear-gradient(135deg, #82d7ff, #269eff); }
+    .player.red { background: linear-gradient(135deg, #ff9aaa, #ff4f67); }
+    .player.blue { background: linear-gradient(135deg, #9ae1ff, #269eff); }
+    .player.boosted { box-shadow: 0 0 0 8px rgba(117, 214, 111, 0.22), 0 9px 0 rgba(36, 48, 68, 0.13), 0 14px 24px rgba(36, 48, 68, 0.18); }
+
+    @keyframes playerPulse {
+      0%, 100% { scale: 1; }
+      50% { scale: 1.06; }
+    }
 
     .player span {
       position: absolute;
@@ -254,11 +342,12 @@
       transform: translateX(-50%);
       padding: 4px 8px;
       border-radius: 999px;
-      background: rgba(8, 13, 24, 0.74);
-      color: #fff;
+      background: #ffffff;
+      color: #243044;
       font-size: 12px;
       line-height: 1;
       white-space: nowrap;
+      box-shadow: 0 6px 14px rgba(36, 48, 68, 0.14);
     }
 
     .roster {
@@ -272,8 +361,8 @@
     .roster-chip {
       border-radius: 999px;
       padding: 7px 10px;
-      background: rgba(255, 255, 255, 0.09);
-      color: #f8fafc;
+      background: #ffffff;
+      color: #344057;
       font-size: 13px;
       font-weight: 750;
     }
@@ -284,22 +373,71 @@
     .overlay-message {
       position: absolute;
       inset: 0;
+      z-index: 7;
       display: grid;
       place-items: center;
       padding: 24px;
       text-align: center;
-      background: rgba(4, 7, 15, 0.5);
-      backdrop-filter: blur(4px);
+      background: rgba(255, 248, 232, 0.56);
+      backdrop-filter: blur(6px);
     }
 
     .overlay-message[hidden] { display: none; }
 
+    .event-toast {
+      position: absolute;
+      left: 50%;
+      top: 18px;
+      z-index: 8;
+      transform: translateX(-50%);
+      max-width: min(560px, calc(100% - 28px));
+      border: 3px solid #fff;
+      border-radius: 999px;
+      padding: 12px 18px;
+      background: #243044;
+      color: #fff;
+      font-weight: 950;
+      letter-spacing: -0.02em;
+      box-shadow: 0 10px 0 rgba(36, 48, 68, 0.12), 0 20px 42px rgba(36, 48, 68, 0.2);
+      animation: toastDrop 0.36s cubic-bezier(.2, 1.5, .2, 1) both;
+    }
+
+    .event-toast[hidden] { display: none; }
+
+    @keyframes toastDrop {
+      from { opacity: 0; transform: translateX(-50%) translateY(-18px) scale(0.94); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    }
+
+    body.is-fever .game-board {
+      animation: feverShake 0.42s ease-in-out infinite;
+      box-shadow: inset 0 -14px 0 rgba(255, 183, 3, 0.12), 0 18px 0 rgba(255, 95, 122, 0.14), 0 0 0 8px rgba(255, 183, 3, 0.14);
+    }
+
+    body.is-fever .status-pill {
+      background: linear-gradient(135deg, #ffde59, #ff8fab);
+      color: #243044;
+    }
+
+    @keyframes feverShake {
+      0%, 100% { transform: translateX(0) rotate(0); }
+      25% { transform: translateX(-2px) rotate(-0.12deg); }
+      75% { transform: translateX(2px) rotate(0.12deg); }
+    }
+
     .overlay-card {
       max-width: 560px;
       padding: 30px;
-      border: 1px solid var(--line);
-      border-radius: 28px;
-      background: rgba(12, 18, 32, 0.88);
+      border: 4px solid #ffffff;
+      border-radius: 34px;
+      background: linear-gradient(180deg, #ffffff 0%, #fff5d8 100%);
+      box-shadow: 0 16px 0 rgba(36, 48, 68, 0.08), 0 28px 60px rgba(255, 183, 3, 0.16);
+      animation: popIn 0.38s cubic-bezier(.2, 1.6, .2, 1) both;
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.9) translateY(14px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
     }
 
     .overlay-card h2 {
@@ -311,8 +449,8 @@
     .error {
       padding: 16px;
       border-radius: 20px;
-      background: rgba(255, 107, 122, 0.14);
-      color: #ffd4d9;
+      background: #ffe1e8;
+      color: #bf3751;
       line-height: 1.5;
     }
 
@@ -376,7 +514,9 @@
 
       <div class="game-board" id="gameBoard">
         <div class="cell-layer" id="cellLayer"></div>
+        <div class="item-layer" id="itemLayer"></div>
         <div class="player-layer" id="playerLayer"></div>
+        <div class="event-toast" id="eventToast" hidden></div>
         <div class="overlay-message" id="stageOverlay">
           <div class="overlay-card">
             <h2 id="overlayTitle">준비 중</h2>

@@ -11,6 +11,7 @@
   var serverOffsetMs = 0;
   var lastSentDirection = '';
   var lastSentAt = 0;
+  var lastEventKey = '';
 
   var els = {
     entryPanel: document.getElementById('entryPanel'),
@@ -24,6 +25,7 @@
     playerName: document.getElementById('playerName'),
     myScore: document.getElementById('myScore'),
     remainingTime: document.getElementById('remainingTime'),
+    eventText: document.getElementById('eventText'),
     errorBox: document.getElementById('errorBox')
   };
 
@@ -147,9 +149,9 @@
     if (freshPlayer) player = freshPlayer;
 
     if (player) {
-      els.teamCard.className = 'team-card ' + player.team;
+      els.teamCard.className = 'team-card ' + player.team + (player.boosted ? ' boosted' : '');
       els.teamName.textContent = player.teamLabel || (player.team === 'red' ? '딸기팀' : '소다팀');
-      els.playerName.textContent = player.nickname;
+      els.playerName.textContent = player.nickname + (player.boosted ? ' · 스피드 업' : '');
       els.myScore.textContent = player.contribution || 0;
     }
 
@@ -162,7 +164,17 @@
     } else if (state.status === 'ended') {
       els.statusText.textContent = state.winner === 'draw' ? '무승부' : state.winnerLabel + ' 승리';
     }
+    renderEventText(state.events || []);
     updateClock();
+  }
+
+  function renderEventText(events) {
+    if (!events.length || !els.eventText) return;
+    var latest = events[events.length - 1];
+    var key = latest.at + ':' + latest.message;
+    if (key === lastEventKey) return;
+    lastEventKey = key;
+    els.eventText.textContent = latest.message;
   }
 
   function updateClock() {

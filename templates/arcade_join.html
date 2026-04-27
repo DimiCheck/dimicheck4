@@ -7,14 +7,15 @@
   <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
   <style>
     :root {
-      --bg: #080b13;
-      --panel: rgba(255, 255, 255, 0.09);
-      --line: rgba(255, 255, 255, 0.15);
-      --text: #f8fafc;
-      --muted: #aeb7c8;
-      --red: #ff6b7a;
-      --blue: #5bbcff;
-      --gold: #ffd166;
+      --bg: #fff8e8;
+      --panel: rgba(255, 255, 255, 0.88);
+      --line: rgba(36, 48, 68, 0.12);
+      --text: #243044;
+      --muted: #728097;
+      --red: #ff5f7a;
+      --blue: #35a7ff;
+      --gold: #ffb703;
+      --green: #75d66f;
       font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
@@ -25,10 +26,21 @@
       margin: 0;
       color: var(--text);
       background:
-        radial-gradient(circle at 20% 0%, rgba(255, 107, 122, 0.24), transparent 32%),
-        radial-gradient(circle at 85% 18%, rgba(91, 188, 255, 0.22), transparent 30%),
-        linear-gradient(160deg, #080b13 0%, #111827 58%, #090b12 100%);
+        radial-gradient(circle at 15% 8%, rgba(255, 191, 105, 0.52), transparent 30%),
+        radial-gradient(circle at 84% 22%, rgba(123, 214, 255, 0.5), transparent 32%),
+        radial-gradient(circle at 70% 90%, rgba(255, 121, 156, 0.34), transparent 28%),
+        linear-gradient(160deg, #fff8e8 0%, #effbff 58%, #fff1f6 100%);
       touch-action: manipulation;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: radial-gradient(circle, rgba(36, 48, 68, 0.08) 1.5px, transparent 1.5px);
+      background-size: 26px 26px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent 78%);
     }
 
     .shell {
@@ -42,11 +54,17 @@
     .card {
       width: min(460px, 100%);
       border: 1px solid var(--line);
-      border-radius: 30px;
+      border-radius: 34px;
       background: var(--panel);
-      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.3);
-      backdrop-filter: blur(18px);
+      box-shadow: 0 14px 0 rgba(36, 48, 68, 0.08), 0 26px 64px rgba(53, 167, 255, 0.13);
+      backdrop-filter: blur(14px);
       padding: 24px;
+      animation: cardIn 0.55s cubic-bezier(.2, 1.2, .2, 1) both;
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(18px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
     }
 
     .brand {
@@ -59,7 +77,8 @@
     .brand img {
       width: 44px;
       height: 44px;
-      border-radius: 14px;
+      border-radius: 17px;
+      box-shadow: 0 8px 20px rgba(36, 48, 68, 0.14);
     }
 
     h1, h2, p { margin: 0; }
@@ -79,10 +98,11 @@
       margin-top: 4px;
       border-radius: 999px;
       padding: 7px 11px;
-      background: rgba(255, 209, 102, 0.16);
-      color: var(--gold);
+      background: #fff0b5;
+      color: #1f2a44;
       font-weight: 900;
       letter-spacing: 0.08em;
+      box-shadow: inset 0 -3px 0 rgba(255, 183, 3, 0.16);
     }
 
     form {
@@ -92,36 +112,44 @@
     }
 
     label {
-      color: #e5e7eb;
+      color: #344057;
       font-weight: 800;
     }
 
     input {
       width: 100%;
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      border-radius: 20px;
+      border: 2px solid rgba(36, 48, 68, 0.1);
+      border-radius: 24px;
       padding: 16px;
       color: var(--text);
-      background: rgba(255, 255, 255, 0.09);
+      background: #ffffff;
       font: inherit;
       font-size: 18px;
       outline: none;
+      box-shadow: inset 0 -5px 0 rgba(36, 48, 68, 0.04);
     }
 
     input:focus {
-      border-color: rgba(255, 209, 102, 0.7);
-      box-shadow: 0 0 0 4px rgba(255, 209, 102, 0.12);
+      border-color: rgba(255, 183, 3, 0.7);
+      box-shadow: 0 0 0 5px rgba(255, 183, 3, 0.14), inset 0 -5px 0 rgba(36, 48, 68, 0.04);
     }
 
     button {
       border: 0;
-      border-radius: 20px;
+      border-radius: 999px;
       padding: 16px;
       color: #17110d;
-      background: linear-gradient(135deg, #ffd166, #ff8f66);
+      background: linear-gradient(135deg, #ffde59, #75d66f);
       font: inherit;
       font-weight: 900;
       cursor: pointer;
+      box-shadow: 0 8px 0 rgba(36, 48, 68, 0.13);
+      transition: transform 0.16s cubic-bezier(.2, 1.4, .2, 1), box-shadow 0.16s ease;
+    }
+
+    button:active {
+      transform: translateY(4px);
+      box-shadow: 0 4px 0 rgba(36, 48, 68, 0.13);
     }
 
     button:disabled {
@@ -131,10 +159,10 @@
 
     .error {
       margin-top: 12px;
-      border-radius: 16px;
+      border-radius: 20px;
       padding: 12px 14px;
-      background: rgba(255, 107, 122, 0.15);
-      color: #ffd4d9;
+      background: #ffe1e8;
+      color: #bf3751;
       line-height: 1.45;
     }
 
@@ -149,9 +177,17 @@
     .team-card {
       display: grid;
       gap: 6px;
-      border-radius: 24px;
+      border: 3px solid #ffffff;
+      border-radius: 30px;
       padding: 18px;
-      background: rgba(255, 255, 255, 0.09);
+      background: linear-gradient(180deg, #ffffff 0%, #fff6df 100%);
+      box-shadow: inset 0 -8px 0 rgba(36, 48, 68, 0.05);
+      animation: popIn 0.38s cubic-bezier(.2, 1.6, .2, 1) both;
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.92) translateY(12px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
     }
 
     .team-name {
@@ -162,6 +198,9 @@
 
     .team-card.red .team-name { color: var(--red); }
     .team-card.blue .team-name { color: var(--blue); }
+    .team-card.boosted {
+      box-shadow: 0 0 0 7px rgba(117, 214, 111, 0.2), inset 0 -8px 0 rgba(36, 48, 68, 0.05);
+    }
 
     .score-row {
       display: grid;
@@ -170,9 +209,11 @@
     }
 
     .mini {
-      border-radius: 18px;
+      border: 1px solid rgba(36, 48, 68, 0.08);
+      border-radius: 24px;
       padding: 14px;
-      background: rgba(255, 255, 255, 0.08);
+      background: #ffffff;
+      box-shadow: inset 0 -5px 0 rgba(36, 48, 68, 0.05);
     }
 
     .mini b {
@@ -190,10 +231,21 @@
 
     .pad button {
       min-height: 76px;
-      color: var(--text);
-      background: rgba(255, 255, 255, 0.11);
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-      font-size: 26px;
+      color: #243044;
+      background: #ffffff;
+      box-shadow: 0 8px 0 rgba(36, 48, 68, 0.13), inset 0 0 0 2px rgba(36, 48, 68, 0.06);
+      font-size: 28px;
+      animation: buttonFloat 2.4s ease-in-out infinite;
+    }
+
+    .pad button:nth-child(2) { animation-delay: 0.05s; }
+    .pad button:nth-child(4) { animation-delay: 0.16s; }
+    .pad button:nth-child(5) { animation-delay: 0.27s; }
+    .pad button:nth-child(6) { animation-delay: 0.38s; }
+
+    @keyframes buttonFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
     }
 
     .pad .empty {
@@ -204,6 +256,15 @@
       color: var(--muted);
       text-align: center;
       font-size: 13px;
+    }
+
+    .event-line {
+      min-height: 24px;
+      color: #243044;
+      text-align: center;
+      font-size: 15px;
+      font-weight: 900;
+      animation: popIn 0.32s cubic-bezier(.2, 1.6, .2, 1) both;
     }
   </style>
 </head>
@@ -249,6 +310,7 @@
         </section>
 
         <p class="hint">화면 버튼을 누르거나 키보드 방향키/WASD로 움직일 수 있습니다.</p>
+        <p class="event-line" id="eventText"></p>
       </div>
 
       <div id="errorBox" class="error" hidden></div>

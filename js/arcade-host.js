@@ -24,7 +24,9 @@
     statusText: document.getElementById('statusText'),
     phaseText: document.getElementById('phaseText'),
     cellLayer: document.getElementById('cellLayer'),
+    itemLayer: document.getElementById('itemLayer'),
     playerLayer: document.getElementById('playerLayer'),
+    eventToast: document.getElementById('eventToast'),
     overlay: document.getElementById('stageOverlay'),
     overlayTitle: document.getElementById('overlayTitle'),
     overlayText: document.getElementById('overlayText')
@@ -38,6 +40,7 @@
   var debugBots = [];
   var debugBotTimers = [];
   var debugAllowAnyTime = false;
+  var lastEventKey = '';
 
   els.boardLink.href = boardUrl;
 
@@ -133,7 +136,7 @@
     for (var i = 0; i < players.length; i += 1) {
       var player = players[i];
       var marker = document.createElement('div');
-      marker.className = 'player ' + player.team;
+      marker.className = 'player ' + player.team + (player.boosted ? ' boosted' : '');
       marker.style.left = ((player.x + 0.5) / width * 100) + '%';
       marker.style.top = ((player.y + 0.5) / height * 100) + '%';
       marker.textContent = avatarGlyph(player.avatar);
@@ -147,6 +150,43 @@
   function avatarGlyph(index) {
     var glyphs = ['●', '◆', '▲', '■', '★', '✦', '✿', '✚', '⬟', '⬢', '◈', '☘'];
     return glyphs[Math.abs(Number(index) || 0) % glyphs.length];
+  }
+
+  function itemGlyph(type) {
+    if (type === 'bomb') return '●';
+    if (type === 'speed') return '↯';
+    return '★';
+  }
+
+  function renderItems(items, width, height) {
+    els.itemLayer.innerHTML = '';
+    for (var i = 0; i < items.length; i += 1) {
+      var item = items[i];
+      var marker = document.createElement('div');
+      marker.className = 'item ' + item.type;
+      marker.title = item.label || item.type;
+      marker.style.left = ((item.x + 0.5) / width * 100) + '%';
+      marker.style.top = ((item.y + 0.5) / height * 100) + '%';
+      marker.textContent = itemGlyph(item.type);
+      els.itemLayer.appendChild(marker);
+    }
+  }
+
+  function renderEventToast(events) {
+    if (!els.eventToast || !events || !events.length) {
+      if (els.eventToast) els.eventToast.hidden = true;
+      return;
+    }
+    var latest = events[events.length - 1];
+    var key = latest.at + ':' + latest.message;
+    if (key === lastEventKey) return;
+    lastEventKey = key;
+    els.eventToast.textContent = latest.message;
+    els.eventToast.hidden = false;
+    window.clearTimeout(renderEventToast.hideTimer);
+    renderEventToast.hideTimer = window.setTimeout(function () {
+      els.eventToast.hidden = true;
+    }, 2200);
   }
 
   function renderRoster(players) {
@@ -169,13 +209,19 @@
 
     els.statusText.textContent = statusLabel(state);
     els.phaseText.textContent = state.phaseLabel ? state.phaseLabel + ' Arcade' : 'DimiCheck Arcade';
+    document.body.classList.toggle('is-fever', Boolean(state.fever));
+    if (state.fever && state.status === 'running') {
+      els.statusText.textContent = '피버 타임';
+    }
     els.redScore.textContent = state.scores.red || 0;
     els.blueScore.textContent = state.scores.blue || 0;
     els.playerCount.textContent = (state.players || []).length + '명';
     els.startButton.disabled = state.status !== 'waiting' && state.status !== 'countdown';
     els.endButton.disabled = state.status === 'ended';
     renderRoster(state.players || []);
+    renderItems(state.items || [], state.gridWidth, state.gridHeight);
     renderPlayers(state.players || [], state.gridWidth, state.gridHeight);
+    renderEventToast(state.events || []);
 
     if (state.status === 'waiting') {
       setOverlay('입장 대기', 'QR을 스캔하면 바로 참여할 수 있습니다.', false);

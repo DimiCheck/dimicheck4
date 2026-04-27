@@ -32,6 +32,12 @@ MAX_GAME_SECONDS = 90
 END_BUFFER_SECONDS = 5 * 60
 MIN_START_WINDOW_SECONDS = WAIT_SECONDS + COUNTDOWN_SECONDS + 30
 SESSION_CLEANUP_INTERVAL_SECONDS = 30
+ITEM_EXPIRE_SECONDS = 9
+STAR_INTERVAL_SECONDS = 7
+SPEED_INTERVAL_SECONDS = 12
+BOMB_INTERVAL_SECONDS = 18
+FEVER_SECONDS = 10
+SPEED_BOOST_SECONDS = 4
 ROOM_PREFIX = "arcade:"
 KST = ZoneInfo("Asia/Seoul")
 VALID_DIRECTIONS = {"up", "down", "left", "right"}
@@ -44,6 +50,17 @@ DIR_DELTA = {
 TEAM_ORDER = ("red", "blue")
 TEAM_LABELS = {"red": "딸기팀", "blue": "소다팀"}
 AVATAR_COUNT = 12
+INITIAL_RED_CELLS = (GRID_WIDTH // 2) * GRID_HEIGHT
+INITIAL_BLUE_CELLS = (GRID_WIDTH - GRID_WIDTH // 2) * GRID_HEIGHT
+ITEM_LABELS = {
+    "star": "별사탕",
+    "bomb": "페인트 폭탄",
+    "speed": "스피드 젤리",
+}
+ITEM_RADIUS = {
+    "star": 1,
+    "bomb": 2,
+}
 
 
 def _now() -> float:
@@ -108,6 +125,11 @@ def _phases_for_grade(grade: int, now_dt: datetime) -> list[dict[str, Any]]:
 def _is_arcade_phase(label: str) -> bool:
     normalized = str(label or "")
     return any(token in normalized for token in ("쉬는", "점심", "저녁", "중식", "석식", "휴식"))
+
+
+def _initial_grid() -> list[list[str]]:
+    midpoint = GRID_WIDTH // 2
+    return [["red" if x < midpoint else "blue" for x in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
 
 
 def _is_class_phase(label: str) -> bool:
@@ -207,6 +229,7 @@ class ArcadePlayer:
     connected: bool = True
     joined_at: float = field(default_factory=_now)
     last_input_at: float = 0.0
+    speed_until: float = 0.0
 
     def public(self) -> dict[str, Any]:
         return {
@@ -220,6 +243,27 @@ class ArcadePlayer:
             "direction": self.direction,
             "contribution": self.contribution,
             "connected": self.connected,
+            "boosted": self.speed_until > _now(),
+        }
+
+
+@dataclass
+class ArcadeItem:
+    id: str
+    type: str
+    x: int
+    y: int
+    spawned_at: float
+    expires_at: float
+
+    def public(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "type": self.type,
+            "label": ITEM_LABELS.get(self.type, self.type),
+            "x": self.x,
+            "y": self.y,
+            "expiresAt": int(self.expires_at * 1000),
         }
 
 
@@ -236,9 +280,14 @@ class ArcadeSession:
     phase_label: str
     grid: list[list[str | None]]
     players: dict[str, ArcadePlayer] = field(default_factory=dict)
+    items: dict[str, ArcadeItem] = field(default_factory=dict)
     scores: dict[str, int] = field(default_factory=lambda: {"red": 0, "blue": 0})
     tick_running: bool = False
     ended_at: float | None = None
+    next_star_at: float = 0.0
+    next_speed_at: float = 0.0
+    next_bomb_at: float = 0.0
+    recent_events: list[dict[str, Any]] = field(default_factory=list)
 
 
 class ArcadeSessionManager:
@@ -291,7 +340,11 @@ class ArcadeSessionManager:
                 starts_at=starts_at,
                 ends_at=game_end_at,
                 phase_label=str(window["label"] or "Arcade"),
-                grid=[[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)],
+                grid=_initial_grid(),
+                scores={"red": INITIAL_RED_CELLS, "blue": INITIAL_BLUE_CELLS},
+                next_star_at=starts_at + 2,
+                next_speed_at=starts_at + 4,
+                next_bomb_at=starts_at + 8,
             )
             self._sessions[code] = session_obj
             return session_obj, None
@@ -464,6 +517,48 @@ class ArcadeSessionManager:
             base_y = GRID_HEIGHT - 3 - count * 2
         return max(0, min(GRID_WIDTH - 1, base_x)), base_y % GRID_HEIGHT
 
+    def _spawn_item_locked(self, session_obj: ArcadeSession, item_type: str, now_ts: float) -> ArcadeItem | None:
+        if len(session_obj.items) >= 6:
+            return None
+        occupied = {(player.x, player.y) for player in session_obj.players.values()}
+        occupied.update((item.x, item.y) for item in session_obj.items.values())
+        for _ in range(40):
+            x = random.randrange(2, GRID_WIDTH - 2)
+            y = random.randrange(1, GRID_HEIGHT - 1)
+            if (x, y) in occupied:
+                continue
+            item = ArcadeItem(
+                id=f"{item_type}-{secrets.token_hex(4)}",
+                type=item_type,
+                x=x,
+                y=y,
+                spawned_at=now_ts,
+                expires_at=now_ts + ITEM_EXPIRE_SECONDS,
+            )
+            session_obj.items[item.id] = item
+            self._record_event_locked(session_obj, "spawn", item_type, f"{ITEM_LABELS.get(item_type, item_type)} 등장")
+            return item
+        return None
+
+    def _maybe_spawn_items_locked(self, session_obj: ArcadeSession, now_ts: float) -> None:
+        fever = self._is_fever_locked(session_obj, now_ts)
+        star_interval = 4 if fever else STAR_INTERVAL_SECONDS
+        if now_ts >= session_obj.next_star_at:
+            self._spawn_item_locked(session_obj, "star", now_ts)
+            session_obj.next_star_at = now_ts + star_interval
+        if now_ts >= session_obj.next_speed_at:
+            self._spawn_item_locked(session_obj, "speed", now_ts)
+            session_obj.next_speed_at = now_ts + SPEED_INTERVAL_SECONDS
+        if now_ts >= session_obj.next_bomb_at:
+            if fever or random.random() < 0.45:
+                self._spawn_item_locked(session_obj, "bomb", now_ts)
+            session_obj.next_bomb_at = now_ts + BOMB_INTERVAL_SECONDS
+
+    def _expire_items_locked(self, session_obj: ArcadeSession, now_ts: float) -> None:
+        expired = [item_id for item_id, item in session_obj.items.items() if item.expires_at <= now_ts]
+        for item_id in expired:
+            session_obj.items.pop(item_id, None)
+
     def _claim_cell_locked(self, session_obj: ArcadeSession, x: int, y: int, team: str, player: ArcadePlayer | None = None) -> bool:
         if x < 0 or y < 0 or x >= GRID_WIDTH or y >= GRID_HEIGHT:
             return False
@@ -477,6 +572,71 @@ class ArcadeSessionManager:
         if player:
             player.contribution += 1
         return True
+
+    def _claim_area_locked(
+        self,
+        session_obj: ArcadeSession,
+        center_x: int,
+        center_y: int,
+        radius: int,
+        team: str,
+        player: ArcadePlayer | None,
+    ) -> list[list[Any]]:
+        changed: list[list[Any]] = []
+        for y in range(center_y - radius, center_y + radius + 1):
+            for x in range(center_x - radius, center_x + radius + 1):
+                if self._claim_cell_locked(session_obj, x, y, team, player):
+                    changed.append([x, y, team])
+        return changed
+
+    def _consume_item_locked(self, session_obj: ArcadeSession, player: ArcadePlayer, changed: list[list[Any]], now_ts: float) -> None:
+        consumed = None
+        for item_id, item in session_obj.items.items():
+            if item.x == player.x and item.y == player.y:
+                consumed = item_id
+                break
+        if not consumed:
+            return
+        item = session_obj.items.pop(consumed)
+        if item.type == "speed":
+            player.speed_until = now_ts + SPEED_BOOST_SECONDS
+            self._record_event_locked(session_obj, "pickup", item.type, f"{player.nickname} 스피드 업")
+            return
+        radius = ITEM_RADIUS.get(item.type)
+        if radius is None:
+            return
+        changed.extend(self._claim_area_locked(session_obj, item.x, item.y, radius, player.team, player))
+        self._record_event_locked(
+            session_obj,
+            "pickup",
+            item.type,
+            f"{player.nickname} {ITEM_LABELS.get(item.type, item.type)}",
+            player.team,
+        )
+
+    def _record_event_locked(
+        self,
+        session_obj: ArcadeSession,
+        event_type: str,
+        item_type: str,
+        message: str,
+        team: str | None = None,
+    ) -> None:
+        session_obj.recent_events.append(
+            {
+                "type": event_type,
+                "itemType": item_type,
+                "label": ITEM_LABELS.get(item_type, item_type),
+                "message": message,
+                "team": team,
+                "at": int(_now() * 1000),
+            }
+        )
+        if len(session_obj.recent_events) > 6:
+            del session_obj.recent_events[:-6]
+
+    def _is_fever_locked(self, session_obj: ArcadeSession, now_ts: float) -> bool:
+        return session_obj.status == "running" and session_obj.ends_at - now_ts <= FEVER_SECONDS
 
     def _recompute_scores_locked(self, session_obj: ArcadeSession) -> None:
         scores = {"red": 0, "blue": 0}
@@ -498,19 +658,24 @@ class ArcadeSessionManager:
         if session_obj.status != "running":
             return []
 
+        self._expire_items_locked(session_obj, now_ts)
+        self._maybe_spawn_items_locked(session_obj, now_ts)
         changed: list[list[Any]] = []
         for player in session_obj.players.values():
-            direction = player.pending_direction if player.pending_direction in VALID_DIRECTIONS else player.direction
-            dx, dy = DIR_DELTA[direction]
-            nx = player.x + dx
-            ny = player.y + dy
-            if nx < 0 or ny < 0 or nx >= GRID_WIDTH or ny >= GRID_HEIGHT:
-                continue
-            player.direction = direction
-            player.x = nx
-            player.y = ny
-            if self._claim_cell_locked(session_obj, nx, ny, player.team, player):
-                changed.append([nx, ny, player.team])
+            move_steps = 2 if player.speed_until > now_ts else 1
+            for _ in range(move_steps):
+                direction = player.pending_direction if player.pending_direction in VALID_DIRECTIONS else player.direction
+                dx, dy = DIR_DELTA[direction]
+                nx = player.x + dx
+                ny = player.y + dy
+                if nx < 0 or ny < 0 or nx >= GRID_WIDTH or ny >= GRID_HEIGHT:
+                    break
+                player.direction = direction
+                player.x = nx
+                player.y = ny
+                if self._claim_cell_locked(session_obj, nx, ny, player.team, player):
+                    changed.append([nx, ny, player.team])
+                self._consume_item_locked(session_obj, player, changed, now_ts)
         return changed
 
     def _end_locked(self, session_obj: ArcadeSession) -> None:
@@ -546,6 +711,9 @@ class ArcadeSessionManager:
             "now": int(now_ts * 1000),
             "scores": deepcopy(session_obj.scores),
             "players": [player.public() for player in session_obj.players.values()],
+            "items": [item.public() for item in session_obj.items.values()],
+            "events": deepcopy(session_obj.recent_events),
+            "fever": self._is_fever_locked(session_obj, now_ts),
             "winner": winner,
             "winnerLabel": TEAM_LABELS.get(winner, "무승부") if winner else None,
             "resultSeconds": RESULT_SECONDS,
