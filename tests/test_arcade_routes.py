@@ -397,6 +397,39 @@ def test_turtle_start_with_short_remaining_window_does_not_end_lobby(monkeypatch
     assert session_obj.ended_at is None
 
 
+def test_turtle_debug_allow_any_time_refreshes_short_lobby_session(monkeypatch):
+    arcade_routes = importlib.import_module("arcade_routes")
+    monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: _allowed_window())
+
+    manager = arcade_routes.TurtleRaceSessionManager()
+    session_obj, error = manager.create_session(2, 4)
+    assert error is None
+    assert session_obj is not None
+    player, join_error = manager.join_player(session_obj.code, "p1", "하나", 0)
+    second, second_error = manager.join_player(session_obj.code, "p2", "둘둘", 1)
+    assert join_error is None
+    assert second_error is None
+    assert player is not None
+    assert second is not None
+
+    session_obj.safe_end_at = time.time() + arcade_routes.TURTLE_WAIT_SECONDS + arcade_routes.TURTLE_RACE_SECONDS - 1
+    blocked, start_error = manager.start_now(session_obj.code)
+    assert blocked is session_obj
+    assert start_error == "남은 시간이 부족합니다."
+    assert session_obj.status == "lobby"
+
+    refreshed, refresh_error = manager.create_session(2, 4, allow_any_time=True)
+    assert refresh_error is None
+    assert refreshed is session_obj
+    assert refreshed.phase_label == "테스트 모드"
+    assert refreshed.safe_end_at - time.time() >= arcade_routes.TURTLE_WAIT_SECONDS + arcade_routes.TURTLE_RACE_SECONDS
+
+    started, retry_error = manager.start_now(session_obj.code)
+    assert retry_error is None
+    assert started is session_obj
+    assert session_obj.status == "countdown"
+
+
 def test_turtle_skin_can_change_only_before_race(monkeypatch):
     arcade_routes = importlib.import_module("arcade_routes")
     monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: _allowed_window())

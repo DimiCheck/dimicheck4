@@ -1652,15 +1652,20 @@ class TurtleRaceSessionManager:
     def create_session(self, grade: int, section: int, allow_any_time: bool = False) -> tuple[TurtleSession | None, str | None]:
         if not config.ARCADE_ENABLED:
             return None, "Arcade가 비활성화되어 있습니다."
-        window = _play_window(grade) if not allow_any_time else {
-            "allowed": True,
-            "label": "테스트 모드",
-            "safeEndAt": _now() + TURTLE_WAIT_SECONDS + TURTLE_RACE_SECONDS + 30,
-            "phaseEndAt": _now() + TURTLE_WAIT_SECONDS + TURTLE_RACE_SECONDS + 30,
-            "remainingSafeSeconds": TURTLE_WAIT_SECONDS + TURTLE_RACE_SECONDS + 30,
-            "startsInSeconds": 0,
-            "reason": "",
-        }
+        if allow_any_time:
+            debug_now = _now()
+            debug_safe_end_at = debug_now + TURTLE_WAIT_SECONDS + TURTLE_RACE_SECONDS + 30
+            window = {
+                "allowed": True,
+                "label": "테스트 모드",
+                "safeEndAt": debug_safe_end_at,
+                "phaseEndAt": debug_safe_end_at,
+                "remainingSafeSeconds": TURTLE_WAIT_SECONDS + TURTLE_RACE_SECONDS + 30,
+                "startsInSeconds": 0,
+                "reason": "",
+            }
+        else:
+            window = _play_window(grade)
         if not window["allowed"]:
             return None, window["reason"]
 
@@ -1672,7 +1677,17 @@ class TurtleRaceSessionManager:
             active = [s for s in self._sessions.values() if s.status != "ended"]
             for existing in active:
                 if existing.grade == grade and existing.section == section:
+                    if allow_any_time:
+                        if existing.status == "lobby":
+                            existing.phase_label = str(window["label"] or "테스트 모드")
+                            existing.safe_end_at = float(window["safeEndAt"])
+                            existing.starts_at = now_ts + TURTLE_WAIT_SECONDS
+                            existing.ends_at = existing.starts_at + TURTLE_RACE_SECONDS
+                            return existing, None
+                        self._end_locked(existing)
+                        break
                     return existing, None
+            active = [s for s in self._sessions.values() if s.status != "ended"]
             if len(active) >= config.ARCADE_MAX_ACTIVE_SESSIONS:
                 return None, "현재 열린 Arcade가 너무 많습니다."
             starts_at = now_ts + TURTLE_WAIT_SECONDS

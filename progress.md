@@ -27,3 +27,4 @@ Original prompt: 구현 시작
 - Fixed Turtle Race stale-session handling: elapsed countdown/racing sessions are finalized before reuse, fresh host creation no longer inherits an already-expired race, and short remaining play windows reject start without flipping the lobby to ended.
 - Turtle Race now uses `turtle-01.png` through `turtle-03.png` skins instead of emoji, randomly preselects a skin on mobile entry, and lets players change it until the race starts with server-synced host rendering.
 - Turtle Race now runs longer/slower (`40s`, `0.7%` per tap), requires 2 connected racers to start, and supports player/saboteur roles. Saboteurs vote every 5 seconds to apply banana, swap-last, shrink-button, or fake-reset effects to racers.
+- Fixed Turtle Race debug start: `TurtleDebug.allowAnyTime()` now refreshes a short same-class lobby into a full test window instead of reusing its old `safe_end_at`.

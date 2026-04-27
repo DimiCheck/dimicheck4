@@ -84,6 +84,10 @@
       setError('Socket.IO를 불러오지 못했습니다.');
       return;
     }
+    if (socket) {
+      socket.disconnect();
+      socket = null;
+    }
     socket = window.io('/ws/arcade', {
       transports: ['websocket', 'polling'],
       query: { code: code }
@@ -103,6 +107,7 @@
       setError('Board에서 인증된 상태로 열어 주세요.');
       return Promise.reject(new Error('Board 인증이 필요합니다.'));
     }
+    setError('');
     return postJson('/api/arcade/turtle/sessions', {
       grade: grade,
       section: section,
