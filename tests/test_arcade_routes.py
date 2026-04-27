@@ -117,6 +117,7 @@ def test_arcade_session_routes_require_board_session_and_create(monkeypatch, tmp
     home = client.get("/arcade?grade=2&section=4")
     assert home.status_code == 200
     assert "땅따먹기 Live".encode() in home.data
+    assert "거북이 경주".encode() in home.data
 
     legacy_host = client.get("/arcade/host?grade=2&section=4")
     assert legacy_host.status_code == 302
@@ -129,6 +130,10 @@ def test_arcade_session_routes_require_board_session_and_create(monkeypatch, tmp
     party_host = client.get("/arcade/party/host?grade=2&section=4")
     assert party_host.status_code == 200
     assert b"Party Mode" in party_host.data
+
+    turtle_host = client.get("/arcade/turtle/host?grade=2&section=4")
+    assert turtle_host.status_code == 200
+    assert "거북이 경주".encode() in turtle_host.data
 
 
 def test_arcade_availability_hides_menu_outside_allowed_window(monkeypatch, tmp_path):
@@ -281,6 +286,63 @@ def test_party_session_routes_create_and_start_with_one_player(monkeypatch, tmp_
     assert started.status_code == 200
     assert started.get_json()["status"] == "countdown"
     assert session_obj.status == "countdown"
+
+
+def test_turtle_session_routes_create_join_start_and_rank(monkeypatch, tmp_path):
+    app_module = _load_app(monkeypatch, tmp_path)
+    arcade_routes = importlib.import_module("arcade_routes")
+    monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: _allowed_window())
+
+    client = app_module.app.test_client()
+    forbidden = client.post("/api/arcade/turtle/sessions", json={"grade": 2, "section": 4})
+    assert forbidden.status_code == 403
+
+    with client.session_transaction() as session_state:
+        session_state["board_verified_2_4"] = True
+
+    response = client.post("/api/arcade/turtle/sessions", json={"grade": 2, "section": 4})
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["mode"] == "turtle"
+    assert payload["status"] == "lobby"
+    assert payload["raceSeconds"] == 22
+
+    code = payload["code"]
+    join_page = client.get(f"/arcade/turtle/join/{code}")
+    assert join_page.status_code == 200
+    assert "거북이 경주".encode() in join_page.data
+
+    session_obj = arcade_routes.turtle_manager.get(code)
+    first, first_error = arcade_routes.turtle_manager.join_player(code, "p1", "하나", 0)
+    second, second_error = arcade_routes.turtle_manager.join_player(code, "p2", "둘둘", 1)
+    assert first_error is None
+    assert second_error is None
+    assert first is not None and first.lane == 0
+    assert second is not None and second.lane == 1
+
+    started = client.post(f"/api/arcade/turtle/sessions/{code}/start")
+    assert started.status_code == 200
+    assert started.get_json()["status"] == "countdown"
+
+    assert session_obj is not None
+    with arcade_routes.turtle_manager._lock:
+        session_obj.starts_at = time.time() - 1
+        assert arcade_routes.turtle_manager._advance_locked(session_obj) is True
+        assert session_obj.status == "racing"
+
+    arcade_routes.turtle_manager.add_taps(code, "p1", 12)
+    arcade_routes.turtle_manager.add_taps(code, "p2", 2)
+    assert session_obj.players["p1"].progress > session_obj.players["p2"].progress
+
+    session_obj.players["p1"].progress = 0.996
+    arcade_routes.turtle_manager.add_taps(code, "p1", 1)
+    assert session_obj.players["p1"].finished_at is not None
+    assert session_obj.players["p1"].rank == 1
+
+    ended = client.post(f"/api/arcade/turtle/sessions/{code}/end")
+    assert ended.status_code == 200
+    ranking = ended.get_json()["rankings"]
+    assert ranking[0]["id"] == "p1"
 
 
 def test_party_round_scores_and_late_join_waits_for_next_round(monkeypatch):

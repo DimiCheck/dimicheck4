@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DimiCheck Turtle Race</title>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <style>
+    :root {
+      --ink: #213047;
+      --muted: #6d7d95;
+      --line: rgba(33, 48, 71, 0.13);
+      --green: #6fd06f;
+      --sand: #ffe7a6;
+      --water: #7cd8ff;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 14%, rgba(255, 206, 84, 0.48), transparent 26%),
+        radial-gradient(circle at 86% 20%, rgba(124, 216, 255, 0.48), transparent 30%),
+        linear-gradient(135deg, #fff8df 0%, #eafaff 58%, #f1ffe9 100%);
+      overflow: hidden;
+    }
+    .page {
+      display: grid;
+      grid-template-columns: 330px 1fr;
+      gap: 22px;
+      height: 100vh;
+      padding: 24px;
+    }
+    .panel {
+      border: 4px solid #fff;
+      border-radius: 34px;
+      background: rgba(255,255,255,0.88);
+      box-shadow: 0 18px 0 rgba(33, 48, 71, 0.08);
+    }
+    .side { padding: 22px; display: grid; gap: 18px; align-content: start; }
+    .brand { display: flex; gap: 14px; align-items: center; }
+    .brand img { width: 54px; height: 54px; border-radius: 16px; }
+    h1, h2, p { margin: 0; }
+    h1 { font-size: 30px; letter-spacing: -0.05em; }
+    .muted { color: var(--muted); font-weight: 800; line-height: 1.45; }
+    .code-card {
+      border-radius: 28px;
+      padding: 18px;
+      background: linear-gradient(180deg, #fff 0%, #fff4ca 100%);
+      text-align: center;
+    }
+    .code { font-size: 48px; font-weight: 950; letter-spacing: 0.08em; }
+    .qr-wrap img { width: 190px; height: 190px; border-radius: 18px; background: #fff; }
+    .join-link { margin-top: 10px; word-break: break-all; color: var(--muted); font-size: 12px; font-weight: 800; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat { border-radius: 22px; padding: 14px; background: #fff; font-weight: 850; }
+    .stat b { display: block; margin-top: 5px; font-size: 24px; }
+    .actions { display: grid; gap: 10px; }
+    button, .button-link {
+      border: 0;
+      border-radius: 999px;
+      padding: 15px 18px;
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 7px 0 rgba(33,48,71,0.12);
+      font-size: 16px;
+      font-weight: 950;
+      text-decoration: none;
+      text-align: center;
+      cursor: pointer;
+    }
+    button.primary { background: linear-gradient(135deg, #7ddc72, #ffe066); }
+    button.danger { background: #ff8aa0; color: #fff; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .stage {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 18px;
+      padding: 24px;
+      min-width: 0;
+    }
+    .stage-head { display: flex; justify-content: space-between; gap: 20px; align-items: start; }
+    .status-pill {
+      display: inline-flex;
+      border-radius: 999px;
+      padding: 10px 16px;
+      background: #213047;
+      color: #fff;
+      font-weight: 950;
+    }
+    .timer { font-size: clamp(42px, 7vw, 94px); font-weight: 950; line-height: 0.9; letter-spacing: -0.08em; }
+    .track {
+      position: relative;
+      display: grid;
+      gap: 12px;
+      min-height: 0;
+      padding: 22px;
+      border-radius: 34px;
+      background:
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.28) 0 18px, transparent 18px 36px),
+        linear-gradient(180deg, #fff3c0 0%, #ffe29a 100%);
+      overflow: hidden;
+    }
+    .finish-line {
+      position: absolute;
+      top: 14px;
+      bottom: 14px;
+      right: 8%;
+      width: 14px;
+      border-radius: 999px;
+      background: repeating-linear-gradient(45deg, #213047 0 8px, #fff 8px 16px);
+      box-shadow: 0 0 0 5px rgba(255,255,255,0.82);
+    }
+    .lane {
+      position: relative;
+      min-height: 70px;
+      border-radius: 24px;
+      background: rgba(255,255,255,0.62);
+      border: 1px solid rgba(33,48,71,0.1);
+      overflow: hidden;
+    }
+    .lane-name {
+      position: absolute;
+      left: 18px;
+      top: 12px;
+      z-index: 2;
+      font-weight: 950;
+    }
+    .turtle {
+      position: absolute;
+      left: 0;
+      top: 30px;
+      transform: translateX(calc(var(--progress, 0) * (100vw - 520px))) translateY(-50%);
+      transition: transform 0.18s ease-out;
+      font-size: 38px;
+      filter: drop-shadow(0 8px 0 rgba(33,48,71,0.12));
+    }
+    .rankings { display: flex; flex-wrap: wrap; gap: 10px; }
+    .chip {
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: #fff;
+      box-shadow: 0 6px 0 rgba(33,48,71,0.08);
+      font-weight: 900;
+    }
+    .error { padding: 14px; border-radius: 18px; background: #ffe1e8; color: #bf3751; font-weight: 850; }
+    @media (max-width: 900px) {
+      body { overflow: auto; }
+      .page { grid-template-columns: 1fr; height: auto; min-height: 100vh; }
+      .turtle { transform: translateX(calc(var(--progress, 0) * (100vw - 130px))) translateY(-50%); }
+    }
+  </style>
+</head>
+<body>
+  <main
+    class="page"
+    data-grade="{{ grade or '' }}"
+    data-section="{{ section or '' }}"
+    data-enabled="{{ '1' if arcade_enabled else '0' }}"
+    data-debug-allow-any-time="{{ '1' if arcade_debug_allow_any_time else '0' }}"
+  >
+    <aside class="side panel">
+      <div class="brand">
+        <img src="/logo.png" alt="">
+        <div>
+          <h1>거북이 경주</h1>
+          <p class="muted">연타로 아주 조금씩 전진합니다.</p>
+        </div>
+      </div>
+      <div id="hostError" class="error" hidden></div>
+      <section class="code-card" id="joinCard" hidden>
+        <div class="code" id="sessionCode">-----</div>
+        <div class="qr-wrap"><img id="qrImage" alt="참여 QR 코드"></div>
+        <div class="join-link" id="joinLink"></div>
+      </section>
+      <section class="stats">
+        <div class="stat">참가자<b id="playerCount">0명</b></div>
+        <div class="stat">상태<b id="raceStatus">대기</b></div>
+      </section>
+      <div class="actions">
+        <button id="startButton" class="primary" disabled>5초 후 시작</button>
+        <button id="endButton" class="danger" disabled>종료</button>
+        <a id="boardLink" class="button-link" href="/">Board로 돌아가기</a>
+      </div>
+    </aside>
+    <section class="stage panel">
+      <div class="stage-head">
+        <div>
+          <div class="status-pill" id="statusText">경주 준비 중</div>
+          <p class="muted" id="phaseText">QR로 참가자를 모아 주세요.</p>
+        </div>
+        <div class="timer" id="timerText">--</div>
+      </div>
+      <div class="track" id="track">
+        <div class="finish-line" aria-hidden="true"></div>
+      </div>
+      <div class="rankings" id="rankings"></div>
+    </section>
+  </main>
+  <script src="/js/arcade-turtle-host.js?v={{ asset_version }}"></script>
+</body>
+</html>

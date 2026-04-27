@@ -66,6 +66,12 @@ PARTY_INTRO_SECONDS = 3
 PARTY_RESULT_SECONDS = 5
 PARTY_MAX_ROUNDS = 6
 PARTY_ROOM_PREFIX = "arcade:party:"
+TURTLE_WAIT_SECONDS = 5
+TURTLE_RACE_SECONDS = 22
+TURTLE_TAP_PROGRESS = 0.006
+TURTLE_MAX_TAPS_PER_EVENT = 12
+TURTLE_MAX_TAPS_PER_SECOND = 18
+TURTLE_ROOM_PREFIX = "arcade:turtle:"
 PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
     {
         "id": "reaction_green",
@@ -305,6 +311,10 @@ def _room(code: str) -> str:
 
 def _party_room(code: str) -> str:
     return f"{PARTY_ROOM_PREFIX}{code}"
+
+
+def _turtle_room(code: str) -> str:
+    return f"{TURTLE_ROOM_PREFIX}{code}"
 
 
 def _sanitize_nickname(value: Any) -> str:
@@ -1553,6 +1563,338 @@ class PartySessionManager:
 party_manager = PartySessionManager()
 
 
+@dataclass
+class TurtlePlayer:
+    id: str
+    nickname: str
+    avatar: int
+    lane: int
+    progress: float = 0.0
+    taps: int = 0
+    connected: bool = True
+    joined_at: float = field(default_factory=_now)
+    last_seen_at: float = field(default_factory=_now)
+    finished_at: float | None = None
+    rank: int | None = None
+    tap_bucket_started_at: float = field(default_factory=_now)
+    tap_bucket_count: int = 0
+
+    def public(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "nickname": self.nickname,
+            "avatar": self.avatar,
+            "lane": self.lane,
+            "progress": round(max(0.0, min(1.0, self.progress)), 4),
+            "progressPercent": round(max(0.0, min(1.0, self.progress)) * 100, 1),
+            "taps": self.taps,
+            "connected": self.connected,
+            "finished": self.finished_at is not None,
+            "finishedAt": int(self.finished_at * 1000) if self.finished_at else None,
+            "rank": self.rank,
+        }
+
+
+@dataclass
+class TurtleSession:
+    code: str
+    grade: int
+    section: int
+    status: str
+    created_at: float
+    starts_at: float
+    ends_at: float
+    safe_end_at: float
+    phase_label: str
+    players: dict[str, TurtlePlayer] = field(default_factory=dict)
+    loop_running: bool = False
+    ended_at: float | None = None
+
+
+class TurtleRaceSessionManager:
+    def __init__(self) -> None:
+        self._sessions: dict[str, TurtleSession] = {}
+        self._lock = threading.RLock()
+        self._socketio = None
+        self._last_cleanup = 0.0
+
+    def bind_socketio(self, socketio: Any) -> None:
+        self._socketio = socketio
+
+    def create_session(self, grade: int, section: int, allow_any_time: bool = False) -> tuple[TurtleSession | None, str | None]:
+        if not config.ARCADE_ENABLED:
+            return None, "Arcade가 비활성화되어 있습니다."
+        window = _play_window(grade) if not allow_any_time else {
+            "allowed": True,
+            "label": "테스트 모드",
+            "safeEndAt": _now() + TURTLE_WAIT_SECONDS + TURTLE_RACE_SECONDS + 30,
+            "phaseEndAt": _now() + TURTLE_WAIT_SECONDS + TURTLE_RACE_SECONDS + 30,
+            "remainingSafeSeconds": TURTLE_WAIT_SECONDS + TURTLE_RACE_SECONDS + 30,
+            "startsInSeconds": 0,
+            "reason": "",
+        }
+        if not window["allowed"]:
+            return None, window["reason"]
+
+        with self._lock:
+            self._cleanup_locked()
+            active = [s for s in self._sessions.values() if s.status != "ended"]
+            for existing in active:
+                if existing.grade == grade and existing.section == section:
+                    return existing, None
+            if len(active) >= config.ARCADE_MAX_ACTIVE_SESSIONS:
+                return None, "현재 열린 Arcade가 너무 많습니다."
+            now_ts = _now()
+            starts_at = now_ts + TURTLE_WAIT_SECONDS
+            ends_at = min(starts_at + TURTLE_RACE_SECONDS, float(window["safeEndAt"]))
+            if ends_at - starts_at < 10:
+                return None, "경주를 진행하기에 시간이 부족합니다."
+            code = self._new_code_locked()
+            session_obj = TurtleSession(
+                code=code,
+                grade=grade,
+                section=section,
+                status="lobby",
+                created_at=now_ts,
+                starts_at=starts_at,
+                ends_at=ends_at,
+                safe_end_at=float(window["safeEndAt"]),
+                phase_label=str(window["label"] or "거북이 경주"),
+            )
+            self._sessions[code] = session_obj
+            return session_obj, None
+
+    def get(self, code: str) -> TurtleSession | None:
+        with self._lock:
+            self._cleanup_locked()
+            return self._sessions.get(str(code or "").upper())
+
+    def join_player(self, code: str, player_id: str, nickname: str, avatar: int) -> tuple[TurtlePlayer | None, str | None]:
+        with self._lock:
+            session_obj = self._sessions.get(str(code or "").upper())
+            if not session_obj:
+                return None, "존재하지 않는 경주입니다."
+            if session_obj.status == "ended":
+                return None, "이미 종료된 경주입니다."
+            if player_id in session_obj.players:
+                player = session_obj.players[player_id]
+                player.connected = True
+                player.last_seen_at = _now()
+                return player, None
+            if len(session_obj.players) >= config.ARCADE_MAX_PLAYERS:
+                return None, "참가 인원이 가득 찼습니다."
+            clean_name = _sanitize_nickname(nickname)
+            if len(clean_name) < 2:
+                return None, "닉네임은 2자 이상이어야 합니다."
+            clean_name = self._dedupe_nickname_locked(session_obj, clean_name)
+            avatar_id = int(avatar) if isinstance(avatar, int) or str(avatar).isdigit() else random.randrange(AVATAR_COUNT)
+            player = TurtlePlayer(
+                id=player_id,
+                nickname=clean_name,
+                avatar=avatar_id % AVATAR_COUNT,
+                lane=len(session_obj.players),
+            )
+            session_obj.players[player_id] = player
+            return player, None
+
+    def mark_connected(self, code: str, player_id: str | None, connected: bool) -> None:
+        if not player_id:
+            return
+        with self._lock:
+            session_obj = self._sessions.get(str(code or "").upper())
+            if session_obj and player_id in session_obj.players:
+                session_obj.players[player_id].connected = connected
+                session_obj.players[player_id].last_seen_at = _now()
+
+    def start_now(self, code: str) -> tuple[TurtleSession | None, str | None]:
+        with self._lock:
+            session_obj = self._sessions.get(str(code or "").upper())
+            if not session_obj or session_obj.status == "ended":
+                return None, "not found"
+            if not any(player.connected for player in session_obj.players.values()):
+                return None, "참가자가 1명 이상 필요합니다."
+            now_ts = _now()
+            session_obj.status = "countdown"
+            session_obj.starts_at = now_ts + TURTLE_WAIT_SECONDS
+            session_obj.ends_at = min(session_obj.starts_at + TURTLE_RACE_SECONDS, session_obj.safe_end_at)
+            if session_obj.ends_at - session_obj.starts_at < 10:
+                self._end_locked(session_obj)
+                return session_obj, "남은 시간이 부족합니다."
+            for player in session_obj.players.values():
+                player.progress = 0.0
+                player.taps = 0
+                player.finished_at = None
+                player.rank = None
+                player.tap_bucket_started_at = now_ts
+                player.tap_bucket_count = 0
+            return session_obj, None
+
+    def add_taps(self, code: str, player_id: str, count: Any) -> tuple[TurtleSession | None, str | None]:
+        with self._lock:
+            session_obj = self._sessions.get(str(code or "").upper())
+            if not session_obj:
+                return None, "세션을 찾을 수 없습니다."
+            if session_obj.status != "racing":
+                return session_obj, None
+            player = session_obj.players.get(player_id)
+            if not player or player.finished_at is not None:
+                return session_obj, None
+            now_ts = _now()
+            try:
+                requested = int(count)
+            except (TypeError, ValueError):
+                requested = 1
+            requested = max(1, min(requested, TURTLE_MAX_TAPS_PER_EVENT))
+            if now_ts - player.tap_bucket_started_at >= 1.0:
+                player.tap_bucket_started_at = now_ts
+                player.tap_bucket_count = 0
+            allowed = max(0, TURTLE_MAX_TAPS_PER_SECOND - player.tap_bucket_count)
+            accepted = min(requested, allowed)
+            if accepted <= 0:
+                return session_obj, None
+            player.tap_bucket_count += accepted
+            player.taps += accepted
+            player.progress = min(1.0, player.progress + accepted * TURTLE_TAP_PROGRESS)
+            player.last_seen_at = now_ts
+            if player.progress >= 1.0 and player.finished_at is None:
+                player.finished_at = now_ts
+                player.rank = 1 + sum(1 for other in session_obj.players.values() if other.finished_at is not None and other.id != player.id)
+                if all(other.finished_at is not None for other in session_obj.players.values() if other.connected):
+                    self._end_locked(session_obj)
+            return session_obj, None
+
+    def end_session(self, code: str) -> TurtleSession | None:
+        normalized_code = str(code or "").upper()
+        with self._lock:
+            session_obj = self._sessions.get(normalized_code)
+            if not session_obj:
+                return None
+            self._end_locked(session_obj)
+            snapshot = self._snapshot_locked(session_obj)
+        self._emit("turtle:state", snapshot, normalized_code)
+        self._emit("turtle:ended", snapshot, normalized_code)
+        return session_obj
+
+    def snapshot(self, session_obj: TurtleSession) -> dict[str, Any]:
+        with self._lock:
+            return self._snapshot_locked(session_obj)
+
+    def run_loop(self, code: str) -> None:
+        with self._lock:
+            session_obj = self._sessions.get(str(code or "").upper())
+            if not session_obj or session_obj.loop_running:
+                return
+            session_obj.loop_running = True
+        try:
+            while True:
+                with self._lock:
+                    session_obj = self._sessions.get(str(code or "").upper())
+                    if not session_obj:
+                        return
+                    changed = self._advance_locked(session_obj)
+                    snapshot = self._snapshot_locked(session_obj)
+                    ended = session_obj.status == "ended"
+                if changed:
+                    self._emit("turtle:state", snapshot, code)
+                    if ended:
+                        self._emit("turtle:ended", snapshot, code)
+                if ended:
+                    return
+                time.sleep(0.25)
+        finally:
+            with self._lock:
+                session_obj = self._sessions.get(str(code or "").upper())
+                if session_obj:
+                    session_obj.loop_running = False
+
+    def _advance_locked(self, session_obj: TurtleSession) -> bool:
+        now_ts = _now()
+        if session_obj.status == "countdown" and now_ts >= session_obj.starts_at:
+            session_obj.status = "racing"
+            return True
+        if session_obj.status == "racing" and now_ts >= session_obj.ends_at:
+            self._end_locked(session_obj)
+            return True
+        return False
+
+    def _end_locked(self, session_obj: TurtleSession) -> None:
+        if session_obj.status == "ended":
+            return
+        session_obj.status = "ended"
+        session_obj.ended_at = _now()
+        ranked = self._rankings_locked(session_obj)
+        for index, item in enumerate(ranked, start=1):
+            player = session_obj.players.get(item["id"])
+            if player and player.rank is None:
+                player.rank = index
+
+    def _snapshot_locked(self, session_obj: TurtleSession) -> dict[str, Any]:
+        now_ts = _now()
+        players = [player.public() for player in sorted(session_obj.players.values(), key=lambda item: item.lane)]
+        return {
+            "mode": "turtle",
+            "code": session_obj.code,
+            "grade": session_obj.grade,
+            "section": session_obj.section,
+            "status": session_obj.status,
+            "phaseLabel": session_obj.phase_label,
+            "startsAt": int(session_obj.starts_at * 1000),
+            "endsAt": int(session_obj.ends_at * 1000),
+            "now": int(now_ts * 1000),
+            "players": players,
+            "rankings": self._rankings_locked(session_obj),
+            "tapProgress": TURTLE_TAP_PROGRESS,
+            "raceSeconds": TURTLE_RACE_SECONDS,
+        }
+
+    def _rankings_locked(self, session_obj: TurtleSession) -> list[dict[str, Any]]:
+        players = [player.public() for player in session_obj.players.values()]
+        return sorted(
+            players,
+            key=lambda item: (
+                item["finishedAt"] is None,
+                item["finishedAt"] or 10**15,
+                -float(item["progress"]),
+                -int(item["taps"]),
+                item["lane"],
+            ),
+        )
+
+    def _new_code_locked(self) -> str:
+        alphabet = string.ascii_uppercase + string.digits
+        while True:
+            code = "".join(secrets.choice(alphabet) for _ in range(5))
+            if code not in self._sessions:
+                return code
+
+    def _cleanup_locked(self) -> None:
+        now_ts = _now()
+        if now_ts - self._last_cleanup < SESSION_CLEANUP_INTERVAL_SECONDS:
+            return
+        self._last_cleanup = now_ts
+        cutoff = now_ts - config.ARCADE_SESSION_TTL_SECONDS
+        for code, session_obj in list(self._sessions.items()):
+            if session_obj.status == "ended" and (session_obj.ended_at or session_obj.created_at) < cutoff:
+                self._sessions.pop(code, None)
+
+    def _dedupe_nickname_locked(self, session_obj: TurtleSession, nickname: str) -> str:
+        existing = {player.nickname for player in session_obj.players.values()}
+        if nickname not in existing:
+            return nickname
+        for index in range(2, 100):
+            candidate = f"{nickname}{index}"
+            if candidate not in existing:
+                return candidate
+        return f"{nickname}{random.randrange(100, 999)}"
+
+    def _emit(self, event: str, payload: dict[str, Any], code: str) -> None:
+        if self._socketio:
+            self._socketio.emit(event, payload, namespace=ARCADE_NAMESPACE, room=_turtle_room(code))
+
+
+turtle_manager = TurtleRaceSessionManager()
+
+
 def _host_allowed(grade: int, section: int) -> bool:
     return is_teacher_session_active() or is_board_session_active(grade, section)
 
@@ -1615,6 +1957,7 @@ def arcade_home():
     board_url = f"/board?grade={grade}&section={section}" if grade and section else "/"
     turf_url = f"/arcade/turf/host?grade={grade}&section={section}" if grade and section else ""
     party_url = f"/arcade/party/host?grade={grade}&section={section}" if grade and section else ""
+    turtle_url = f"/arcade/turtle/host?grade={grade}&section={section}" if grade and section else ""
     return render_template(
         "arcade_home.html",
         arcade_enabled=config.ARCADE_ENABLED,
@@ -1624,6 +1967,7 @@ def arcade_home():
         board_url=board_url,
         turf_url=turf_url,
         party_url=party_url,
+        turtle_url=turtle_url,
     )
 
 
@@ -1677,6 +2021,32 @@ def arcade_party_host():
 @blueprint.get("/arcade/party/join/<code>")
 def arcade_party_join(code: str):
     return render_template("arcade_party_join.html", code=str(code or "").upper(), arcade_enabled=config.ARCADE_ENABLED)
+
+
+@blueprint.get("/arcade/turtle/host")
+def arcade_turtle_host():
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+    if not grade or not section or not _host_allowed(grade, section):
+        return render_template(
+            "arcade_turtle_host.html",
+            arcade_enabled=False,
+            arcade_debug_allow_any_time=config.ARCADE_DEBUG_ALLOW_ANY_TIME,
+            grade=grade,
+            section=section,
+        )
+    return render_template(
+        "arcade_turtle_host.html",
+        arcade_enabled=config.ARCADE_ENABLED,
+        arcade_debug_allow_any_time=config.ARCADE_DEBUG_ALLOW_ANY_TIME,
+        grade=grade,
+        section=section,
+    )
+
+
+@blueprint.get("/arcade/turtle/join/<code>")
+def arcade_turtle_join(code: str):
+    return render_template("arcade_turtle_join.html", code=str(code or "").upper(), arcade_enabled=config.ARCADE_ENABLED)
 
 
 @blueprint.post("/api/arcade/sessions")
@@ -1769,6 +2139,52 @@ def end_party_session(code: str):
     return jsonify(party_manager.snapshot(ended)) if ended else (jsonify({"error": "not found"}), 404)
 
 
+@blueprint.post("/api/arcade/turtle/sessions")
+def create_turtle_session():
+    payload = request.get_json(silent=True) or {}
+    grade = int(payload.get("grade") or 0)
+    section = int(payload.get("section") or 0)
+    if not grade or not section or not _host_allowed(grade, section):
+        return jsonify({"error": "not allowed"}), 403
+    if bool(payload.get("debugAllowAnyTime")) and not config.ARCADE_DEBUG_ALLOW_ANY_TIME:
+        return jsonify({"error": "서버의 Arcade 테스트 우회 모드가 꺼져 있습니다. ARCADE_DEBUG_ALLOW_ANY_TIME=1로 실행해야 합니다."}), 400
+    allow_any_time = bool(payload.get("debugAllowAnyTime")) and config.ARCADE_DEBUG_ALLOW_ANY_TIME
+    session_obj, error = turtle_manager.create_session(grade, section, allow_any_time=allow_any_time)
+    if error or not session_obj:
+        return jsonify({"error": error or "failed"}), 400
+    return jsonify(turtle_manager.snapshot(session_obj))
+
+
+@blueprint.get("/api/arcade/turtle/sessions/<code>")
+def get_turtle_session(code: str):
+    session_obj = turtle_manager.get(code)
+    if not session_obj:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(turtle_manager.snapshot(session_obj))
+
+
+@blueprint.post("/api/arcade/turtle/sessions/<code>/start")
+def start_turtle_session(code: str):
+    session_obj = turtle_manager.get(code)
+    if not session_obj or not _host_allowed(session_obj.grade, session_obj.section):
+        return jsonify({"error": "not allowed"}), 403
+    updated, error = turtle_manager.start_now(code)
+    if error and not updated:
+        return jsonify({"error": error}), 400
+    snapshot = turtle_manager.snapshot(updated)
+    turtle_manager._emit("turtle:state", snapshot, str(code or "").upper())
+    return jsonify(snapshot)
+
+
+@blueprint.post("/api/arcade/turtle/sessions/<code>/end")
+def end_turtle_session(code: str):
+    session_obj = turtle_manager.get(code)
+    if not session_obj or not _host_allowed(session_obj.grade, session_obj.section):
+        return jsonify({"error": "not allowed"}), 403
+    ended = turtle_manager.end_session(code)
+    return jsonify(turtle_manager.snapshot(ended)) if ended else (jsonify({"error": "not found"}), 404)
+
+
 class ArcadeNamespace(Namespace):
     def on_connect(self):  # type: ignore[override]
         emit("arcade:connected", {"ok": True})
@@ -1778,6 +2194,7 @@ class ArcadeNamespace(Namespace):
         player_id = request.args.get("playerId")
         arcade_manager.mark_connected(str(code or "").upper(), player_id, False)
         party_manager.mark_connected(str(code or "").upper(), player_id, False)
+        turtle_manager.mark_connected(str(code or "").upper(), player_id, False)
 
     def on_join_host(self, data):  # type: ignore[override]
         code = str((data or {}).get("code") or "").upper()
@@ -1878,6 +2295,59 @@ class ArcadeNamespace(Namespace):
         code = str((data or {}).get("code") or "").upper()
         leave_room(_party_room(code))
 
+    def on_turtle_join_host(self, data):  # type: ignore[override]
+        code = str((data or {}).get("code") or "").upper()
+        session_obj = turtle_manager.get(code)
+        if not session_obj:
+            emit("turtle:error", {"message": "세션을 찾을 수 없습니다."})
+            return
+        join_room(_turtle_room(code))
+        emit("turtle:state", turtle_manager.snapshot(session_obj))
+        self._ensure_turtle_loop(code)
+
+    def on_turtle_join_player(self, data):  # type: ignore[override]
+        payload = data or {}
+        code = str(payload.get("code") or "").upper()
+        player_id = str(payload.get("playerId") or "").strip()
+        if not player_id:
+            emit("turtle:error", {"message": "playerId가 없습니다."})
+            return
+        player, error = turtle_manager.join_player(
+            code,
+            player_id,
+            payload.get("nickname") or "",
+            payload.get("avatar") or 0,
+        )
+        if error or not player:
+            emit("turtle:error", {"message": error or "입장할 수 없습니다."})
+            return
+        join_room(_turtle_room(code))
+        session_obj = turtle_manager.get(code)
+        if not session_obj:
+            emit("turtle:error", {"message": "세션을 찾을 수 없습니다."})
+            return
+        snapshot = turtle_manager.snapshot(session_obj)
+        emit("turtle:joined", {"player": player.public(), "session": snapshot})
+        turtle_manager._emit("turtle:state", snapshot, code)
+        self._ensure_turtle_loop(code)
+
+    def on_turtle_tap(self, data):  # type: ignore[override]
+        payload = data or {}
+        code = str(payload.get("code") or "").upper()
+        player_id = str(payload.get("playerId") or "").strip()
+        session_obj, error = turtle_manager.add_taps(code, player_id, payload.get("count") or 1)
+        if error and not session_obj:
+            emit("turtle:error", {"message": error})
+            return
+        if session_obj:
+            snapshot = turtle_manager.snapshot(session_obj)
+            emit("turtle:submitted", {"ok": True, "session": snapshot})
+            turtle_manager._emit("turtle:state", snapshot, code)
+
+    def on_turtle_leave(self, data):  # type: ignore[override]
+        code = str((data or {}).get("code") or "").upper()
+        leave_room(_turtle_room(code))
+
     def _ensure_tick(self, code: str) -> None:
         socketio = arcade_manager._socketio
         if socketio:
@@ -1888,8 +2358,14 @@ class ArcadeNamespace(Namespace):
         if socketio:
             socketio.start_background_task(party_manager.run_loop, code)
 
+    def _ensure_turtle_loop(self, code: str) -> None:
+        socketio = turtle_manager._socketio
+        if socketio:
+            socketio.start_background_task(turtle_manager.run_loop, code)
+
 
 def init_arcade_socketio(socketio: Any) -> None:
     arcade_manager.bind_socketio(socketio)
     party_manager.bind_socketio(socketio)
+    turtle_manager.bind_socketio(socketio)
     socketio.on_namespace(ArcadeNamespace(ARCADE_NAMESPACE))

@@ -20,3 +20,4 @@ Original prompt: 구현 시작
 - Removed noisy stale-submit errors in Party by sending `roundId` with submissions and ignoring late/old round submissions; clarified color-game instructions and mobile hints.
 - Fixed forbidden-color visibility: host now shows `금지: <색>` as the main prompt and mobile marks the forbidden color button with a small `금지` badge.
 - Added more distinct Party inputs: slider games (`눈대중 슬라이더`, `볼륨 맞추기`) and ordering games (`줄 세우기`, `급식 순서`), plus engine-aware round selection to avoid repeating the same input style back-to-back.
+- Added new Live Arcade `거북이 경주`: separate host/join pages, server-authoritative turtle sessions, batched mobile tap events, countdown/race/end states, finish-line progress, and final rankings.

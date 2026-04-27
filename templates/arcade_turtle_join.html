@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>거북이 경주 참여</title>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <style>
+    :root {
+      --ink: #213047;
+      --muted: #6d7d95;
+      --green: #6fd06f;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 16% 8%, rgba(255, 206, 84, 0.5), transparent 28%),
+        radial-gradient(circle at 86% 20%, rgba(124, 216, 255, 0.48), transparent 32%),
+        linear-gradient(160deg, #fff8df 0%, #eafaff 58%, #f1ffe9 100%);
+      touch-action: manipulation;
+    }
+    .shell { min-height: 100vh; padding: 18px; display: grid; align-items: center; }
+    .panel {
+      border: 4px solid #fff;
+      border-radius: 34px;
+      padding: 22px;
+      background: rgba(255,255,255,0.9);
+      box-shadow: 0 18px 0 rgba(33,48,71,0.08);
+    }
+    .hidden { display: none !important; }
+    h1, h2, p { margin: 0; }
+    h1 { font-size: 34px; letter-spacing: -0.06em; }
+    .muted { color: var(--muted); font-weight: 850; line-height: 1.45; }
+    form { display: grid; gap: 12px; margin-top: 18px; }
+    input {
+      width: 100%;
+      border: 0;
+      border-radius: 20px;
+      padding: 16px;
+      background: #fff;
+      box-shadow: inset 0 -5px 0 rgba(33,48,71,0.06);
+      font-size: 18px;
+      font-weight: 900;
+    }
+    button {
+      border: 0;
+      border-radius: 24px;
+      padding: 16px;
+      background: #213047;
+      color: #fff;
+      box-shadow: 0 8px 0 rgba(33,48,71,0.13);
+      font-size: 18px;
+      font-weight: 950;
+    }
+    .game { display: none; gap: 14px; }
+    .game.active { display: grid; }
+    .status-card {
+      border-radius: 26px;
+      padding: 16px;
+      background: #fff;
+      box-shadow: inset 0 -6px 0 rgba(33,48,71,0.06);
+      text-align: center;
+    }
+    .big {
+      font-size: 46px;
+      font-weight: 950;
+      letter-spacing: -0.08em;
+    }
+    .progress {
+      height: 24px;
+      border-radius: 999px;
+      background: rgba(33,48,71,0.1);
+      overflow: hidden;
+    }
+    .progress span {
+      display: block;
+      width: var(--progress, 0%);
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #6fd06f, #ffe066);
+      transition: width 0.12s ease-out;
+    }
+    .tap-button {
+      min-height: 260px;
+      border-radius: 42px;
+      background:
+        radial-gradient(circle at 35% 28%, rgba(255,255,255,0.75), transparent 22%),
+        linear-gradient(135deg, #6fd06f, #ffe066);
+      color: #17301b;
+      font-size: 34px;
+      touch-action: manipulation;
+    }
+    .tap-button:disabled { opacity: 0.5; }
+    .error { margin-top: 12px; padding: 12px; border-radius: 18px; background: #ffe1e8; color: #bf3751; font-weight: 850; }
+  </style>
+</head>
+<body>
+  <main class="shell" data-code="{{ code }}" data-enabled="{{ '1' if arcade_enabled else '0' }}">
+    <section class="panel" id="entryPanel">
+      <h1>거북이 경주</h1>
+      <p class="muted">닉네임을 넣고 들어간 뒤, 시작하면 버튼을 계속 누르세요.</p>
+      <form id="joinForm">
+        <input id="nicknameInput" maxlength="8" autocomplete="nickname" placeholder="닉네임">
+        <button id="joinButton" type="submit">입장</button>
+      </form>
+      <div id="entryErrorBox" class="error" hidden></div>
+    </section>
+    <section class="game" id="gamePanel">
+      <div class="status-card">
+        <p class="muted" id="statusText">연결 중</p>
+        <div class="big" id="remainingTime">--</div>
+      </div>
+      <div class="status-card">
+        <p class="muted">내 거북이</p>
+        <div class="big" id="myProgress">0%</div>
+        <div class="progress"><span id="progressBar"></span></div>
+      </div>
+      <button id="tapButton" class="tap-button" type="button" disabled>대기</button>
+      <div class="status-card">
+        <p class="muted" id="myRank">등수는 경주 후 표시됩니다.</p>
+        <p class="muted" id="tapCount">0 taps</p>
+      </div>
+      <div id="errorBox" class="error" hidden></div>
+    </section>
+  </main>
+  <script src="/js/arcade-turtle-join.js?v={{ asset_version }}"></script>
+</body>
+</html>
