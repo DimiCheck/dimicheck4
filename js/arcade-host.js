@@ -41,6 +41,8 @@
   var debugBotTimers = [];
   var debugAllowAnyTime = false;
   var lastEventKey = '';
+  var playerMarkers = {};
+  var itemMarkers = {};
 
   els.boardLink.href = boardUrl;
 
@@ -132,19 +134,38 @@
   }
 
   function renderPlayers(players, width, height) {
-    els.playerLayer.innerHTML = '';
+    var seen = {};
     for (var i = 0; i < players.length; i += 1) {
       var player = players[i];
-      var marker = document.createElement('div');
+      seen[player.id] = true;
+      var marker = playerMarkers[player.id];
+      if (!marker) {
+        marker = document.createElement('div');
+        marker.className = 'player';
+        marker.appendChild(document.createElement('span'));
+        playerMarkers[player.id] = marker;
+        els.playerLayer.appendChild(marker);
+        window.requestAnimationFrame(function (node) {
+          node.classList.add('is-ready');
+        }.bind(null, marker));
+      }
       marker.className = 'player ' + player.team + (player.boosted ? ' boosted' : '');
-      marker.style.left = ((player.x + 0.5) / width * 100) + '%';
-      marker.style.top = ((player.y + 0.5) / height * 100) + '%';
+      setGridPosition(marker, player.x, player.y, width, height);
       marker.textContent = avatarGlyph(player.avatar);
-      var label = document.createElement('span');
+      var label = marker.querySelector('span') || document.createElement('span');
       label.textContent = player.nickname;
-      marker.appendChild(label);
-      els.playerLayer.appendChild(marker);
+      if (!label.parentNode) marker.appendChild(label);
     }
+    Object.keys(playerMarkers).forEach(function (id) {
+      if (seen[id]) return;
+      playerMarkers[id].remove();
+      delete playerMarkers[id];
+    });
+  }
+
+  function setGridPosition(marker, x, y, width, height) {
+    marker.style.left = ((x + 0.5) / width * 100) + '%';
+    marker.style.top = ((y + 0.5) / height * 100) + '%';
   }
 
   function avatarGlyph(index) {
@@ -159,17 +180,29 @@
   }
 
   function renderItems(items, width, height) {
-    els.itemLayer.innerHTML = '';
+    var seen = {};
     for (var i = 0; i < items.length; i += 1) {
       var item = items[i];
-      var marker = document.createElement('div');
+      seen[item.id] = true;
+      var marker = itemMarkers[item.id];
+      if (!marker) {
+        marker = document.createElement('div');
+        itemMarkers[item.id] = marker;
+        els.itemLayer.appendChild(marker);
+        window.requestAnimationFrame(function (node) {
+          node.classList.add('is-ready');
+        }.bind(null, marker));
+      }
       marker.className = 'item ' + item.type;
       marker.title = item.label || item.type;
-      marker.style.left = ((item.x + 0.5) / width * 100) + '%';
-      marker.style.top = ((item.y + 0.5) / height * 100) + '%';
+      setGridPosition(marker, item.x, item.y, width, height);
       marker.textContent = itemGlyph(item.type);
-      els.itemLayer.appendChild(marker);
     }
+    Object.keys(itemMarkers).forEach(function (id) {
+      if (seen[id]) return;
+      itemMarkers[id].remove();
+      delete itemMarkers[id];
+    });
   }
 
   function renderEventToast(events) {

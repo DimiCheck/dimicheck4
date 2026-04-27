@@ -321,7 +321,8 @@
       box-shadow: 0 9px 0 rgba(36, 48, 68, 0.13), 0 14px 24px rgba(36, 48, 68, 0.18);
       font-size: clamp(15px, 1.5vw, 22px);
       font-weight: 900;
-      transition: left 0.22s linear, top 0.22s linear;
+      transition: left 0.28s cubic-bezier(.2, .8, .2, 1), top 0.28s cubic-bezier(.2, .8, .2, 1), box-shadow 0.2s ease;
+      will-change: left, top;
       animation: playerPulse 1.4s ease-in-out infinite;
     }
 
