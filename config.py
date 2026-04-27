@@ -122,6 +122,7 @@ class Config:
     ARCADE_MAX_PLAYERS: int = int(os.getenv("ARCADE_MAX_PLAYERS", "60"))
     ARCADE_SESSION_TTL_SECONDS: int = int(os.getenv("ARCADE_SESSION_TTL_SECONDS", "1200"))
     ARCADE_TICK_MS: int = int(os.getenv("ARCADE_TICK_MS", "320"))
+    ARCADE_DEBUG_ALLOW_ANY_TIME: bool = _env_bool("ARCADE_DEBUG_ALLOW_ANY_TIME", False)
 
     # Google Analytics (Measurement Protocol)
     GA4_MEASUREMENT_ID: str | None = os.getenv("GA4_MEASUREMENT_ID")

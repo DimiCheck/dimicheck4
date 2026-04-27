@@ -116,6 +116,37 @@ def test_arcade_session_routes_require_board_session_and_create(monkeypatch, tmp
     assert b"Arcade" in host.data
 
 
+def test_arcade_debug_any_time_requires_explicit_server_flag(monkeypatch, tmp_path):
+    app_module = _load_app(monkeypatch, tmp_path)
+    arcade_routes = importlib.import_module("arcade_routes")
+    monkeypatch.setattr(
+        arcade_routes,
+        "_play_window",
+        lambda _grade: {
+            "allowed": False,
+            "label": "",
+            "safeEndAt": None,
+            "phaseEndAt": None,
+            "remainingSafeSeconds": 0,
+            "startsInSeconds": None,
+            "reason": "blocked by time",
+        },
+    )
+
+    client = app_module.app.test_client()
+    with client.session_transaction() as session_state:
+        session_state["board_verified_2_4"] = True
+
+    blocked = client.post("/api/arcade/sessions", json={"grade": 2, "section": 4, "debugAllowAnyTime": True})
+    assert blocked.status_code == 400
+    assert blocked.get_json()["error"] == "blocked by time"
+
+    monkeypatch.setattr(arcade_routes.config, "ARCADE_DEBUG_ALLOW_ANY_TIME", True)
+    allowed = client.post("/api/arcade/sessions", json={"grade": 2, "section": 4, "debugAllowAnyTime": True})
+    assert allowed.status_code == 200
+    assert allowed.get_json()["phaseLabel"] == "테스트 모드"
+
+
 def test_arcade_manager_assigns_balanced_teams_and_claims_spawn_cells(monkeypatch):
     arcade_routes = importlib.import_module("arcade_routes")
     monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: _allowed_window())

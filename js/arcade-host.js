@@ -35,6 +35,9 @@
   var cells = [];
   var serverOffsetMs = 0;
   var returnedToBoard = false;
+  var debugBots = [];
+  var debugBotTimers = [];
+  var debugAllowAnyTime = false;
 
   els.boardLink.href = boardUrl;
 
@@ -183,6 +186,7 @@
     } else if (state.status === 'ended') {
       var winner = state.winner === 'draw' ? '무승부' : state.winnerLabel + ' 승리';
       setOverlay(winner, '잠시 후 Board로 돌아갑니다.', false);
+      stopDebugBotInputs();
       scheduleBoardReturn(state.resultSeconds || 10);
     }
   }
@@ -240,6 +244,127 @@
     });
   }
 
+  function debugSessionCode() {
+    if (!sessionState || !sessionState.code) {
+      throw new Error('Arcade 세션이 아직 준비되지 않았습니다.');
+    }
+    return sessionState.code;
+  }
+
+  function randomDirection() {
+    var directions = ['up', 'down', 'left', 'right'];
+    return directions[Math.floor(Math.random() * directions.length)];
+  }
+
+  function createDebugBot(index) {
+    var code = debugSessionCode();
+    if (!window.io) {
+      throw new Error('Socket.IO를 불러오지 못했습니다.');
+    }
+    var playerId = 'debug-' + Date.now().toString(36) + '-' + index + '-' + Math.random().toString(36).slice(2, 7);
+    var nickname = '봇' + String(index + 1);
+    var botSocket = window.io('/ws/arcade', {
+      transports: ['websocket', 'polling'],
+      query: { code: code, playerId: playerId }
+    });
+    botSocket.on('connect', function () {
+      botSocket.emit('join_player', {
+        code: code,
+        playerId: playerId,
+        nickname: nickname,
+        avatar: index
+      });
+    });
+    var timer = window.setInterval(function () {
+      if (!botSocket.connected || !sessionState) return;
+      if (sessionState.status !== 'countdown' && sessionState.status !== 'running') return;
+      botSocket.emit('player_input', {
+        code: code,
+        playerId: playerId,
+        direction: randomDirection()
+      });
+    }, 180 + Math.floor(Math.random() * 180));
+    debugBotTimers.push(timer);
+    debugBots.push({ id: playerId, nickname: nickname, socket: botSocket });
+    return nickname;
+  }
+
+  function addDebugBots(count) {
+    var safeCount = Math.max(1, Math.min(Number(count) || 8, 50));
+    var created = [];
+    for (var i = 0; i < safeCount; i += 1) {
+      created.push(createDebugBot(debugBots.length));
+    }
+    return {
+      created: created.length,
+      nicknames: created,
+      totalBots: debugBots.length
+    };
+  }
+
+  function stopDebugBotInputs() {
+    while (debugBotTimers.length) {
+      window.clearInterval(debugBotTimers.pop());
+    }
+  }
+
+  function clearDebugBots() {
+    stopDebugBotInputs();
+    while (debugBots.length) {
+      var bot = debugBots.pop();
+      if (bot && bot.socket) {
+        bot.socket.disconnect();
+      }
+    }
+    return { totalBots: 0 };
+  }
+
+  function installDebugConsole() {
+    var api = {
+      help: function () {
+        return {
+          'ArcadeDebug.allowAnyTime()': '시간 제한 우회 테스트 세션을 새로 만듭니다. 서버에서 ARCADE_DEBUG_ALLOW_ANY_TIME=1일 때만 동작합니다.',
+          'ArcadeDebug.bots(12)': '테스트 봇 12명을 입장시킵니다.',
+          'ArcadeDebug.start()': '현재 세션을 바로 시작합니다.',
+          'ArcadeDebug.end()': '현재 세션을 종료합니다.',
+          'ArcadeDebug.demo(12)': '봇을 입장시키고 1.2초 뒤 바로 시작합니다.',
+          'ArcadeDebug.clear()': '테스트 봇 연결을 끊습니다.',
+          'ArcadeDebug.state()': '현재 호스트가 받은 최신 상태를 봅니다.'
+        };
+      },
+      state: function () {
+        return sessionState;
+      },
+      allowAnyTime: function () {
+        debugAllowAnyTime = true;
+        clearDebugBots();
+        sessionState = null;
+        returnedToBoard = false;
+        createSession();
+        return '시간 제한 우회 세션을 요청했습니다. 서버 설정이 꺼져 있으면 거부됩니다.';
+      },
+      bots: function (count) {
+        return addDebugBots(count);
+      },
+      clear: clearDebugBots,
+      start: function () {
+        return postJson('/api/arcade/sessions/' + encodeURIComponent(debugSessionCode()) + '/start').then(renderState);
+      },
+      end: function () {
+        return postJson('/api/arcade/sessions/' + encodeURIComponent(debugSessionCode()) + '/end').then(renderState);
+      },
+      demo: function (count) {
+        var result = addDebugBots(count || 12);
+        window.setTimeout(function () {
+          api.start();
+        }, 1200);
+        return result;
+      }
+    };
+    window.DimiArcadeDebug = api;
+    window.ArcadeDebug = api;
+  }
+
   function createSession() {
     if (!enabled || !grade || !section) {
       setOverlay('시작할 수 없음', 'Board 인증이 필요하거나 Arcade가 비활성화되어 있습니다.', false);
@@ -247,7 +372,11 @@
       return;
     }
     setOverlay('준비 중', 'Arcade 세션을 만들고 있습니다.', false);
-    postJson('/api/arcade/sessions', { grade: grade, section: section }).then(function (state) {
+    postJson('/api/arcade/sessions', {
+      grade: grade,
+      section: section,
+      debugAllowAnyTime: debugAllowAnyTime
+    }).then(function (state) {
       setupJoinCard(state);
       renderState(state);
       connectSocket(state.code);
@@ -274,5 +403,6 @@
   });
 
   window.setInterval(updateClock, 250);
+  installDebugConsole();
   createSession();
 })();

@@ -251,10 +251,18 @@ class ArcadeSessionManager:
     def bind_socketio(self, socketio: Any) -> None:
         self._socketio = socketio
 
-    def create_session(self, grade: int, section: int) -> tuple[ArcadeSession | None, str | None]:
+    def create_session(self, grade: int, section: int, allow_any_time: bool = False) -> tuple[ArcadeSession | None, str | None]:
         if not config.ARCADE_ENABLED:
             return None, "Arcade가 비활성화되어 있습니다."
-        window = _play_window(grade)
+        window = _play_window(grade) if not allow_any_time else {
+            "allowed": True,
+            "label": "테스트 모드",
+            "safeEndAt": _now() + WAIT_SECONDS + COUNTDOWN_SECONDS + MAX_GAME_SECONDS,
+            "phaseEndAt": _now() + WAIT_SECONDS + COUNTDOWN_SECONDS + MAX_GAME_SECONDS,
+            "remainingSafeSeconds": WAIT_SECONDS + COUNTDOWN_SECONDS + MAX_GAME_SECONDS,
+            "startsInSeconds": 0,
+            "reason": "",
+        }
         if not window["allowed"]:
             return None, window["reason"]
 
@@ -577,7 +585,8 @@ def create_arcade_session():
     section = int(payload.get("section") or 0)
     if not grade or not section or not _host_allowed(grade, section):
         return jsonify({"error": "not allowed"}), 403
-    session_obj, error = arcade_manager.create_session(grade, section)
+    allow_any_time = bool(payload.get("debugAllowAnyTime")) and config.ARCADE_DEBUG_ALLOW_ANY_TIME
+    session_obj, error = arcade_manager.create_session(grade, section, allow_any_time=allow_any_time)
     if error or not session_obj:
         return jsonify({"error": error or "failed"}), 400
     return jsonify(arcade_manager.snapshot(session_obj))
