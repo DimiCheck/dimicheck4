@@ -61,6 +61,157 @@ ITEM_RADIUS = {
     "star": 1,
     "bomb": 2,
 }
+PARTY_WAIT_SECONDS = 5
+PARTY_INTRO_SECONDS = 3
+PARTY_RESULT_SECONDS = 5
+PARTY_MAX_ROUNDS = 6
+PARTY_ROOM_PREFIX = "arcade:party:"
+PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
+    {
+        "id": "reaction_green",
+        "engine": "reaction",
+        "title": "반응 버튼",
+        "instruction": "초록 신호가 뜨면 가장 빨리 누르세요.",
+        "minPlayers": 1,
+        "duration": 5,
+        "config": {"signal": "초록"},
+    },
+    {
+        "id": "reaction_fake",
+        "engine": "reaction",
+        "title": "거짓 신호",
+        "instruction": "진짜 신호가 뜰 때만 누르세요.",
+        "minPlayers": 1,
+        "duration": 6,
+        "config": {"signal": "진짜", "fake": True},
+    },
+    {
+        "id": "late_tap",
+        "engine": "reaction",
+        "title": "늦게 누르기",
+        "instruction": "시간 안에서 가장 늦게 누르면 높은 점수입니다.",
+        "minPlayers": 1,
+        "duration": 6,
+        "config": {"late": True},
+    },
+    {
+        "id": "center_stop",
+        "engine": "timing",
+        "title": "중앙 정지",
+        "instruction": "움직이는 바가 목표 지점에 가까울 때 멈추세요.",
+        "minPlayers": 1,
+        "duration": 8,
+        "config": {"targetMs": 3600, "toleranceMs": 2200},
+    },
+    {
+        "id": "five_seconds",
+        "engine": "timing",
+        "title": "목표 시간",
+        "instruction": "감으로 목표 시간에 맞춰 멈추세요.",
+        "minPlayers": 1,
+        "duration": 7,
+        "config": {"targetMs": 5000, "toleranceMs": 2500},
+    },
+    {
+        "id": "closing_bell",
+        "engine": "timing",
+        "title": "종례 카운트다운",
+        "instruction": "카운트다운의 끝에 가장 가깝게 누르세요.",
+        "minPlayers": 1,
+        "duration": 6,
+        "config": {"targetMs": 4800, "toleranceMs": 1800},
+    },
+    {
+        "id": "hold_release",
+        "engine": "timing",
+        "title": "홀드 앤 릴리즈",
+        "instruction": "버튼을 누르고 있다가 목표 구간에서 떼세요.",
+        "minPlayers": 1,
+        "duration": 7,
+        "config": {"targetMs": 4200, "toleranceMs": 2000, "hold": True},
+    },
+    {
+        "id": "color_memory",
+        "engine": "memory",
+        "title": "색 순서 기억",
+        "instruction": "보이는 색 순서를 그대로 입력하세요.",
+        "minPlayers": 1,
+        "duration": 12,
+        "config": {"kind": "colors", "length": 5},
+    },
+    {
+        "id": "direction_memory",
+        "engine": "memory",
+        "title": "방향 기억",
+        "instruction": "화살표 순서를 기억해 그대로 누르세요.",
+        "minPlayers": 1,
+        "duration": 12,
+        "config": {"kind": "directions", "length": 5},
+    },
+    {
+        "id": "number_memory",
+        "engine": "memory",
+        "title": "숫자 기억",
+        "instruction": "숫자열을 기억해서 입력하세요.",
+        "minPlayers": 1,
+        "duration": 12,
+        "config": {"kind": "numbers", "length": 6},
+    },
+    {
+        "id": "forbidden_color",
+        "engine": "choice",
+        "title": "금지 색 피하기",
+        "instruction": "금지 색을 제외하고 정답 색을 고르세요.",
+        "minPlayers": 1,
+        "duration": 8,
+        "config": {"options": ["빨강", "파랑", "노랑", "초록"], "forbidden": "빨강"},
+    },
+    {
+        "id": "stroop",
+        "engine": "choice",
+        "title": "스트룹 테스트",
+        "instruction": "글자 뜻이 아니라 실제 색을 고르세요.",
+        "minPlayers": 1,
+        "duration": 8,
+        "config": {"options": ["빨강", "파랑", "노랑", "초록"], "correct": "파랑", "cue": "빨강"},
+    },
+    {
+        "id": "minority_vote",
+        "engine": "majority",
+        "title": "다수결 함정",
+        "instruction": "사람이 적게 고른 쪽이 이깁니다.",
+        "minPlayers": 3,
+        "duration": 8,
+        "config": {"options": ["A", "B"]},
+    },
+    {
+        "id": "unique_number",
+        "engine": "majority",
+        "title": "눈치게임",
+        "instruction": "겹치지 않는 숫자를 고르면 점수입니다.",
+        "minPlayers": 2,
+        "duration": 8,
+        "config": {"options": ["1", "2", "3", "4", "5"], "unique": True},
+    },
+    {
+        "id": "lucky_door",
+        "engine": "luck",
+        "title": "운명의 문",
+        "instruction": "문 하나를 고르세요. 결과는 열어 봐야 압니다.",
+        "minPlayers": 1,
+        "duration": 7,
+        "config": {"options": ["1번 문", "2번 문", "3번 문"]},
+    },
+    {
+        "id": "treasure_box",
+        "engine": "luck",
+        "title": "보물상자",
+        "instruction": "상자 하나를 열어 보세요.",
+        "minPlayers": 1,
+        "duration": 7,
+        "config": {"options": ["빨강 상자", "파랑 상자", "노랑 상자", "초록 상자"]},
+    },
+)
 
 
 def _now() -> float:
@@ -69,6 +220,10 @@ def _now() -> float:
 
 def _room(code: str) -> str:
     return f"{ROOM_PREFIX}{code}"
+
+
+def _party_room(code: str) -> str:
+    return f"{PARTY_ROOM_PREFIX}{code}"
 
 
 def _sanitize_nickname(value: Any) -> str:
@@ -696,6 +851,523 @@ class ArcadeSessionManager:
 arcade_manager = ArcadeSessionManager()
 
 
+@dataclass
+class PartyPlayer:
+    id: str
+    nickname: str
+    avatar: int
+    connected: bool = True
+    joined_at: float = field(default_factory=_now)
+    score: int = 0
+    rounds_played: int = 0
+    last_seen_at: float = field(default_factory=_now)
+
+    def public(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "nickname": self.nickname,
+            "avatar": self.avatar,
+            "connected": self.connected,
+            "score": self.score,
+            "roundsPlayed": self.rounds_played,
+            "averageScore": round(self.score / self.rounds_played, 1) if self.rounds_played else 0,
+        }
+
+
+@dataclass
+class PartyRound:
+    id: str
+    index: int
+    definition: dict[str, Any]
+    status: str
+    intro_at: float
+    starts_at: float
+    ends_at: float
+    result_at: float
+    participants: list[str]
+    prompt: dict[str, Any]
+    submissions: dict[str, dict[str, Any]] = field(default_factory=dict)
+    results: list[dict[str, Any]] = field(default_factory=list)
+
+    def public(self, include_answer: bool = False) -> dict[str, Any]:
+        prompt = deepcopy(self.prompt)
+        if not include_answer:
+            prompt.pop("answer", None)
+            prompt.pop("answers", None)
+        return {
+            "id": self.id,
+            "index": self.index,
+            "gameId": self.definition["id"],
+            "engine": self.definition["engine"],
+            "title": self.definition["title"],
+            "instruction": self.definition["instruction"],
+            "status": self.status,
+            "introAt": int(self.intro_at * 1000),
+            "startsAt": int(self.starts_at * 1000),
+            "endsAt": int(self.ends_at * 1000),
+            "resultAt": int(self.result_at * 1000),
+            "participants": list(self.participants),
+            "submittedCount": len(self.submissions),
+            "prompt": prompt,
+            "results": deepcopy(self.results),
+        }
+
+
+@dataclass
+class PartySession:
+    code: str
+    grade: int
+    section: int
+    status: str
+    created_at: float
+    ends_at: float
+    phase_label: str
+    round_count: int = PARTY_MAX_ROUNDS
+    current_round_index: int = 0
+    next_transition_at: float = 0.0
+    players: dict[str, PartyPlayer] = field(default_factory=dict)
+    current_round: PartyRound | None = None
+    ended_at: float | None = None
+    loop_running: bool = False
+    recent_game_ids: list[str] = field(default_factory=list)
+
+
+class PartySessionManager:
+    def __init__(self) -> None:
+        self._sessions: dict[str, PartySession] = {}
+        self._lock = threading.RLock()
+        self._socketio = None
+        self._last_cleanup = 0.0
+
+    def bind_socketio(self, socketio: Any) -> None:
+        self._socketio = socketio
+
+    def create_session(self, grade: int, section: int, allow_any_time: bool = False) -> tuple[PartySession | None, str | None]:
+        if not config.ARCADE_ENABLED:
+            return None, "Arcade가 비활성화되어 있습니다."
+        window = _play_window(grade) if not allow_any_time else {
+            "allowed": True,
+            "label": "테스트 모드",
+            "safeEndAt": _now() + 420,
+            "phaseEndAt": _now() + 420,
+            "remainingSafeSeconds": 420,
+            "startsInSeconds": 0,
+            "reason": "",
+        }
+        if not window["allowed"]:
+            return None, window["reason"]
+
+        with self._lock:
+            self._cleanup_locked()
+            active = [s for s in self._sessions.values() if s.status != "ended"]
+            for existing in active:
+                if existing.grade == grade and existing.section == section:
+                    return existing, None
+            if len(active) >= config.ARCADE_MAX_ACTIVE_SESSIONS:
+                return None, "현재 열린 Arcade가 너무 많습니다."
+            code = self._new_code_locked()
+            now_ts = _now()
+            safe_end = float(window["safeEndAt"])
+            session_obj = PartySession(
+                code=code,
+                grade=grade,
+                section=section,
+                status="lobby",
+                created_at=now_ts,
+                ends_at=safe_end,
+                phase_label=str(window["label"] or "Party"),
+            )
+            self._sessions[code] = session_obj
+            return session_obj, None
+
+    def get(self, code: str) -> PartySession | None:
+        with self._lock:
+            self._cleanup_locked()
+            return self._sessions.get(str(code or "").upper())
+
+    def join_player(self, code: str, player_id: str, nickname: str, avatar: int) -> tuple[PartyPlayer | None, str | None]:
+        with self._lock:
+            session_obj = self._sessions.get(str(code or "").upper())
+            if not session_obj:
+                return None, "존재하지 않는 Party입니다."
+            if session_obj.status == "ended":
+                return None, "이미 종료된 Party입니다."
+            if player_id in session_obj.players:
+                player = session_obj.players[player_id]
+                player.connected = True
+                player.last_seen_at = _now()
+                return player, None
+            if len(session_obj.players) >= config.ARCADE_MAX_PLAYERS:
+                return None, "참가 인원이 가득 찼습니다."
+            clean_name = _sanitize_nickname(nickname)
+            if len(clean_name) < 2:
+                return None, "닉네임은 2자 이상이어야 합니다."
+            clean_name = self._dedupe_nickname_locked(session_obj, clean_name)
+            avatar_id = int(avatar) if isinstance(avatar, int) or str(avatar).isdigit() else random.randrange(AVATAR_COUNT)
+            player = PartyPlayer(id=player_id, nickname=clean_name, avatar=avatar_id % AVATAR_COUNT)
+            session_obj.players[player_id] = player
+            return player, None
+
+    def mark_connected(self, code: str, player_id: str | None, connected: bool) -> None:
+        if not player_id:
+            return
+        with self._lock:
+            session_obj = self._sessions.get(str(code or "").upper())
+            if session_obj and player_id in session_obj.players:
+                session_obj.players[player_id].connected = connected
+                session_obj.players[player_id].last_seen_at = _now()
+
+    def start_now(self, code: str) -> tuple[PartySession | None, str | None]:
+        with self._lock:
+            session_obj = self._sessions.get(str(code or "").upper())
+            if not session_obj or session_obj.status == "ended":
+                return None, "not found"
+            if not self._connected_players_locked(session_obj):
+                return None, "참가자가 1명 이상 필요합니다."
+            if session_obj.current_round_index >= session_obj.round_count:
+                self._end_locked(session_obj)
+                return session_obj, None
+            if not self._has_round_time_locked(session_obj):
+                self._end_locked(session_obj)
+                return session_obj, "남은 시간이 부족합니다."
+            now_ts = _now()
+            session_obj.status = "countdown"
+            session_obj.next_transition_at = now_ts + PARTY_WAIT_SECONDS
+            return session_obj, None
+
+    def submit(self, code: str, player_id: str, value: Any) -> tuple[PartySession | None, str | None]:
+        with self._lock:
+            session_obj = self._sessions.get(str(code or "").upper())
+            if not session_obj or session_obj.status != "playing" or not session_obj.current_round:
+                return None, "지금은 제출할 수 없습니다."
+            round_obj = session_obj.current_round
+            if player_id not in round_obj.participants:
+                return None, "다음 라운드부터 참여할 수 있습니다."
+            if player_id in round_obj.submissions:
+                return session_obj, None
+            round_obj.submissions[player_id] = {
+                "value": value,
+                "submittedAt": _now(),
+            }
+            if len(round_obj.submissions) >= len(round_obj.participants):
+                self._finish_round_locked(session_obj)
+            return session_obj, None
+
+    def end_session(self, code: str) -> PartySession | None:
+        normalized_code = str(code or "").upper()
+        with self._lock:
+            session_obj = self._sessions.get(normalized_code)
+            if not session_obj:
+                return None
+            self._end_locked(session_obj)
+            snapshot = self._snapshot_locked(session_obj)
+        self._emit("party:state", snapshot, normalized_code)
+        self._emit("party:ended", snapshot, normalized_code)
+        return session_obj
+
+    def snapshot(self, session_obj: PartySession) -> dict[str, Any]:
+        with self._lock:
+            return self._snapshot_locked(session_obj)
+
+    def run_loop(self, code: str) -> None:
+        with self._lock:
+            session_obj = self._sessions.get(code)
+            if not session_obj or session_obj.loop_running:
+                return
+            session_obj.loop_running = True
+        try:
+            while True:
+                should_emit = False
+                ended = False
+                with self._lock:
+                    session_obj = self._sessions.get(code)
+                    if not session_obj or session_obj.status == "ended":
+                        return
+                    should_emit = self._advance_locked(session_obj)
+                    ended = session_obj.status == "ended"
+                    snapshot = self._snapshot_locked(session_obj)
+                if should_emit:
+                    self._emit("party:state", snapshot, code)
+                    if ended:
+                        self._emit("party:ended", snapshot, code)
+                        return
+                time.sleep(0.35)
+        finally:
+            with self._lock:
+                session_obj = self._sessions.get(code)
+                if session_obj:
+                    session_obj.loop_running = False
+
+    def _emit(self, event: str, payload: dict[str, Any], code: str) -> None:
+        if self._socketio:
+            self._socketio.emit(event, payload, namespace=ARCADE_NAMESPACE, room=_party_room(code))
+
+    def _new_code_locked(self) -> str:
+        alphabet = string.ascii_uppercase + string.digits
+        while True:
+            code = "".join(secrets.choice(alphabet) for _ in range(5))
+            if code not in self._sessions and not arcade_manager.get(code):
+                return code
+
+    def _cleanup_locked(self) -> None:
+        now_ts = _now()
+        if now_ts - self._last_cleanup < SESSION_CLEANUP_INTERVAL_SECONDS:
+            return
+        self._last_cleanup = now_ts
+        expired = []
+        for code, session_obj in self._sessions.items():
+            ttl_expired = now_ts - session_obj.created_at > config.ARCADE_SESSION_TTL_SECONDS
+            ended_expired = session_obj.status == "ended" and session_obj.ended_at and now_ts - session_obj.ended_at > 120
+            if ttl_expired or ended_expired:
+                expired.append(code)
+        for code in expired:
+            self._sessions.pop(code, None)
+
+    def _dedupe_nickname_locked(self, session_obj: PartySession, nickname: str) -> str:
+        existing = {player.nickname for player in session_obj.players.values()}
+        if nickname not in existing:
+            return nickname
+        base = nickname[:6]
+        idx = 2
+        while f"{base}#{idx}" in existing:
+            idx += 1
+        return f"{base}#{idx}"
+
+    def _connected_players_locked(self, session_obj: PartySession) -> list[PartyPlayer]:
+        return [player for player in session_obj.players.values() if player.connected]
+
+    def _has_round_time_locked(self, session_obj: PartySession) -> bool:
+        return session_obj.ends_at - _now() >= PARTY_WAIT_SECONDS + PARTY_INTRO_SECONDS + PARTY_RESULT_SECONDS + 8
+
+    def _advance_locked(self, session_obj: PartySession) -> bool:
+        now_ts = _now()
+        if now_ts >= session_obj.ends_at:
+            self._end_locked(session_obj)
+            return True
+        if session_obj.status == "countdown" and now_ts >= session_obj.next_transition_at:
+            self._begin_round_locked(session_obj)
+            return True
+        if session_obj.status == "round_intro" and session_obj.current_round and now_ts >= session_obj.current_round.starts_at:
+            session_obj.status = "playing"
+            session_obj.current_round.status = "playing"
+            return True
+        if session_obj.status == "playing" and session_obj.current_round and now_ts >= session_obj.current_round.ends_at:
+            self._finish_round_locked(session_obj)
+            return True
+        if session_obj.status == "round_result" and now_ts >= session_obj.next_transition_at:
+            if session_obj.current_round_index >= session_obj.round_count or not self._has_round_time_locked(session_obj):
+                self._end_locked(session_obj)
+            else:
+                session_obj.status = "countdown"
+                session_obj.next_transition_at = now_ts + PARTY_WAIT_SECONDS
+            return True
+        return False
+
+    def _begin_round_locked(self, session_obj: PartySession) -> None:
+        participants = [player.id for player in self._connected_players_locked(session_obj)]
+        if not participants:
+            session_obj.status = "lobby"
+            return
+        definition = self._select_game_locked(session_obj, len(participants))
+        now_ts = _now()
+        intro_at = now_ts
+        starts_at = now_ts + PARTY_INTRO_SECONDS
+        ends_at = starts_at + int(definition["duration"])
+        result_at = ends_at + PARTY_RESULT_SECONDS
+        session_obj.current_round_index += 1
+        session_obj.current_round = PartyRound(
+            id=f"r{session_obj.current_round_index}-{secrets.token_hex(3)}",
+            index=session_obj.current_round_index,
+            definition=definition,
+            status="round_intro",
+            intro_at=intro_at,
+            starts_at=starts_at,
+            ends_at=min(ends_at, session_obj.ends_at),
+            result_at=min(result_at, session_obj.ends_at),
+            participants=participants,
+            prompt=self._make_prompt(definition, starts_at, ends_at),
+        )
+        session_obj.status = "round_intro"
+        session_obj.recent_game_ids.append(definition["id"])
+        del session_obj.recent_game_ids[:-3]
+
+    def _select_game_locked(self, session_obj: PartySession, player_count: int) -> dict[str, Any]:
+        candidates = [
+            definition
+            for definition in PARTY_MINIGAMES
+            if player_count >= int(definition.get("minPlayers") or 1)
+            and definition["id"] not in session_obj.recent_game_ids
+        ]
+        if not candidates:
+            candidates = [definition for definition in PARTY_MINIGAMES if player_count >= int(definition.get("minPlayers") or 1)]
+        return deepcopy(random.choice(candidates or list(PARTY_MINIGAMES)))
+
+    def _make_prompt(self, definition: dict[str, Any], starts_at: float, ends_at: float) -> dict[str, Any]:
+        config_data = definition.get("config") or {}
+        engine = definition["engine"]
+        prompt: dict[str, Any] = {
+            "engine": engine,
+            "durationMs": int((ends_at - starts_at) * 1000),
+        }
+        if engine == "reaction":
+            arm_at = starts_at + random.uniform(1.1, max(1.2, (ends_at - starts_at) - 1.0))
+            prompt.update({"signalAt": int(arm_at * 1000), "late": bool(config_data.get("late")), "label": config_data.get("signal") or "신호"})
+            if config_data.get("fake"):
+                fake_at = starts_at + max(0.45, (arm_at - starts_at) * 0.48)
+                prompt["fakeAt"] = int(fake_at * 1000)
+        elif engine == "timing":
+            prompt.update({"targetMs": int(config_data.get("targetMs") or 4000), "hold": bool(config_data.get("hold"))})
+        elif engine == "memory":
+            prompt["sequence"] = self._make_memory_sequence(config_data)
+        elif engine == "choice":
+            options = list(config_data.get("options") or ["A", "B", "C", "D"])
+            correct = config_data.get("correct")
+            if not correct and config_data.get("forbidden") in options:
+                correct_options = [option for option in options if option != config_data["forbidden"]]
+            else:
+                correct_options = [correct or random.choice(options)]
+            prompt.update({"options": options, "cue": config_data.get("cue"), "forbidden": config_data.get("forbidden"), "answers": correct_options})
+        elif engine == "majority":
+            prompt.update({"options": list(config_data.get("options") or ["A", "B"]), "unique": bool(config_data.get("unique"))})
+        elif engine == "luck":
+            options = list(config_data.get("options") or ["A", "B", "C"])
+            prompt.update({"options": options, "outcomes": {option: random.choice([0, 30, 60, 100]) for option in options}})
+        return prompt
+
+    def _make_memory_sequence(self, config_data: dict[str, Any]) -> list[str]:
+        pools = {
+            "colors": ["빨강", "파랑", "노랑", "초록"],
+            "directions": ["위", "아래", "왼쪽", "오른쪽"],
+            "numbers": list("0123456789"),
+        }
+        pool = pools.get(str(config_data.get("kind") or "colors"), pools["colors"])
+        length = int(config_data.get("length") or 5)
+        return [random.choice(pool) for _ in range(length)]
+
+    def _finish_round_locked(self, session_obj: PartySession) -> None:
+        round_obj = session_obj.current_round
+        if not round_obj or round_obj.status == "round_result":
+            return
+        round_obj.results = self._score_round_locked(session_obj, round_obj)
+        for result in round_obj.results:
+            player = session_obj.players.get(result["playerId"])
+            if not player:
+                continue
+            player.score += int(result["score"])
+            player.rounds_played += 1
+        round_obj.status = "round_result"
+        session_obj.status = "round_result"
+        session_obj.next_transition_at = min(_now() + PARTY_RESULT_SECONDS, session_obj.ends_at)
+
+    def _score_round_locked(self, session_obj: PartySession, round_obj: PartyRound) -> list[dict[str, Any]]:
+        engine = round_obj.definition["engine"]
+        scores: list[dict[str, Any]] = []
+        counts: dict[str, int] = {}
+        if engine == "majority":
+            for submission in round_obj.submissions.values():
+                value = str(submission.get("value") or "")
+                counts[value] = counts.get(value, 0) + 1
+        for player_id in round_obj.participants:
+            player = session_obj.players.get(player_id)
+            submission = round_obj.submissions.get(player_id)
+            score, note = self._score_submission(engine, round_obj, submission, counts)
+            scores.append({
+                "playerId": player_id,
+                "nickname": player.nickname if player else "Unknown",
+                "score": int(max(0, min(100, score))),
+                "note": note,
+                "submitted": bool(submission),
+            })
+        scores.sort(key=lambda item: item["score"], reverse=True)
+        return scores
+
+    def _score_submission(
+        self,
+        engine: str,
+        round_obj: PartyRound,
+        submission: dict[str, Any] | None,
+        counts: dict[str, int],
+    ) -> tuple[int, str]:
+        if not submission:
+            return 0, "미제출"
+        value = submission.get("value")
+        prompt = round_obj.prompt
+        submitted_at_ms = int(float(submission["submittedAt"]) * 1000)
+        if engine == "reaction":
+            signal_at = int(prompt["signalAt"])
+            if submitted_at_ms < signal_at:
+                return 0, "너무 빨랐음"
+            if prompt.get("late"):
+                diff = max(0, int(round_obj.ends_at * 1000) - submitted_at_ms)
+                return max(0, 100 - int(diff / 45)), "늦을수록 고득점"
+            reaction = submitted_at_ms - signal_at
+            return max(0, 100 - int(reaction / 18)), f"{reaction}ms"
+        if engine == "timing":
+            try:
+                value_ms = int(value)
+            except (TypeError, ValueError):
+                value_ms = submitted_at_ms - int(round_obj.starts_at * 1000)
+            target = int(prompt["targetMs"])
+            diff = abs(value_ms - target)
+            return max(0, 100 - int(diff / 22)), f"{diff}ms 차이"
+        if engine == "memory":
+            answer = [str(item) for item in prompt.get("sequence", [])]
+            given = [str(item) for item in (value if isinstance(value, list) else [])]
+            correct = sum(1 for idx, item in enumerate(answer) if idx < len(given) and given[idx] == item)
+            return int((correct / max(1, len(answer))) * 100), f"{correct}/{len(answer)}"
+        if engine == "choice":
+            answers = {str(item) for item in prompt.get("answers", [])}
+            return (100, "정답") if str(value) in answers else (0, "오답")
+        if engine == "majority":
+            choice = str(value)
+            if not choice:
+                return 0, "미선택"
+            if prompt.get("unique"):
+                return (100, "유일 선택") if counts.get(choice, 0) == 1 else (25, "겹침")
+            min_count = min(counts.values()) if counts else 0
+            return (100, "소수 선택") if counts.get(choice, 0) == min_count else (25, "다수 선택")
+        if engine == "luck":
+            outcomes = prompt.get("outcomes") or {}
+            score = int(outcomes.get(str(value), 0))
+            return score, f"{score}점"
+        return 0, "채점 불가"
+
+    def _end_locked(self, session_obj: PartySession) -> None:
+        if session_obj.status == "ended":
+            return
+        session_obj.status = "ended"
+        session_obj.ended_at = _now()
+
+    def _snapshot_locked(self, session_obj: PartySession) -> dict[str, Any]:
+        now_ts = _now()
+        players = [player.public() for player in session_obj.players.values()]
+        total_ranking = sorted(players, key=lambda item: item["score"], reverse=True)
+        average_ranking = sorted(players, key=lambda item: (item["averageScore"], item["roundsPlayed"]), reverse=True)
+        return {
+            "mode": "party",
+            "code": session_obj.code,
+            "grade": session_obj.grade,
+            "section": session_obj.section,
+            "status": session_obj.status,
+            "phaseLabel": session_obj.phase_label,
+            "roundIndex": session_obj.current_round_index,
+            "roundCount": session_obj.round_count,
+            "endsAt": int(session_obj.ends_at * 1000),
+            "nextTransitionAt": int(session_obj.next_transition_at * 1000),
+            "now": int(now_ts * 1000),
+            "players": players,
+            "currentRound": session_obj.current_round.public() if session_obj.current_round else None,
+            "rankings": {
+                "total": total_ranking,
+                "average": average_ranking,
+            },
+            "resultSeconds": PARTY_RESULT_SECONDS,
+        }
+
+
+party_manager = PartySessionManager()
+
+
 def _host_allowed(grade: int, section: int) -> bool:
     return is_teacher_session_active() or is_board_session_active(grade, section)
 
@@ -757,6 +1429,7 @@ def arcade_home():
     host_allowed = bool(grade and section and _host_allowed(grade, section))
     board_url = f"/board?grade={grade}&section={section}" if grade and section else "/"
     turf_url = f"/arcade/turf/host?grade={grade}&section={section}" if grade and section else ""
+    party_url = f"/arcade/party/host?grade={grade}&section={section}" if grade and section else ""
     return render_template(
         "arcade_home.html",
         arcade_enabled=config.ARCADE_ENABLED,
@@ -765,6 +1438,7 @@ def arcade_home():
         section=section,
         board_url=board_url,
         turf_url=turf_url,
+        party_url=party_url,
     )
 
 
@@ -780,6 +1454,20 @@ def arcade_turf_host():
 @blueprint.get("/arcade/join/<code>")
 def arcade_join(code: str):
     return render_template("arcade_join.html", code=str(code or "").upper(), arcade_enabled=config.ARCADE_ENABLED)
+
+
+@blueprint.get("/arcade/party/host")
+def arcade_party_host():
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+    if not grade or not section or not _host_allowed(grade, section):
+        return render_template("arcade_party_host.html", arcade_enabled=False, grade=grade, section=section)
+    return render_template("arcade_party_host.html", arcade_enabled=config.ARCADE_ENABLED, grade=grade, section=section)
+
+
+@blueprint.get("/arcade/party/join/<code>")
+def arcade_party_join(code: str):
+    return render_template("arcade_party_join.html", code=str(code or "").upper(), arcade_enabled=config.ARCADE_ENABLED)
 
 
 @blueprint.post("/api/arcade/sessions")
@@ -824,6 +1512,50 @@ def end_arcade_session(code: str):
     return jsonify(arcade_manager.snapshot(ended)) if ended else (jsonify({"error": "not found"}), 404)
 
 
+@blueprint.post("/api/arcade/party/sessions")
+def create_party_session():
+    payload = request.get_json(silent=True) or {}
+    grade = int(payload.get("grade") or 0)
+    section = int(payload.get("section") or 0)
+    if not grade or not section or not _host_allowed(grade, section):
+        return jsonify({"error": "not allowed"}), 403
+    allow_any_time = bool(payload.get("debugAllowAnyTime")) and config.ARCADE_DEBUG_ALLOW_ANY_TIME
+    session_obj, error = party_manager.create_session(grade, section, allow_any_time=allow_any_time)
+    if error or not session_obj:
+        return jsonify({"error": error or "failed"}), 400
+    return jsonify(party_manager.snapshot(session_obj))
+
+
+@blueprint.get("/api/arcade/party/sessions/<code>")
+def get_party_session(code: str):
+    session_obj = party_manager.get(code)
+    if not session_obj:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(party_manager.snapshot(session_obj))
+
+
+@blueprint.post("/api/arcade/party/sessions/<code>/start")
+def start_party_session(code: str):
+    session_obj = party_manager.get(code)
+    if not session_obj or not _host_allowed(session_obj.grade, session_obj.section):
+        return jsonify({"error": "not allowed"}), 403
+    updated, error = party_manager.start_now(code)
+    if error and not updated:
+        return jsonify({"error": error}), 400
+    snapshot = party_manager.snapshot(updated)
+    party_manager._emit("party:state", snapshot, str(code or "").upper())
+    return jsonify(snapshot)
+
+
+@blueprint.post("/api/arcade/party/sessions/<code>/end")
+def end_party_session(code: str):
+    session_obj = party_manager.get(code)
+    if not session_obj or not _host_allowed(session_obj.grade, session_obj.section):
+        return jsonify({"error": "not allowed"}), 403
+    ended = party_manager.end_session(code)
+    return jsonify(party_manager.snapshot(ended)) if ended else (jsonify({"error": "not found"}), 404)
+
+
 class ArcadeNamespace(Namespace):
     def on_connect(self):  # type: ignore[override]
         emit("arcade:connected", {"ok": True})
@@ -832,6 +1564,7 @@ class ArcadeNamespace(Namespace):
         code = request.args.get("code")
         player_id = request.args.get("playerId")
         arcade_manager.mark_connected(str(code or "").upper(), player_id, False)
+        party_manager.mark_connected(str(code or "").upper(), player_id, False)
 
     def on_join_host(self, data):  # type: ignore[override]
         code = str((data or {}).get("code") or "").upper()
@@ -879,12 +1612,71 @@ class ArcadeNamespace(Namespace):
         code = str((data or {}).get("code") or "").upper()
         leave_room(_room(code))
 
+    def on_party_join_host(self, data):  # type: ignore[override]
+        code = str((data or {}).get("code") or "").upper()
+        session_obj = party_manager.get(code)
+        if not session_obj:
+            emit("party:error", {"message": "세션을 찾을 수 없습니다."})
+            return
+        join_room(_party_room(code))
+        emit("party:state", party_manager.snapshot(session_obj))
+        self._ensure_party_loop(code)
+
+    def on_party_join_player(self, data):  # type: ignore[override]
+        payload = data or {}
+        code = str(payload.get("code") or "").upper()
+        player_id = str(payload.get("playerId") or "").strip()
+        if not player_id:
+            emit("party:error", {"message": "playerId가 없습니다."})
+            return
+        player, error = party_manager.join_player(
+            code,
+            player_id,
+            payload.get("nickname") or "",
+            payload.get("avatar") or 0,
+        )
+        if error or not player:
+            emit("party:error", {"message": error or "입장할 수 없습니다."})
+            return
+        join_room(_party_room(code))
+        session_obj = party_manager.get(code)
+        if not session_obj:
+            emit("party:error", {"message": "세션을 찾을 수 없습니다."})
+            return
+        snapshot = party_manager.snapshot(session_obj)
+        emit("party:joined", {"player": player.public(), "session": snapshot})
+        party_manager._emit("party:state", snapshot, code)
+        self._ensure_party_loop(code)
+
+    def on_party_submit(self, data):  # type: ignore[override]
+        payload = data or {}
+        code = str(payload.get("code") or "").upper()
+        player_id = str(payload.get("playerId") or "").strip()
+        session_obj, error = party_manager.submit(code, player_id, payload.get("value"))
+        if error and not session_obj:
+            emit("party:error", {"message": error})
+            return
+        if session_obj:
+            snapshot = party_manager.snapshot(session_obj)
+            emit("party:submitted", {"ok": True, "session": snapshot})
+            party_manager._emit("party:state", snapshot, code)
+
+    def on_party_leave(self, data):  # type: ignore[override]
+        code = str((data or {}).get("code") or "").upper()
+        leave_room(_party_room(code))
+
     def _ensure_tick(self, code: str) -> None:
         socketio = arcade_manager._socketio
         if socketio:
             socketio.start_background_task(arcade_manager.tick, code)
 
+    def _ensure_party_loop(self, code: str) -> None:
+        socketio = party_manager._socketio
+        if socketio:
+            socketio.start_background_task(party_manager.run_loop, code)
+
 
 def init_arcade_socketio(socketio: Any) -> None:
     arcade_manager.bind_socketio(socketio)
+    party_manager.bind_socketio(socketio)
     socketio.on_namespace(ArcadeNamespace(ARCADE_NAMESPACE))

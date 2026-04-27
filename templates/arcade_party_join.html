@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DimiCheck Party 참여</title>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <style>
+    :root {
+      --panel: rgba(255, 255, 255, 0.9);
+      --ink: #243044;
+      --muted: #728097;
+      --line: rgba(36, 48, 68, 0.12);
+      --gold: #ffb703;
+      --green: #75d66f;
+      --pink: #ff5f7a;
+      --blue: #35a7ff;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 15% 8%, rgba(255, 191, 105, 0.52), transparent 30%),
+        radial-gradient(circle at 84% 22%, rgba(123, 214, 255, 0.5), transparent 32%),
+        radial-gradient(circle at 70% 90%, rgba(255, 121, 156, 0.34), transparent 28%),
+        linear-gradient(160deg, #fff8e8 0%, #effbff 58%, #fff1f6 100%);
+      touch-action: manipulation;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: radial-gradient(circle, rgba(36, 48, 68, 0.08) 1.5px, transparent 1.5px);
+      background-size: 26px 26px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent 78%);
+    }
+    .shell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 18px;
+    }
+    .card {
+      width: min(470px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 34px;
+      background: var(--panel);
+      box-shadow: 0 14px 0 rgba(36, 48, 68, 0.08), 0 26px 64px rgba(53, 167, 255, 0.13);
+      backdrop-filter: blur(14px);
+      padding: 24px;
+      animation: cardIn 0.55s cubic-bezier(.2, 1.2, .2, 1) both;
+    }
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(18px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .brand img {
+      width: 44px;
+      height: 44px;
+      border-radius: 17px;
+      box-shadow: 0 8px 20px rgba(36, 48, 68, 0.14);
+    }
+    h1, h2, p { margin: 0; }
+    h1 { font-size: 30px; letter-spacing: -0.05em; }
+    .muted { color: var(--muted); line-height: 1.55; font-weight: 750; }
+    .code {
+      display: inline-flex;
+      margin-top: 4px;
+      border-radius: 999px;
+      padding: 7px 11px;
+      background: #fff0b5;
+      color: #1f2a44;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+    }
+    form {
+      display: grid;
+      gap: 14px;
+      margin-top: 22px;
+    }
+    label { color: #344057; font-weight: 850; }
+    input {
+      width: 100%;
+      border: 2px solid rgba(36, 48, 68, 0.1);
+      border-radius: 24px;
+      padding: 16px;
+      color: var(--ink);
+      background: #fff;
+      font: inherit;
+      font-size: 18px;
+      outline: none;
+      box-shadow: inset 0 -5px 0 rgba(36, 48, 68, 0.04);
+    }
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 16px;
+      color: #17110d;
+      background: linear-gradient(135deg, #ffde59, #75d66f);
+      font: inherit;
+      font-weight: 950;
+      cursor: pointer;
+      box-shadow: 0 8px 0 rgba(36, 48, 68, 0.13);
+      transition: transform 0.16s cubic-bezier(.2, 1.4, .2, 1), box-shadow 0.16s ease, opacity 0.18s ease;
+    }
+    button:active {
+      transform: translateY(4px);
+      box-shadow: 0 4px 0 rgba(36, 48, 68, 0.13);
+    }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .entry.hidden { display: none; }
+    .game { display: none; gap: 16px; }
+    .game.active { display: grid; }
+    .status-card {
+      display: grid;
+      gap: 8px;
+      border: 3px solid #fff;
+      border-radius: 30px;
+      padding: 18px;
+      background: linear-gradient(180deg, #ffffff 0%, #fff6df 100%);
+      box-shadow: inset 0 -8px 0 rgba(36, 48, 68, 0.05);
+      animation: popIn 0.38s cubic-bezier(.2, 1.6, .2, 1) both;
+    }
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.92) translateY(12px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .round-name {
+      font-size: 34px;
+      font-weight: 950;
+      letter-spacing: -0.05em;
+    }
+    .score-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .mini {
+      border: 1px solid rgba(36, 48, 68, 0.08);
+      border-radius: 24px;
+      padding: 14px;
+      background: #fff;
+      box-shadow: inset 0 -5px 0 rgba(36, 48, 68, 0.05);
+    }
+    .mini b {
+      display: block;
+      margin-top: 6px;
+      font-size: 26px;
+    }
+    .controls {
+      display: grid;
+      gap: 10px;
+    }
+    .choice-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .choice-grid button { min-height: 70px; background: #fff; }
+    .choice-grid button.selected {
+      background: linear-gradient(135deg, #9ae1ff, #ffde59);
+      transform: translateY(3px);
+      box-shadow: 0 4px 0 rgba(36, 48, 68, 0.13);
+    }
+    .sequence-answer {
+      min-height: 42px;
+      border-radius: 18px;
+      padding: 10px;
+      background: #fff;
+      text-align: center;
+      font-weight: 900;
+    }
+    .big-button {
+      min-height: 150px;
+      font-size: 28px;
+      animation: buttonFloat 2.2s ease-in-out infinite;
+    }
+    .big-button.ready {
+      background: linear-gradient(135deg, #75d66f, #ffde59);
+      box-shadow: 0 10px 0 rgba(36, 48, 68, 0.15), 0 0 0 8px rgba(117, 214, 111, 0.16);
+    }
+    .big-button.waiting {
+      background: #243044;
+      color: #fff;
+    }
+    .big-button.danger {
+      background: linear-gradient(135deg, #ff8fab, #ffde59);
+    }
+    @keyframes buttonFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+    .error {
+      margin-top: 12px;
+      border-radius: 20px;
+      padding: 12px 14px;
+      background: #ffe1e8;
+      color: #bf3751;
+      line-height: 1.45;
+    }
+  </style>
+</head>
+<body>
+  <main class="shell" data-code="{{ code }}" data-enabled="{{ '1' if arcade_enabled else '0' }}">
+    <section class="card">
+      <div class="brand">
+        <img src="/logo.png" alt="">
+        <div>
+          <h1>Party 참여</h1>
+          <p class="muted">입장 코드 <span class="code">{{ code }}</span></p>
+        </div>
+      </div>
+
+      <div id="entryPanel" class="entry">
+        <p class="muted">닉네임만 입력하면 다음 라운드부터 참여합니다.</p>
+        <form id="joinForm">
+          <label for="nicknameInput">닉네임</label>
+          <input id="nicknameInput" autocomplete="nickname" maxlength="8" placeholder="예: 민준" required>
+          <button id="joinButton" type="submit">입장하기</button>
+        </form>
+      </div>
+
+      <div id="gamePanel" class="game">
+        <section class="status-card">
+          <p class="muted" id="statusText">연결 중</p>
+          <div class="round-name" id="roundName">대기 중</div>
+          <p class="muted" id="instruction">다음 라운드를 기다려 주세요.</p>
+        </section>
+
+        <section class="score-row">
+          <div class="mini">내 점수<b id="myScore">0</b></div>
+          <div class="mini">남은 시간<b id="remainingTime">--</b></div>
+        </section>
+
+        <section class="controls" id="controls"></section>
+        <div id="errorBox" class="error" hidden></div>
+      </div>
+
+      <div id="entryErrorBox" class="error" hidden></div>
+    </section>
+  </main>
+  <script src="/js/arcade-party-join.js?v={{ asset_version }}"></script>
+</body>
+</html>

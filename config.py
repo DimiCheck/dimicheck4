@@ -28,6 +28,8 @@ def _default_asset_version() -> str:
         "js/info.js",
         "js/arcade-host.js",
         "js/arcade-join.js",
+        "js/arcade-party-host.js",
+        "js/arcade-party-join.js",
         "js/reset.js",
         "arcade_routes.py",
         "main.css",
@@ -35,6 +37,8 @@ def _default_asset_version() -> str:
         "templates/arcade_home.html",
         "templates/arcade_host.html",
         "templates/arcade_join.html",
+        "templates/arcade_party_host.html",
+        "templates/arcade_party_join.html",
     )
     latest_mtime = 0
     for rel_path in tracked_files:

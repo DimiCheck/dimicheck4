@@ -126,6 +126,10 @@ def test_arcade_session_routes_require_board_session_and_create(monkeypatch, tmp
     assert turf_host.status_code == 200
     assert b"Arcade" in turf_host.data
 
+    party_host = client.get("/arcade/party/host?grade=2&section=4")
+    assert party_host.status_code == 200
+    assert b"Party Mode" in party_host.data
+
 
 def test_arcade_availability_hides_menu_outside_allowed_window(monkeypatch, tmp_path):
     app_module = _load_app(monkeypatch, tmp_path)
@@ -207,6 +211,192 @@ def test_arcade_debug_any_time_requires_explicit_server_flag(monkeypatch, tmp_pa
     allowed = client.post("/api/arcade/sessions", json={"grade": 2, "section": 4, "debugAllowAnyTime": True})
     assert allowed.status_code == 200
     assert allowed.get_json()["phaseLabel"] == "테스트 모드"
+
+
+def test_party_session_routes_create_and_start_with_one_player(monkeypatch, tmp_path):
+    app_module = _load_app(monkeypatch, tmp_path)
+    arcade_routes = importlib.import_module("arcade_routes")
+    monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: _allowed_window())
+
+    client = app_module.app.test_client()
+    forbidden = client.post("/api/arcade/party/sessions", json={"grade": 2, "section": 4})
+    assert forbidden.status_code == 403
+
+    with client.session_transaction() as session_state:
+        session_state["board_verified_2_4"] = True
+
+    response = client.post("/api/arcade/party/sessions", json={"grade": 2, "section": 4})
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["mode"] == "party"
+    assert payload["status"] == "lobby"
+    assert payload["roundCount"] == 6
+
+    code = payload["code"]
+    join_page = client.get(f"/arcade/party/join/{code}")
+    assert join_page.status_code == 200
+    assert b"Party" in join_page.data
+
+    session_obj = arcade_routes.party_manager.get(code)
+    player, error = arcade_routes.party_manager.join_player(code, "p1", "하나", 0)
+    assert error is None
+    assert player is not None
+
+    started = client.post(f"/api/arcade/party/sessions/{code}/start")
+    assert started.status_code == 200
+    assert started.get_json()["status"] == "countdown"
+    assert session_obj.status == "countdown"
+
+
+def test_party_round_scores_and_late_join_waits_for_next_round(monkeypatch):
+    arcade_routes = importlib.import_module("arcade_routes")
+    monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: _allowed_window())
+
+    manager = arcade_routes.PartySessionManager()
+    session_obj, error = manager.create_session(2, 4)
+    assert error is None
+    assert session_obj is not None
+    manager.join_player(session_obj.code, "p1", "하나", 0)
+    manager.join_player(session_obj.code, "p2", "둘둘", 1)
+
+    definition = {
+        "id": "choice-test",
+        "engine": "choice",
+        "title": "테스트 선택",
+        "instruction": "정답을 고르세요.",
+        "minPlayers": 1,
+        "duration": 8,
+        "config": {"options": ["A", "B"], "correct": "A"},
+    }
+    monkeypatch.setattr(manager, "_select_game_locked", lambda _session_obj, _count: definition)
+
+    started, start_error = manager.start_now(session_obj.code)
+    assert start_error is None
+    assert started is session_obj
+    with manager._lock:
+        session_obj.next_transition_at = time.time() - 1
+        assert manager._advance_locked(session_obj) is True
+        assert session_obj.status == "round_intro"
+        assert session_obj.current_round is not None
+        session_obj.current_round.starts_at = time.time() - 1
+        assert manager._advance_locked(session_obj) is True
+        assert session_obj.status == "playing"
+
+    late_player, late_error = manager.join_player(session_obj.code, "p3", "셋셋", 2)
+    assert late_error is None
+    assert late_player is not None
+    assert "p3" not in session_obj.current_round.participants
+
+    submitted, submit_error = manager.submit(session_obj.code, "p1", "A")
+    assert submit_error is None
+    assert submitted is session_obj
+    manager.submit(session_obj.code, "p2", "B")
+
+    assert session_obj.status == "round_result"
+    scores = {result["playerId"]: result["score"] for result in session_obj.current_round.results}
+    assert scores["p1"] == 100
+    assert scores["p2"] == 0
+    assert session_obj.players["p1"].score == 100
+    assert session_obj.players["p2"].rounds_played == 1
+    assert session_obj.players["p3"].rounds_played == 0
+
+    with manager._lock:
+        session_obj.next_transition_at = time.time() - 1
+        assert manager._advance_locked(session_obj) is True
+        assert session_obj.status == "countdown"
+        session_obj.next_transition_at = time.time() - 1
+        assert manager._advance_locked(session_obj) is True
+        assert session_obj.current_round is not None
+        assert "p3" in session_obj.current_round.participants
+
+
+def test_party_minigame_pack_covers_engine_types():
+    arcade_routes = importlib.import_module("arcade_routes")
+    games = arcade_routes.PARTY_MINIGAMES
+    assert len(games) >= 16
+    engines = {game["engine"] for game in games}
+    assert {"reaction", "timing", "memory", "choice", "majority", "luck"} <= engines
+    assert all(game["title"] and game["instruction"] for game in games)
+    assert any(game["id"] == "reaction_fake" and game["config"].get("fake") for game in games)
+
+
+def test_party_score_engines_handle_common_round_types():
+    arcade_routes = importlib.import_module("arcade_routes")
+    manager = arcade_routes.PartySessionManager()
+    now = time.time()
+    session_obj = arcade_routes.PartySession(
+        code="TEST1",
+        grade=2,
+        section=4,
+        status="playing",
+        created_at=now,
+        ends_at=now + 120,
+        phase_label="테스트",
+        players={
+            "p1": arcade_routes.PartyPlayer(id="p1", nickname="하나", avatar=0),
+            "p2": arcade_routes.PartyPlayer(id="p2", nickname="둘둘", avatar=1),
+        },
+    )
+
+    def make_round(engine, prompt, submissions):
+        return arcade_routes.PartyRound(
+            id=f"{engine}-round",
+            index=1,
+            definition={"id": engine, "engine": engine, "title": engine, "instruction": engine},
+            status="playing",
+            intro_at=now,
+            starts_at=now,
+            ends_at=now + 10,
+            result_at=now + 15,
+            participants=["p1", "p2"],
+            prompt=prompt,
+            submissions=submissions,
+        )
+
+    reaction_round = make_round(
+        "reaction",
+        {"signalAt": int((now + 1) * 1000)},
+        {"p1": {"value": "tap", "submittedAt": now + 1.2}, "p2": {"value": "tap", "submittedAt": now + 2.0}},
+    )
+    assert manager._score_round_locked(session_obj, reaction_round)[0]["playerId"] == "p1"
+
+    timing_round = make_round(
+        "timing",
+        {"targetMs": 4000},
+        {"p1": {"value": 4020, "submittedAt": now + 4}, "p2": {"value": 6200, "submittedAt": now + 6.2}},
+    )
+    assert manager._score_round_locked(session_obj, timing_round)[0]["score"] > 90
+
+    memory_round = make_round(
+        "memory",
+        {"sequence": ["빨강", "파랑", "초록"]},
+        {"p1": {"value": ["빨강", "파랑", "초록"], "submittedAt": now + 4}, "p2": {"value": ["빨강"], "submittedAt": now + 5}},
+    )
+    assert manager._score_round_locked(session_obj, memory_round)[0]["score"] == 100
+
+    choice_round = make_round(
+        "choice",
+        {"answers": ["A"]},
+        {"p1": {"value": "A", "submittedAt": now + 4}, "p2": {"value": "B", "submittedAt": now + 5}},
+    )
+    assert {result["playerId"]: result["score"] for result in manager._score_round_locked(session_obj, choice_round)} == {
+        "p1": 100,
+        "p2": 0,
+    }
+
+    majority_round = make_round(
+        "majority",
+        {"options": ["A", "B"]},
+        {"p1": {"value": "A", "submittedAt": now + 4}, "p2": {"value": "B", "submittedAt": now + 5}},
+    )
+    assert all(result["score"] == 100 for result in manager._score_round_locked(session_obj, majority_round))
+
+    luck_round = make_round(
+        "luck",
+        {"outcomes": {"문1": 30, "문2": 100}},
+        {"p1": {"value": "문1", "submittedAt": now + 4}, "p2": {"value": "문2", "submittedAt": now + 5}},
+    )
+    assert manager._score_round_locked(session_obj, luck_round)[0]["playerId"] == "p2"
 
 
 def test_arcade_manager_assigns_balanced_teams_and_claims_spawn_cells(monkeypatch):

@@ -300,14 +300,19 @@
           </div>
         </article>
 
-        <article class="game-card disabled">
-          <span class="badge">NEXT</span>
+        <article class="game-card live">
+          <span class="badge">PARTY</span>
           <div>
-            <h3>라이브 퀴즈</h3>
-            <p>반 전체가 휴대폰으로 답하는 빠른 퀴즈 모드. 아직 준비 중입니다.</p>
+            <h3>Party Mode</h3>
+            <p>QR로 들어와 짧은 미니게임을 연속으로 플레이합니다. 중간 입장은 다음 라운드부터 자연스럽게 참여합니다.</p>
           </div>
           <div class="card-actions">
-            <span class="pill locked">준비 중</span>
+            {% if arcade_enabled and host_allowed %}
+              <a class="pill primary" href="{{ party_url }}">전자칠판에서 시작</a>
+              <span class="small-note">1명부터 시작 가능</span>
+            {% else %}
+              <span class="pill locked">Board 인증 후 사용 가능</span>
+            {% endif %}
           </div>
         </article>
       </div>

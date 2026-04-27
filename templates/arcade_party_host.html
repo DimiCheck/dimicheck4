@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DimiCheck Party</title>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <style>
+    :root {
+      --bg: #fff8e8;
+      --panel: rgba(255, 255, 255, 0.86);
+      --ink: #243044;
+      --muted: #728097;
+      --line: rgba(36, 48, 68, 0.12);
+      --gold: #ffb703;
+      --green: #75d66f;
+      --pink: #ff5f7a;
+      --blue: #35a7ff;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 13% 12%, rgba(255, 191, 105, 0.52), transparent 25%),
+        radial-gradient(circle at 86% 18%, rgba(123, 214, 255, 0.52), transparent 27%),
+        radial-gradient(circle at 74% 86%, rgba(255, 121, 156, 0.33), transparent 29%),
+        linear-gradient(145deg, #fff8e8 0%, #effbff 48%, #fff1f6 100%);
+      overflow: hidden;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: radial-gradient(circle, rgba(36, 48, 68, 0.08) 1.5px, transparent 1.5px);
+      background-size: 28px 28px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,0.65), transparent 82%);
+    }
+    h1, h2, h3, p { margin: 0; }
+    .page {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+      gap: 22px;
+      height: 100vh;
+      padding: 22px;
+    }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 34px;
+      background: var(--panel);
+      box-shadow: 0 18px 0 rgba(36, 48, 68, 0.08), 0 28px 70px rgba(53, 167, 255, 0.13);
+      backdrop-filter: blur(14px);
+      animation: cardIn 0.55s cubic-bezier(.2, 1.2, .2, 1) both;
+    }
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(18px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .side {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 24px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .brand img {
+      width: 48px;
+      height: 48px;
+      border-radius: 18px;
+      box-shadow: 0 8px 20px rgba(36, 48, 68, 0.14);
+    }
+    h1 {
+      font-size: 34px;
+      letter-spacing: -0.06em;
+    }
+    .muted {
+      color: var(--muted);
+      line-height: 1.55;
+      font-weight: 750;
+    }
+    .code-card {
+      display: grid;
+      gap: 12px;
+      padding: 18px;
+      border: 3px solid #fff;
+      border-radius: 30px;
+      background: linear-gradient(180deg, #ffffff 0%, #fff4cf 100%);
+      box-shadow: inset 0 -8px 0 rgba(255, 183, 3, 0.13), 0 16px 28px rgba(255, 183, 3, 0.16);
+    }
+    .code {
+      font-size: clamp(42px, 9vw, 76px);
+      font-weight: 950;
+      line-height: 0.95;
+      letter-spacing: 0.05em;
+      text-align: center;
+      text-shadow: 0 4px 0 rgba(255, 183, 3, 0.24);
+      animation: softBounce 1.8s ease-in-out infinite;
+    }
+    @keyframes softBounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    .qr-wrap {
+      display: grid;
+      place-items: center;
+      min-height: 230px;
+      border: 2px dashed rgba(36, 48, 68, 0.18);
+      border-radius: 28px;
+      background: #fff;
+      padding: 16px;
+    }
+    .qr-wrap img {
+      width: min(230px, 100%);
+      height: auto;
+      display: block;
+    }
+    .join-link {
+      overflow: hidden;
+      color: #5c6b84;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+      text-align: center;
+    }
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    button, .button-link {
+      border: 0;
+      border-radius: 999px;
+      padding: 14px 16px;
+      color: var(--ink);
+      background: #fff1bd;
+      font: inherit;
+      font-weight: 900;
+      text-align: center;
+      text-decoration: none;
+      cursor: pointer;
+      box-shadow: 0 7px 0 rgba(36, 48, 68, 0.13);
+      transition: transform 0.16s cubic-bezier(.2, 1.4, .2, 1), box-shadow 0.16s ease, opacity 0.18s ease;
+    }
+    button:active, .button-link:active {
+      transform: translateY(3px);
+      box-shadow: 0 3px 0 rgba(36, 48, 68, 0.13);
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    .primary { background: linear-gradient(135deg, #7bd66f, #ffde59); }
+    .danger { background: #ffe1e8; color: #bf3751; }
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .stat {
+      padding: 14px;
+      border: 1px solid rgba(36, 48, 68, 0.08);
+      border-radius: 24px;
+      background: #fff;
+      box-shadow: inset 0 -5px 0 rgba(36, 48, 68, 0.05);
+    }
+    .stat b {
+      display: block;
+      margin-top: 6px;
+      font-size: 24px;
+    }
+    .stage {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 18px;
+      padding: 24px;
+      overflow: hidden;
+    }
+    .stage-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+    }
+    .status-pill {
+      display: inline-flex;
+      border: 2px solid #fff;
+      border-radius: 999px;
+      padding: 9px 13px;
+      background: #fff;
+      font-weight: 900;
+      box-shadow: 0 8px 18px rgba(36, 48, 68, 0.09);
+    }
+    .game-card {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-height: 0;
+      border: 5px solid #fff;
+      border-radius: 38px;
+      padding: 34px;
+      background:
+        radial-gradient(circle at 14% 20%, rgba(255, 183, 3, 0.28), transparent 28%),
+        radial-gradient(circle at 86% 20%, rgba(53, 167, 255, 0.24), transparent 30%),
+        linear-gradient(180deg, #fff 0%, #fff7dd 100%);
+      box-shadow: inset 0 -14px 0 rgba(36, 48, 68, 0.05), 0 18px 0 rgba(36, 48, 68, 0.08);
+      text-align: center;
+    }
+    .round-title {
+      font-size: clamp(48px, 7vw, 108px);
+      line-height: 0.92;
+      letter-spacing: -0.07em;
+    }
+    .instruction {
+      margin-top: 14px;
+      color: #536176;
+      font-size: clamp(18px, 2vw, 28px);
+      font-weight: 850;
+    }
+    .prompt {
+      margin-top: 28px;
+      font-size: clamp(28px, 4vw, 58px);
+      font-weight: 950;
+    }
+    .prompt.cue {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: min(520px, 100%);
+      border: 5px solid #fff;
+      border-radius: 34px;
+      padding: 22px 28px;
+      background: #243044;
+      color: #fff;
+      box-shadow: 0 14px 0 rgba(36, 48, 68, 0.16);
+      transform: rotate(-1deg);
+    }
+    .prompt.cue.ready {
+      background: linear-gradient(135deg, #75d66f, #ffde59);
+      color: #172017;
+      animation: cuePop 0.4s cubic-bezier(.2, 1.7, .2, 1) both;
+    }
+    @keyframes cuePop {
+      from { transform: scale(0.88) rotate(1deg); }
+      to { transform: scale(1) rotate(-1deg); }
+    }
+    .sequence {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 26px;
+    }
+    .seq-chip {
+      min-width: 72px;
+      border-radius: 24px;
+      padding: 16px 20px;
+      background: #fff;
+      box-shadow: 0 8px 0 rgba(36, 48, 68, 0.1);
+      font-size: 28px;
+      font-weight: 950;
+    }
+    .meter {
+      width: min(620px, 100%);
+      height: 24px;
+      margin: 28px auto 0;
+      border: 4px solid #fff;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(36, 48, 68, 0.1);
+    }
+    .meter span {
+      display: block;
+      width: var(--progress, 0%);
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--pink), var(--gold), var(--green));
+      transition: width 0.25s linear;
+    }
+    .roster, .rankings {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-content: flex-start;
+      overflow: auto;
+    }
+    .ranking-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      width: 100%;
+      align-items: center;
+    }
+    .rank-title {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: #243044;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 950;
+    }
+    .chip {
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: #fff;
+      color: #344057;
+      font-size: 13px;
+      font-weight: 850;
+      box-shadow: inset 0 -3px 0 rgba(36, 48, 68, 0.05);
+    }
+    .results {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      width: min(900px, 100%);
+      margin: 28px auto 0;
+    }
+    .result-card {
+      border-radius: 26px;
+      padding: 16px;
+      background: #fff;
+      box-shadow: 0 8px 0 rgba(36, 48, 68, 0.1);
+      font-weight: 900;
+    }
+    .error {
+      padding: 14px;
+      border-radius: 20px;
+      background: #ffe1e8;
+      color: #bf3751;
+      line-height: 1.5;
+    }
+    @media (max-width: 900px) {
+      body { overflow: auto; }
+      .page { grid-template-columns: 1fr; height: auto; min-height: 100vh; }
+      .game-card { min-height: 440px; }
+      .results { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page" data-grade="{{ grade or '' }}" data-section="{{ section or '' }}" data-enabled="{{ '1' if arcade_enabled else '0' }}">
+    <aside class="side panel">
+      <div class="brand">
+        <img src="/logo.png" alt="">
+        <div>
+          <h1>Party Mode</h1>
+          <p class="muted">짧은 미니게임을 라운드로 이어갑니다.</p>
+        </div>
+      </div>
+
+      <div id="hostError" class="error" hidden></div>
+
+      <section class="code-card" id="joinCard" hidden>
+        <div class="code" id="sessionCode">-----</div>
+        <div class="qr-wrap"><img id="qrImage" alt="참여 QR 코드"></div>
+        <div class="join-link" id="joinLink"></div>
+      </section>
+
+      <section class="stats">
+        <div class="stat">참가자<b id="playerCount">0명</b></div>
+        <div class="stat">라운드<b id="roundCount">0/6</b></div>
+        <div class="stat">제출<b id="submitCount">0/0</b></div>
+        <div class="stat">남은 시간<b id="remainingTime">--</b></div>
+      </section>
+
+      <div class="actions">
+        <button id="startButton" class="primary" disabled>시작</button>
+        <button id="endButton" class="danger" disabled>종료</button>
+        <a id="boardLink" class="button-link" href="/">Board로 돌아가기</a>
+      </div>
+
+      <div class="roster" id="roster"></div>
+    </aside>
+
+    <section class="stage panel">
+      <div class="stage-head">
+        <div>
+          <div class="status-pill" id="statusText">Party 준비 중</div>
+          <p class="muted" id="phaseText">잠시만 기다려 주세요.</p>
+        </div>
+      </div>
+      <div class="game-card" id="gameCard">
+        <div>
+          <h2 class="round-title" id="roundTitle">준비 중</h2>
+          <p class="instruction" id="instruction">세션을 만드는 중입니다.</p>
+          <div class="prompt" id="promptText"></div>
+          <div class="sequence" id="sequence"></div>
+          <div class="meter"><span id="progressBar"></span></div>
+          <div class="results" id="results"></div>
+        </div>
+      </div>
+      <div class="rankings" id="rankings"></div>
+    </section>
+  </main>
+  <script src="/js/arcade-party-host.js?v={{ asset_version }}"></script>
+</body>
+</html>
