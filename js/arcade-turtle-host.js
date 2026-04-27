@@ -124,24 +124,27 @@
     els.statusText.textContent = statusLabel(state.status);
     els.raceStatus.textContent = statusLabel(state.status);
     els.phaseText.textContent = state.phaseLabel ? state.phaseLabel + ' · 거북이 경주' : '거북이 경주';
-    els.playerCount.textContent = (state.players || []).filter(function (player) { return player.connected; }).length + '명';
-    els.startButton.disabled = state.status !== 'lobby' || !(state.players || []).some(function (player) { return player.connected; });
+    var racers = (state.players || []).filter(function (player) { return player.role === 'player' && player.connected; }).length;
+    var saboteurs = (state.players || []).filter(function (player) { return player.role === 'saboteur' && player.connected; }).length;
+    els.playerCount.textContent = '플레이어 ' + racers + '명 · 훼방 ' + saboteurs + '명';
+    els.startButton.disabled = state.status !== 'lobby' || racers < Number(state.minRacers || 2);
     els.endButton.disabled = state.status === 'ended';
     renderTrack(state.players || []);
-    renderRankings(state.rankings || []);
+    renderRankings(state);
     updateClock();
   }
 
   function renderTrack(players) {
     els.track.querySelectorAll('.lane').forEach(function (node) { node.remove(); });
-    if (!players.length) {
+    var racers = players.filter(function (player) { return player.role === 'player'; });
+    if (!racers.length) {
       var empty = document.createElement('div');
       empty.className = 'lane';
-      empty.innerHTML = '<span class="lane-name">QR로 참가자를 기다리는 중</span><span class="turtle"><img src="/turtle-01.png" alt=""></span>';
+      empty.innerHTML = '<span class="lane-name">플레이어 2명을 기다리는 중</span><span class="turtle"><img src="/turtle-01.png" alt=""></span>';
       els.track.appendChild(empty);
       return;
     }
-    players.forEach(function (player) {
+    racers.forEach(function (player) {
       var lane = document.createElement('div');
       lane.className = 'lane';
       var name = document.createElement('span');
@@ -166,9 +169,21 @@
     });
   }
 
-  function renderRankings(rankings) {
+  function renderRankings(state) {
     els.rankings.innerHTML = '';
-    (rankings || []).slice(0, 12).forEach(function (player, index) {
+    if (state.status === 'racing' && state.sabotageVote && state.sabotageVote.endsAt) {
+      var voteChip = document.createElement('div');
+      voteChip.className = 'chip';
+      voteChip.textContent = '훼방 투표 ' + formatSeconds(state.sabotageVote.endsAt - currentServerNow()) + '초 · ' + (state.sabotageVote.votesCount || 0) + '표';
+      els.rankings.appendChild(voteChip);
+    }
+    (state.recentEvents || []).slice(-3).reverse().forEach(function (event) {
+      var eventChip = document.createElement('div');
+      eventChip.className = 'chip';
+      eventChip.textContent = event.message || (event.itemLabel + ' → ' + event.targetNickname);
+      els.rankings.appendChild(eventChip);
+    });
+    (state.rankings || []).slice(0, 12).forEach(function (player, index) {
       var chip = document.createElement('div');
       chip.className = 'chip';
       chip.textContent = (index + 1) + '위 ' + player.nickname + ' · ' + Math.round(player.progressPercent) + '% · ' + player.taps + '탭';
@@ -193,6 +208,9 @@
       els.timerText.textContent = '끝';
     } else {
       els.timerText.textContent = '--';
+    }
+    if (sessionState.status === 'racing') {
+      renderRankings(sessionState);
     }
   }
 

@@ -83,6 +83,22 @@
       font-weight: 950;
     }
     .skin-picker.is-locked { opacity: 0.62; pointer-events: none; }
+    .role-picker {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .role-option {
+      min-height: 78px;
+      border: 3px solid transparent;
+      background: #fff;
+      color: var(--ink);
+      box-shadow: inset 0 -6px 0 rgba(33,48,71,0.06), 0 8px 0 rgba(33,48,71,0.08);
+    }
+    .role-option.is-selected {
+      border-color: #213047;
+      background: linear-gradient(180deg, #fff 0%, #eef6ff 100%);
+    }
     input {
       width: 100%;
       border: 0;
@@ -149,8 +165,47 @@
       margin-right: 8px;
       filter: drop-shadow(0 7px 0 rgba(33,48,71,0.1));
     }
+    .tap-button.is-shrunk {
+      min-height: 142px;
+      width: 70%;
+      justify-self: center;
+      animation: turtle-dodge 0.7s ease-in-out infinite alternate;
+    }
+    .fake-reset {
+      display: none;
+      border-radius: 30px;
+      background: #ff3b30;
+      color: #fff;
+      box-shadow: 0 9px 0 rgba(160,30,24,0.22);
+      font-size: 24px;
+    }
+    .fake-reset.is-active { display: block; }
+    .sabotage-panel {
+      display: none;
+      gap: 12px;
+    }
+    .sabotage-panel.active { display: grid; }
+    .choice-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .choice-grid button {
+      min-height: 64px;
+      background: #fff;
+      color: var(--ink);
+      box-shadow: inset 0 -6px 0 rgba(33,48,71,0.06), 0 8px 0 rgba(33,48,71,0.08);
+    }
+    .choice-grid button.is-selected {
+      background: #213047;
+      color: #fff;
+    }
     .tap-button:disabled { opacity: 0.5; }
     .error { margin-top: 12px; padding: 12px; border-radius: 18px; background: #ffe1e8; color: #bf3751; font-weight: 850; }
+    @keyframes turtle-dodge {
+      from { transform: translateX(-18px) rotate(-1deg); }
+      to { transform: translateX(18px) rotate(1deg); }
+    }
   </style>
 </head>
 <body>
@@ -160,6 +215,10 @@
       <p class="muted">닉네임을 넣고 들어간 뒤, 시작하면 버튼을 계속 누르세요.</p>
       <form id="joinForm">
         <input id="nicknameInput" maxlength="8" autocomplete="nickname" placeholder="닉네임">
+        <div class="role-picker">
+          <button class="role-option is-selected" type="button" data-turtle-role="player">플레이어<br><span class="muted">직접 경주</span></button>
+          <button class="role-option" type="button" data-turtle-role="saboteur">훼방꾼<br><span class="muted">아이템 투표</span></button>
+        </div>
         <div class="skin-picker" id="entrySkinPicker">
           <p class="muted">내 거북이</p>
           <div class="skin-options">
@@ -191,6 +250,12 @@
         </div>
       </div>
       <button id="tapButton" class="tap-button" type="button" disabled>대기</button>
+      <button id="fakeResetButton" class="fake-reset" type="button">초기화</button>
+      <div class="status-card sabotage-panel" id="sabotagePanel">
+        <p class="muted" id="sabotageStatus">5초마다 훼방 아이템을 투표합니다.</p>
+        <div class="choice-grid" id="sabotageTargets"></div>
+        <div class="choice-grid" id="sabotageItems"></div>
+      </div>
       <div class="status-card">
         <p class="muted" id="myRank">등수는 경주 후 표시됩니다.</p>
         <p class="muted" id="tapCount">0 taps</p>

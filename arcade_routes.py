@@ -67,12 +67,20 @@ PARTY_RESULT_SECONDS = 3
 PARTY_MAX_ROUNDS = 6
 PARTY_ROOM_PREFIX = "arcade:party:"
 TURTLE_WAIT_SECONDS = 5
-TURTLE_RACE_SECONDS = 22
-TURTLE_TAP_PROGRESS = 0.012
+TURTLE_RACE_SECONDS = 40
+TURTLE_TAP_PROGRESS = 0.007
 TURTLE_MAX_TAPS_PER_EVENT = 12
-TURTLE_MAX_TAPS_PER_SECOND = 18
+TURTLE_MAX_TAPS_PER_SECOND = 16
+TURTLE_MIN_RACERS = 2
+TURTLE_SABOTEUR_VOTE_SECONDS = 5
 TURTLE_ROOM_PREFIX = "arcade:turtle:"
 TURTLE_SKINS = ("turtle-01.png", "turtle-02.png", "turtle-03.png")
+TURTLE_SABOTAGE_ITEMS: tuple[dict[str, str], ...] = (
+    {"id": "banana", "label": "바나나", "description": "뒤로 미끄러짐"},
+    {"id": "swap_last", "label": "꼴지와 교체", "description": "꼴지와 위치 바꾸기"},
+    {"id": "shrink", "label": "작아져라", "description": "2초간 버튼이 작아지고 도망감"},
+    {"id": "fake_reset", "label": "초기화 함정", "description": "빨간 초기화 버튼으로 방해"},
+)
 PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
     {
         "id": "reaction_green",
@@ -1576,6 +1584,7 @@ class TurtlePlayer:
     avatar: int
     lane: int
     skin: str
+    role: str = "player"
     progress: float = 0.0
     taps: int = 0
     connected: bool = True
@@ -1585,13 +1594,21 @@ class TurtlePlayer:
     rank: int | None = None
     tap_bucket_started_at: float = field(default_factory=_now)
     tap_bucket_count: int = 0
+    shrink_until: float = 0.0
+    fake_reset_until: float = 0.0
 
     def public(self) -> dict[str, Any]:
+        now_ts = _now()
+        effects = {
+            "shrink": max(0, int(self.shrink_until * 1000)) if self.shrink_until > now_ts else 0,
+            "fakeReset": max(0, int(self.fake_reset_until * 1000)) if self.fake_reset_until > now_ts else 0,
+        }
         return {
             "id": self.id,
             "nickname": self.nickname,
             "avatar": self.avatar,
             "skin": self.skin,
+            "role": self.role,
             "lane": self.lane,
             "progress": round(max(0.0, min(1.0, self.progress)), 4),
             "progressPercent": round(max(0.0, min(1.0, self.progress)) * 100, 1),
@@ -1600,6 +1617,7 @@ class TurtlePlayer:
             "finished": self.finished_at is not None,
             "finishedAt": int(self.finished_at * 1000) if self.finished_at else None,
             "rank": self.rank,
+            "effects": effects,
         }
 
 
@@ -1617,6 +1635,11 @@ class TurtleSession:
     players: dict[str, TurtlePlayer] = field(default_factory=dict)
     loop_running: bool = False
     ended_at: float | None = None
+    sabotage_vote_id: int = 0
+    sabotage_vote_started_at: float = 0.0
+    sabotage_vote_ends_at: float = 0.0
+    sabotage_votes: dict[str, dict[str, str]] = field(default_factory=dict)
+    recent_events: list[dict[str, Any]] = field(default_factory=list)
 
 
 class TurtleRaceSessionManager:
@@ -1682,7 +1705,15 @@ class TurtleRaceSessionManager:
                 self._expire_elapsed_locked(session_obj, _now())
             return session_obj
 
-    def join_player(self, code: str, player_id: str, nickname: str, avatar: int, skin: Any = None) -> tuple[TurtlePlayer | None, str | None]:
+    def join_player(
+        self,
+        code: str,
+        player_id: str,
+        nickname: str,
+        avatar: int,
+        skin: Any = None,
+        role: Any = None,
+    ) -> tuple[TurtlePlayer | None, str | None]:
         with self._lock:
             session_obj = self._sessions.get(str(code or "").upper())
             if not session_obj:
@@ -1690,27 +1721,32 @@ class TurtleRaceSessionManager:
             self._expire_elapsed_locked(session_obj, _now())
             if session_obj.status == "ended":
                 return None, "이미 종료된 경주입니다."
+            normalized_role = self._normalize_role(role)
             if player_id in session_obj.players:
                 player = session_obj.players[player_id]
                 player.connected = True
                 player.last_seen_at = _now()
                 normalized_skin = self._normalize_skin(skin)
-                if normalized_skin and session_obj.status in {"lobby", "countdown"}:
+                if normalized_skin and player.role == "player" and session_obj.status in {"lobby", "countdown"}:
                     player.skin = normalized_skin
                 return player, None
             if len(session_obj.players) >= config.ARCADE_MAX_PLAYERS:
                 return None, "참가 인원이 가득 찼습니다."
+            if normalized_role == "player" and session_obj.status not in {"lobby", "countdown"}:
+                return None, "경주 참가자는 시작 전에만 들어갈 수 있습니다."
             clean_name = _sanitize_nickname(nickname)
             if len(clean_name) < 2:
                 return None, "닉네임은 2자 이상이어야 합니다."
             clean_name = self._dedupe_nickname_locked(session_obj, clean_name)
             avatar_id = int(avatar) if isinstance(avatar, int) or str(avatar).isdigit() else random.randrange(AVATAR_COUNT)
+            lane = sum(1 for player in session_obj.players.values() if player.role == "player") if normalized_role == "player" else -1
             player = TurtlePlayer(
                 id=player_id,
                 nickname=clean_name,
                 avatar=avatar_id % AVATAR_COUNT,
-                lane=len(session_obj.players),
+                lane=lane,
                 skin=self._normalize_skin(skin) or random.choice(TURTLE_SKINS),
+                role=normalized_role,
             )
             session_obj.players[player_id] = player
             return player, None
@@ -1726,11 +1762,43 @@ class TurtleRaceSessionManager:
             player = session_obj.players.get(str(player_id or "").strip())
             if not player:
                 return None, "참가자를 찾을 수 없습니다."
+            if player.role != "player":
+                return session_obj, "플레이어만 거북이를 고를 수 있습니다."
             normalized_skin = self._normalize_skin(skin)
             if not normalized_skin:
                 return session_obj, "알 수 없는 거북이입니다."
             player.skin = normalized_skin
             player.last_seen_at = _now()
+            return session_obj, None
+
+    def submit_sabotage_vote(
+        self,
+        code: str,
+        player_id: str,
+        target_id: Any,
+        item_id: Any,
+    ) -> tuple[TurtleSession | None, str | None]:
+        with self._lock:
+            session_obj = self._sessions.get(str(code or "").upper())
+            if not session_obj:
+                return None, "세션을 찾을 수 없습니다."
+            if session_obj.status != "racing":
+                return session_obj, None
+            voter = session_obj.players.get(str(player_id or "").strip())
+            if not voter or voter.role != "saboteur":
+                return None, "훼방꾼만 투표할 수 있습니다."
+            target = session_obj.players.get(str(target_id or "").strip())
+            if not target or target.role != "player" or target.finished_at is not None:
+                return session_obj, "대상을 찾을 수 없습니다."
+            normalized_item = self._normalize_sabotage_item(item_id)
+            if not normalized_item:
+                return session_obj, "알 수 없는 아이템입니다."
+            now_ts = _now()
+            if session_obj.sabotage_vote_ends_at and now_ts >= session_obj.sabotage_vote_ends_at:
+                self._resolve_sabotage_vote_locked(session_obj, now_ts)
+                self._reset_sabotage_vote_locked(session_obj, now_ts)
+            session_obj.sabotage_votes[voter.id] = {"targetId": target.id, "itemId": normalized_item}
+            voter.last_seen_at = now_ts
             return session_obj, None
 
     def mark_connected(self, code: str, player_id: str | None, connected: bool) -> None:
@@ -1751,8 +1819,9 @@ class TurtleRaceSessionManager:
                 return session_obj, "이미 종료된 경주입니다."
             if session_obj.status != "lobby":
                 return session_obj, "이미 진행 중인 경주입니다."
-            if not any(player.connected for player in session_obj.players.values()):
-                return None, "참가자가 1명 이상 필요합니다."
+            connected_racers = [player for player in session_obj.players.values() if player.role == "player" and player.connected]
+            if len(connected_racers) < TURTLE_MIN_RACERS:
+                return None, "플레이어가 2명 이상 필요합니다."
             now_ts = _now()
             starts_at = now_ts + TURTLE_WAIT_SECONDS
             ends_at = min(starts_at + TURTLE_RACE_SECONDS, session_obj.safe_end_at)
@@ -1761,6 +1830,11 @@ class TurtleRaceSessionManager:
             session_obj.status = "countdown"
             session_obj.starts_at = starts_at
             session_obj.ends_at = ends_at
+            session_obj.recent_events = []
+            session_obj.sabotage_vote_id = 0
+            session_obj.sabotage_votes = {}
+            session_obj.sabotage_vote_started_at = 0.0
+            session_obj.sabotage_vote_ends_at = 0.0
             for player in session_obj.players.values():
                 player.progress = 0.0
                 player.taps = 0
@@ -1768,6 +1842,8 @@ class TurtleRaceSessionManager:
                 player.rank = None
                 player.tap_bucket_started_at = now_ts
                 player.tap_bucket_count = 0
+                player.shrink_until = 0.0
+                player.fake_reset_until = 0.0
             return session_obj, None
 
     def add_taps(self, code: str, player_id: str, count: Any) -> tuple[TurtleSession | None, str | None]:
@@ -1778,7 +1854,7 @@ class TurtleRaceSessionManager:
             if session_obj.status != "racing":
                 return session_obj, None
             player = session_obj.players.get(player_id)
-            if not player or player.finished_at is not None:
+            if not player or player.role != "player" or player.finished_at is not None:
                 return session_obj, None
             now_ts = _now()
             try:
@@ -1800,7 +1876,7 @@ class TurtleRaceSessionManager:
             if player.progress >= 1.0 and player.finished_at is None:
                 player.finished_at = now_ts
                 player.rank = 1 + sum(1 for other in session_obj.players.values() if other.finished_at is not None and other.id != player.id)
-                if all(other.finished_at is not None for other in session_obj.players.values() if other.connected):
+                if all(other.finished_at is not None for other in session_obj.players.values() if other.connected and other.role == "player"):
                     self._end_locked(session_obj)
             return session_obj, None
 
@@ -1853,9 +1929,14 @@ class TurtleRaceSessionManager:
         now_ts = _now()
         if session_obj.status == "countdown" and now_ts >= session_obj.starts_at:
             session_obj.status = "racing"
+            self._reset_sabotage_vote_locked(session_obj, now_ts)
             return True
         if session_obj.status == "racing" and now_ts >= session_obj.ends_at:
             self._end_locked(session_obj)
+            return True
+        if session_obj.status == "racing" and session_obj.sabotage_vote_ends_at and now_ts >= session_obj.sabotage_vote_ends_at:
+            self._resolve_sabotage_vote_locked(session_obj, now_ts)
+            self._reset_sabotage_vote_locked(session_obj, now_ts)
             return True
         return False
 
@@ -1872,6 +1953,7 @@ class TurtleRaceSessionManager:
             return
         session_obj.status = "ended"
         session_obj.ended_at = _now()
+        session_obj.sabotage_votes = {}
         ranked = self._rankings_locked(session_obj)
         for index, item in enumerate(ranked, start=1):
             player = session_obj.players.get(item["id"])
@@ -1880,7 +1962,15 @@ class TurtleRaceSessionManager:
 
     def _snapshot_locked(self, session_obj: TurtleSession) -> dict[str, Any]:
         now_ts = _now()
-        players = [player.public() for player in sorted(session_obj.players.values(), key=lambda item: item.lane)]
+        players = [
+            player.public()
+            for player in sorted(
+                session_obj.players.values(),
+                key=lambda item: (0 if item.role == "player" else 1, item.lane if item.lane >= 0 else 999, item.joined_at),
+            )
+        ]
+        connected_racers = [player for player in session_obj.players.values() if player.role == "player" and player.connected]
+        connected_saboteurs = [player for player in session_obj.players.values() if player.role == "saboteur" and player.connected]
         return {
             "mode": "turtle",
             "code": session_obj.code,
@@ -1893,12 +1983,24 @@ class TurtleRaceSessionManager:
             "now": int(now_ts * 1000),
             "players": players,
             "rankings": self._rankings_locked(session_obj),
+            "recentEvents": deepcopy(session_obj.recent_events[-5:]),
+            "connectedRacers": len(connected_racers),
+            "connectedSaboteurs": len(connected_saboteurs),
+            "minRacers": TURTLE_MIN_RACERS,
+            "sabotageItems": deepcopy(list(TURTLE_SABOTAGE_ITEMS)),
+            "sabotageVote": {
+                "id": session_obj.sabotage_vote_id,
+                "startedAt": int(session_obj.sabotage_vote_started_at * 1000) if session_obj.sabotage_vote_started_at else None,
+                "endsAt": int(session_obj.sabotage_vote_ends_at * 1000) if session_obj.sabotage_vote_ends_at else None,
+                "votesCount": len(session_obj.sabotage_votes),
+                "durationSeconds": TURTLE_SABOTEUR_VOTE_SECONDS,
+            },
             "tapProgress": TURTLE_TAP_PROGRESS,
             "raceSeconds": TURTLE_RACE_SECONDS,
         }
 
     def _rankings_locked(self, session_obj: TurtleSession) -> list[dict[str, Any]]:
-        players = [player.public() for player in session_obj.players.values()]
+        players = [player.public() for player in session_obj.players.values() if player.role == "player"]
         return sorted(
             players,
             key=lambda item: (
@@ -1909,6 +2011,66 @@ class TurtleRaceSessionManager:
                 item["lane"],
             ),
         )
+
+    def _reset_sabotage_vote_locked(self, session_obj: TurtleSession, now_ts: float) -> None:
+        session_obj.sabotage_vote_id += 1
+        session_obj.sabotage_vote_started_at = now_ts
+        session_obj.sabotage_vote_ends_at = min(now_ts + TURTLE_SABOTEUR_VOTE_SECONDS, session_obj.ends_at)
+        session_obj.sabotage_votes = {}
+
+    def _resolve_sabotage_vote_locked(self, session_obj: TurtleSession, now_ts: float) -> None:
+        if not session_obj.sabotage_votes:
+            return
+        tallies: dict[tuple[str, str], int] = {}
+        for vote in session_obj.sabotage_votes.values():
+            key = (vote.get("targetId") or "", vote.get("itemId") or "")
+            tallies[key] = tallies.get(key, 0) + 1
+        if not tallies:
+            return
+        target_id, item_id = sorted(tallies.items(), key=lambda entry: (-entry[1], entry[0][0], entry[0][1]))[0][0]
+        target = session_obj.players.get(target_id)
+        if not target or target.role != "player" or target.finished_at is not None:
+            return
+        self._apply_sabotage_locked(session_obj, target, item_id, now_ts)
+
+    def _apply_sabotage_locked(self, session_obj: TurtleSession, target: TurtlePlayer, item_id: str, now_ts: float) -> None:
+        item_label = self._sabotage_label(item_id)
+        note = ""
+        if item_id == "banana":
+            target.progress = max(0.0, target.progress - 0.08)
+            note = f"{target.nickname} 바나나 미끄러짐"
+        elif item_id == "swap_last":
+            racers = [player for player in session_obj.players.values() if player.role == "player" and player.finished_at is None]
+            last = min(racers, key=lambda player: (player.progress, -player.taps, -player.lane), default=None)
+            if last and last.id != target.id:
+                target.progress, last.progress = last.progress, target.progress
+                target.taps, last.taps = last.taps, target.taps
+                note = f"{target.nickname} 꼴지와 위치 교체"
+            else:
+                note = f"{target.nickname} 이미 꼴지"
+        elif item_id == "shrink":
+            target.shrink_until = max(target.shrink_until, now_ts + 2)
+            note = f"{target.nickname} 버튼 축소"
+        elif item_id == "fake_reset":
+            target.fake_reset_until = max(target.fake_reset_until, now_ts + 2)
+            note = f"{target.nickname} 초기화 함정"
+        else:
+            return
+        session_obj.recent_events.append({
+            "at": int(now_ts * 1000),
+            "targetId": target.id,
+            "targetNickname": target.nickname,
+            "itemId": item_id,
+            "itemLabel": item_label,
+            "message": note,
+        })
+        session_obj.recent_events = session_obj.recent_events[-8:]
+
+    def _sabotage_label(self, item_id: str) -> str:
+        for item in TURTLE_SABOTAGE_ITEMS:
+            if item["id"] == item_id:
+                return item["label"]
+        return item_id
 
     def _new_code_locked(self) -> str:
         alphabet = string.ascii_uppercase + string.digits
@@ -1945,6 +2107,15 @@ class TurtleRaceSessionManager:
     def _normalize_skin(self, skin: Any) -> str | None:
         value = str(skin or "").strip().split("/")[-1]
         return value if value in TURTLE_SKINS else None
+
+    def _normalize_role(self, role: Any) -> str:
+        value = str(role or "player").strip().lower()
+        return "saboteur" if value in {"saboteur", "hinder", "disturber", "훼방꾼"} else "player"
+
+    def _normalize_sabotage_item(self, item_id: Any) -> str | None:
+        value = str(item_id or "").strip()
+        valid = {item["id"] for item in TURTLE_SABOTAGE_ITEMS}
+        return value if value in valid else None
 
     def _emit(self, event: str, payload: dict[str, Any], code: str) -> None:
         if self._socketio:
@@ -2380,6 +2551,7 @@ class ArcadeNamespace(Namespace):
             payload.get("nickname") or "",
             payload.get("avatar") or 0,
             payload.get("skin"),
+            payload.get("role"),
         )
         if error or not player:
             emit("turtle:error", {"message": error or "입장할 수 없습니다."})
@@ -2399,6 +2571,25 @@ class ArcadeNamespace(Namespace):
         code = str(payload.get("code") or "").upper()
         player_id = str(payload.get("playerId") or "").strip()
         session_obj, error = turtle_manager.select_skin(code, player_id, payload.get("skin"))
+        if error:
+            emit("turtle:error", {"message": error})
+        if error and not session_obj:
+            return
+        if session_obj:
+            snapshot = turtle_manager.snapshot(session_obj)
+            emit("turtle:submitted", {"ok": not error, "session": snapshot})
+            turtle_manager._emit("turtle:state", snapshot, code)
+
+    def on_turtle_sabotage_vote(self, data):  # type: ignore[override]
+        payload = data or {}
+        code = str(payload.get("code") or "").upper()
+        player_id = str(payload.get("playerId") or "").strip()
+        session_obj, error = turtle_manager.submit_sabotage_vote(
+            code,
+            player_id,
+            payload.get("targetId"),
+            payload.get("itemId"),
+        )
         if error:
             emit("turtle:error", {"message": error})
         if error and not session_obj:

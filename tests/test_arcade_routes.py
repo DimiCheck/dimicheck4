@@ -305,8 +305,9 @@ def test_turtle_session_routes_create_join_start_and_rank(monkeypatch, tmp_path)
     payload = response.get_json()
     assert payload["mode"] == "turtle"
     assert payload["status"] == "lobby"
-    assert payload["raceSeconds"] == 22
-    assert payload["tapProgress"] == 0.012
+    assert payload["raceSeconds"] == 40
+    assert payload["tapProgress"] == 0.007
+    assert payload["minRacers"] == 2
 
     code = payload["code"]
     join_page = client.get(f"/arcade/turtle/join/{code}")
@@ -381,8 +382,11 @@ def test_turtle_start_with_short_remaining_window_does_not_end_lobby(monkeypatch
     assert error is None
     assert session_obj is not None
     player, join_error = manager.join_player(session_obj.code, "p1", "하나", 0)
+    second, second_error = manager.join_player(session_obj.code, "p2", "둘둘", 1)
     assert join_error is None
+    assert second_error is None
     assert player is not None
+    assert second is not None
 
     session_obj.safe_end_at = time.time() + arcade_routes.TURTLE_WAIT_SECONDS + 5
     updated, start_error = manager.start_now(session_obj.code)
@@ -421,6 +425,61 @@ def test_turtle_skin_can_change_only_before_race(monkeypatch):
     assert updated is session_obj
     assert late_error == "시작 후에는 거북이를 바꿀 수 없습니다."
     assert session_obj.players["p1"].skin == "turtle-03.png"
+
+
+def test_turtle_requires_two_racers_and_applies_saboteur_votes(monkeypatch):
+    arcade_routes = importlib.import_module("arcade_routes")
+    monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: _allowed_window())
+
+    manager = arcade_routes.TurtleRaceSessionManager()
+    session_obj, error = manager.create_session(2, 4)
+    assert error is None
+    assert session_obj is not None
+    first, first_error = manager.join_player(session_obj.code, "p1", "하나", 0, "turtle-01.png", "player")
+    saboteur, saboteur_error = manager.join_player(session_obj.code, "s1", "방해", 2, role="saboteur")
+    assert first_error is None
+    assert saboteur_error is None
+    assert first is not None and first.role == "player"
+    assert saboteur is not None and saboteur.role == "saboteur"
+
+    updated, start_error = manager.start_now(session_obj.code)
+    assert updated is None
+    assert start_error == "플레이어가 2명 이상 필요합니다."
+
+    second, second_error = manager.join_player(session_obj.code, "p2", "둘둘", 1, "turtle-02.png", "player")
+    assert second_error is None
+    assert second is not None and second.lane == 1
+    updated, start_error = manager.start_now(session_obj.code)
+    assert start_error is None
+    assert updated is session_obj
+
+    with manager._lock:
+        session_obj.starts_at = time.time() - 1
+        assert manager._advance_locked(session_obj) is True
+        assert session_obj.status == "racing"
+
+    manager.add_taps(session_obj.code, "p1", 10)
+    before = session_obj.players["p1"].progress
+    updated, vote_error = manager.submit_sabotage_vote(session_obj.code, "s1", "p1", "banana")
+    assert vote_error is None
+    assert updated is session_obj
+    assert session_obj.players["p1"].progress == before
+    session_obj.sabotage_vote_ends_at = time.time() - 1
+    assert manager._advance_locked(session_obj) is True
+    assert session_obj.players["p1"].progress < before
+    assert session_obj.recent_events[-1]["itemId"] == "banana"
+
+    updated, shrink_error = manager.submit_sabotage_vote(session_obj.code, "s1", "p2", "shrink")
+    assert shrink_error is None
+    assert updated is session_obj
+    session_obj.sabotage_vote_ends_at = time.time() - 1
+    assert manager._advance_locked(session_obj) is True
+    assert session_obj.players["p2"].shrink_until > time.time()
+    snapshot = manager.snapshot(session_obj)
+    assert snapshot["connectedRacers"] == 2
+    assert snapshot["connectedSaboteurs"] == 1
+    assert snapshot["rankings"]
+    assert all(player["role"] == "player" for player in snapshot["rankings"])
 
 
 def test_party_round_scores_and_late_join_waits_for_next_round(monkeypatch):

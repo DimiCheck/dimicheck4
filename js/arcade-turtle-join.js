@@ -13,6 +13,11 @@
   var flushTimer = 0;
   var turtleSkins = ['turtle-01.png', 'turtle-02.png', 'turtle-03.png'];
   var selectedSkin = turtleSkins[Math.floor(Math.random() * turtleSkins.length)];
+  var selectedRole = 'player';
+  var selectedSabotageTarget = '';
+  var selectedSabotageItem = '';
+  var activeVoteId = 0;
+  var votedVoteId = 0;
 
   var els = {
     entryPanel: document.getElementById('entryPanel'),
@@ -30,11 +35,20 @@
     tapCount: document.getElementById('tapCount'),
     errorBox: document.getElementById('errorBox'),
     skinOptions: Array.prototype.slice.call(document.querySelectorAll('[data-turtle-skin]')),
-    gameSkinPicker: document.getElementById('gameSkinPicker')
+    roleOptions: Array.prototype.slice.call(document.querySelectorAll('[data-turtle-role]')),
+    gameSkinPicker: document.getElementById('gameSkinPicker'),
+    entrySkinPicker: document.getElementById('entrySkinPicker'),
+    sabotagePanel: document.getElementById('sabotagePanel'),
+    sabotageStatus: document.getElementById('sabotageStatus'),
+    sabotageTargets: document.getElementById('sabotageTargets'),
+    sabotageItems: document.getElementById('sabotageItems'),
+    fakeResetButton: document.getElementById('fakeResetButton')
   };
 
   restoreNickname();
+  bindRolePicker();
   bindSkinPicker();
+  updateRoleSelection();
   updateSkinSelection();
 
   function getOrCreatePlayerId() {
@@ -102,7 +116,8 @@
         playerId: playerId,
         nickname: nickname,
         avatar: avatarId(),
-        skin: selectedSkin
+        skin: selectedSkin,
+        role: selectedRole
       });
     });
     socket.on('turtle:joined', function (payload) {
@@ -153,6 +168,7 @@
     }
     els.statusText.textContent = statusLabel(state.status);
     renderPlayer();
+    renderSabotagePanel();
     updateClock();
   }
 
@@ -166,22 +182,41 @@
 
   function renderPlayer() {
     var progress = player ? Math.round(player.progressPercent || 0) : 0;
+    var isSaboteur = player && player.role === 'saboteur';
     els.myProgress.textContent = progress + '%';
     els.progressBar.style.setProperty('--progress', progress + '%');
     els.tapCount.textContent = (player ? player.taps : 0) + ' taps';
     if (els.gameSkinPicker) {
-      var canChoose = sessionState && (sessionState.status === 'lobby' || sessionState.status === 'countdown');
+      var canChoose = !isSaboteur && sessionState && (sessionState.status === 'lobby' || sessionState.status === 'countdown');
       els.gameSkinPicker.hidden = !canChoose;
       els.gameSkinPicker.classList.toggle('is-locked', !canChoose);
     }
-    if (sessionState && sessionState.status === 'racing' && player && !player.finished) {
+    if (isSaboteur) {
+      els.myProgress.textContent = '훼방';
+      els.progressBar.style.setProperty('--progress', '100%');
+      els.tapCount.textContent = '아이템 투표';
+      els.tapButton.hidden = true;
+      if (els.fakeResetButton) els.fakeResetButton.classList.remove('is-active');
+    } else {
+      els.tapButton.hidden = false;
+    }
+    var effects = (player && player.effects) || {};
+    var shrinkActive = effects.shrink && effects.shrink > currentServerNow();
+    var fakeResetActive = effects.fakeReset && effects.fakeReset > currentServerNow();
+    els.tapButton.classList.toggle('is-shrunk', !!shrinkActive);
+    if (els.fakeResetButton) {
+      els.fakeResetButton.classList.toggle('is-active', !!fakeResetActive && !isSaboteur && sessionState && sessionState.status === 'racing');
+    }
+    if (!isSaboteur && sessionState && sessionState.status === 'racing' && player && !player.finished) {
       els.tapButton.disabled = false;
       els.tapButton.innerHTML = '<img src="' + turtleSkinUrl(selectedSkin) + '" alt="">전진';
     } else {
       els.tapButton.disabled = true;
       els.tapButton.textContent = sessionState && sessionState.status === 'countdown' ? '준비' : '대기';
     }
-    if (player && player.rank) {
+    if (isSaboteur) {
+      els.myRank.textContent = '5초마다 아이템을 투표해 경주를 흔드세요.';
+    } else if (player && player.rank) {
       els.myRank.textContent = player.rank + '위 · ' + (player.finished ? '완주' : '시간 종료');
     } else if (sessionState && sessionState.status === 'ended') {
       els.myRank.textContent = '결과를 전자칠판에서 확인하세요.';
@@ -202,6 +237,10 @@
     } else {
       els.remainingTime.textContent = '--';
     }
+    if (sessionState.status === 'racing') {
+      renderPlayer();
+      renderSabotagePanel();
+    }
   }
 
   function flushTaps() {
@@ -216,6 +255,26 @@
       playerId: playerId,
       count: count
     });
+  }
+
+  function bindRolePicker() {
+    els.roleOptions.forEach(function (button) {
+      button.addEventListener('click', function () {
+        selectedRole = button.getAttribute('data-turtle-role') === 'saboteur' ? 'saboteur' : 'player';
+        updateRoleSelection();
+      });
+    });
+  }
+
+  function updateRoleSelection() {
+    els.roleOptions.forEach(function (button) {
+      var selected = button.getAttribute('data-turtle-role') === selectedRole;
+      button.classList.toggle('is-selected', selected);
+      button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    });
+    if (els.entrySkinPicker) {
+      els.entrySkinPicker.hidden = selectedRole === 'saboteur';
+    }
   }
 
   function bindSkinPicker() {
@@ -252,17 +311,92 @@
     return '/' + (sanitizeSkin(skin) || 'turtle-01.png');
   }
 
+  function renderSabotagePanel() {
+    if (!els.sabotagePanel) return;
+    var isSaboteur = player && player.role === 'saboteur';
+    var active = isSaboteur && sessionState && sessionState.status === 'racing';
+    els.sabotagePanel.classList.toggle('active', !!active);
+    if (!active) return;
+    var vote = sessionState.sabotageVote || {};
+    var voteId = Number(vote.id || 0);
+    if (voteId !== activeVoteId) {
+      activeVoteId = voteId;
+      selectedSabotageTarget = '';
+      selectedSabotageItem = '';
+    }
+    var remaining = vote.endsAt ? formatSeconds(vote.endsAt - currentServerNow()) : '--';
+    els.sabotageStatus.textContent = voteId === votedVoteId
+      ? '투표 완료 · 다음 투표까지 ' + remaining + '초'
+      : '대상과 아이템을 고르세요 · ' + remaining + '초';
+    renderSabotageTargets(voteId);
+    renderSabotageItems(voteId);
+  }
+
+  function renderSabotageTargets(voteId) {
+    els.sabotageTargets.innerHTML = '';
+    (sessionState.players || []).filter(function (item) {
+      return item.role === 'player' && !item.finished;
+    }).forEach(function (target) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = target.nickname + ' · ' + Math.round(target.progressPercent || 0) + '%';
+      button.classList.toggle('is-selected', selectedSabotageTarget === target.id);
+      button.disabled = voteId === votedVoteId;
+      button.addEventListener('click', function () {
+        selectedSabotageTarget = target.id;
+        maybeSubmitSabotageVote(voteId);
+      });
+      els.sabotageTargets.appendChild(button);
+    });
+  }
+
+  function renderSabotageItems(voteId) {
+    els.sabotageItems.innerHTML = '';
+    (sessionState.sabotageItems || []).forEach(function (item) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = item.label;
+      button.title = item.description || '';
+      button.classList.toggle('is-selected', selectedSabotageItem === item.id);
+      button.disabled = voteId === votedVoteId;
+      button.addEventListener('click', function () {
+        selectedSabotageItem = item.id;
+        maybeSubmitSabotageVote(voteId);
+      });
+      els.sabotageItems.appendChild(button);
+    });
+  }
+
+  function maybeSubmitSabotageVote(voteId) {
+    renderSabotagePanel();
+    if (!selectedSabotageTarget || !selectedSabotageItem || !socket || !socket.connected) return;
+    votedVoteId = voteId;
+    socket.emit('turtle_sabotage_vote', {
+      code: code,
+      playerId: playerId,
+      targetId: selectedSabotageTarget,
+      itemId: selectedSabotageItem
+    });
+    renderSabotagePanel();
+  }
+
   els.tapButton.addEventListener('click', function () {
     if (!sessionState || sessionState.status !== 'racing' || (player && player.finished)) return;
     pendingTaps += 1;
     if (player) {
       player.taps += 1;
-      player.progressPercent = Math.min(100, (player.progressPercent || 0) + 1.2);
+      player.progressPercent = Math.min(100, (player.progressPercent || 0) + ((sessionState.tapProgress || 0.007) * 100));
       player.progress = player.progressPercent / 100;
       renderPlayer();
     }
     if (pendingTaps >= 6) flushTaps();
   });
+  if (els.fakeResetButton) {
+    els.fakeResetButton.addEventListener('click', function () {
+      els.fakeResetButton.classList.remove('is-active');
+      els.myRank.textContent = '함정 버튼이었어요. 계속 전진하세요.';
+    });
+  }
 
   els.joinForm.addEventListener('submit', function (event) {
     event.preventDefault();
@@ -287,10 +421,12 @@
       status: sessionState ? sessionState.status : 'entry',
       player: player ? {
         nickname: player.nickname,
+        role: player.role,
         skin: player.skin,
         progress: player.progressPercent,
         taps: player.taps,
-        rank: player.rank
+        rank: player.rank,
+        effects: player.effects
       } : null
     });
   };
