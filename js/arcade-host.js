@@ -39,7 +39,7 @@
   var returnedToBoard = false;
   var debugBots = [];
   var debugBotTimers = [];
-  var debugAllowAnyTime = false;
+  var debugAllowAnyTime = root.getAttribute('data-debug-allow-any-time') === '1';
   var lastEventKey = '';
   var playerMarkers = {};
   var itemMarkers = {};

@@ -35,7 +35,7 @@
   var sessionState = null;
   var socket = null;
   var serverOffsetMs = 0;
-  var debugAllowAnyTime = false;
+  var debugAllowAnyTime = root.getAttribute('data-debug-allow-any-time') === '1';
   var returnedToBoard = false;
   var debugBots = [];
   var latestCueText = '';
@@ -382,6 +382,7 @@
     var api = {
       help: function () {
         return {
+          'ArcadeDebug.allowAnyTime()': 'Party에서도 같은 이름으로 시간 제한 우회 테스트 세션을 새로 만듭니다.',
           'PartyDebug.allowAnyTime()': '시간 제한 우회 테스트 세션을 새로 만듭니다. 서버에서 ARCADE_DEBUG_ALLOW_ANY_TIME=1일 때만 동작합니다.',
           'PartyDebug.bots(12)': '테스트 봇 12명을 입장시킵니다.',
           'PartyDebug.start()': '현재 Party를 시작합니다.',
@@ -411,6 +412,7 @@
     };
     window.DimiPartyDebug = api;
     window.PartyDebug = api;
+    window.ArcadeDebug = api;
   }
 
   els.startButton.addEventListener('click', function () {

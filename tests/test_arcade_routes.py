@@ -213,6 +213,41 @@ def test_arcade_debug_any_time_requires_explicit_server_flag(monkeypatch, tmp_pa
     assert allowed.get_json()["phaseLabel"] == "테스트 모드"
 
 
+def test_party_debug_any_time_requires_explicit_server_flag_and_marks_host(monkeypatch, tmp_path):
+    app_module = _load_app(monkeypatch, tmp_path)
+    arcade_routes = importlib.import_module("arcade_routes")
+    monkeypatch.setattr(
+        arcade_routes,
+        "_play_window",
+        lambda _grade: {
+            "allowed": False,
+            "label": "",
+            "safeEndAt": None,
+            "phaseEndAt": None,
+            "remainingSafeSeconds": 0,
+            "startsInSeconds": None,
+            "reason": "blocked by time",
+        },
+    )
+
+    client = app_module.app.test_client()
+    with client.session_transaction() as session_state:
+        session_state["board_verified_2_4"] = True
+
+    blocked = client.post("/api/arcade/party/sessions", json={"grade": 2, "section": 4, "debugAllowAnyTime": True})
+    assert blocked.status_code == 400
+    assert blocked.get_json()["error"] == "blocked by time"
+
+    monkeypatch.setattr(arcade_routes.config, "ARCADE_DEBUG_ALLOW_ANY_TIME", True)
+    host_page = client.get("/arcade/party/host?grade=2&section=4")
+    assert host_page.status_code == 200
+    assert b'data-debug-allow-any-time="1"' in host_page.data
+
+    allowed = client.post("/api/arcade/party/sessions", json={"grade": 2, "section": 4, "debugAllowAnyTime": True})
+    assert allowed.status_code == 200
+    assert allowed.get_json()["phaseLabel"] == "테스트 모드"
+
+
 def test_party_session_routes_create_and_start_with_one_player(monkeypatch, tmp_path):
     app_module = _load_app(monkeypatch, tmp_path)
     arcade_routes = importlib.import_module("arcade_routes")

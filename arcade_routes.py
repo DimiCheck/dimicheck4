@@ -1447,8 +1447,20 @@ def arcade_turf_host():
     grade = request.args.get("grade", type=int)
     section = request.args.get("section", type=int)
     if not grade or not section or not _host_allowed(grade, section):
-        return render_template("arcade_host.html", arcade_enabled=False, grade=grade, section=section)
-    return render_template("arcade_host.html", arcade_enabled=config.ARCADE_ENABLED, grade=grade, section=section)
+        return render_template(
+            "arcade_host.html",
+            arcade_enabled=False,
+            arcade_debug_allow_any_time=config.ARCADE_DEBUG_ALLOW_ANY_TIME,
+            grade=grade,
+            section=section,
+        )
+    return render_template(
+        "arcade_host.html",
+        arcade_enabled=config.ARCADE_ENABLED,
+        arcade_debug_allow_any_time=config.ARCADE_DEBUG_ALLOW_ANY_TIME,
+        grade=grade,
+        section=section,
+    )
 
 
 @blueprint.get("/arcade/join/<code>")
@@ -1461,8 +1473,20 @@ def arcade_party_host():
     grade = request.args.get("grade", type=int)
     section = request.args.get("section", type=int)
     if not grade or not section or not _host_allowed(grade, section):
-        return render_template("arcade_party_host.html", arcade_enabled=False, grade=grade, section=section)
-    return render_template("arcade_party_host.html", arcade_enabled=config.ARCADE_ENABLED, grade=grade, section=section)
+        return render_template(
+            "arcade_party_host.html",
+            arcade_enabled=False,
+            arcade_debug_allow_any_time=config.ARCADE_DEBUG_ALLOW_ANY_TIME,
+            grade=grade,
+            section=section,
+        )
+    return render_template(
+        "arcade_party_host.html",
+        arcade_enabled=config.ARCADE_ENABLED,
+        arcade_debug_allow_any_time=config.ARCADE_DEBUG_ALLOW_ANY_TIME,
+        grade=grade,
+        section=section,
+    )
 
 
 @blueprint.get("/arcade/party/join/<code>")

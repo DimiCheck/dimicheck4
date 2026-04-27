@@ -469,7 +469,13 @@
   </style>
 </head>
 <body>
-  <main class="page" data-grade="{{ grade or '' }}" data-section="{{ section or '' }}" data-enabled="{{ '1' if arcade_enabled else '0' }}">
+  <main
+    class="page"
+    data-grade="{{ grade or '' }}"
+    data-section="{{ section or '' }}"
+    data-enabled="{{ '1' if arcade_enabled else '0' }}"
+    data-debug-allow-any-time="{{ '1' if arcade_debug_allow_any_time else '0' }}"
+  >
     <aside class="side panel">
       <div class="brand">
         <img src="/logo.png" alt="">

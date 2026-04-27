@@ -14,3 +14,4 @@ Original prompt: 구현 시작
 - Improved Party polish: live reaction cues, total/average ranking groups, mobile live button text, render_game_to_text hooks, broader engine scoring tests.
 - Added fake-signal prompt support for the 거짓 신호 minigame.
 - Playwright visual client could not run because the local environment does not have the `playwright` package installed; avoided adding a new dependency and used route/JS/test verification instead.
+- Fixed Party debug entry: `ARCADE_DEBUG_ALLOW_ANY_TIME=1` now marks host pages so initial session creation bypasses time limits, and Party exposes `ArcadeDebug` as an alias of `PartyDebug` for console testing.
