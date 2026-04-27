@@ -419,8 +419,18 @@
         clearDebugBots();
         sessionState = null;
         returnedToBoard = false;
-        createSession();
-        return '시간 제한 우회 세션을 요청했습니다. 서버 설정이 꺼져 있으면 거부됩니다.';
+        return createSession().then(function (state) {
+          return {
+            ok: true,
+            message: '시간 제한 우회 세션이 열렸습니다.',
+            code: state.code
+          };
+        }).catch(function (error) {
+          return {
+            ok: false,
+            message: error.message
+          };
+        });
       },
       bots: function (count) {
         return addDebugBots(count);
@@ -448,10 +458,10 @@
     if (!enabled || !grade || !section) {
       setOverlay('시작할 수 없음', 'Board 인증이 필요하거나 Arcade가 비활성화되어 있습니다.', false);
       setError('Board에서 인증된 상태로 Arcade를 열어 주세요.');
-      return;
+      return Promise.reject(new Error('Board에서 인증된 상태로 Arcade를 열어 주세요.'));
     }
     setOverlay('준비 중', 'Arcade 세션을 만들고 있습니다.', false);
-    postJson('/api/arcade/sessions', {
+    return postJson('/api/arcade/sessions', {
       grade: grade,
       section: section,
       debugAllowAnyTime: debugAllowAnyTime

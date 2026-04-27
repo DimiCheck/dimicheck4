@@ -205,7 +205,7 @@ def test_arcade_debug_any_time_requires_explicit_server_flag(monkeypatch, tmp_pa
 
     blocked = client.post("/api/arcade/sessions", json={"grade": 2, "section": 4, "debugAllowAnyTime": True})
     assert blocked.status_code == 400
-    assert blocked.get_json()["error"] == "blocked by time"
+    assert blocked.get_json()["error"] == "서버의 Arcade 테스트 우회 모드가 꺼져 있습니다. ARCADE_DEBUG_ALLOW_ANY_TIME=1로 실행해야 합니다."
 
     monkeypatch.setattr(arcade_routes.config, "ARCADE_DEBUG_ALLOW_ANY_TIME", True)
     allowed = client.post("/api/arcade/sessions", json={"grade": 2, "section": 4, "debugAllowAnyTime": True})
@@ -236,7 +236,7 @@ def test_party_debug_any_time_requires_explicit_server_flag_and_marks_host(monke
 
     blocked = client.post("/api/arcade/party/sessions", json={"grade": 2, "section": 4, "debugAllowAnyTime": True})
     assert blocked.status_code == 400
-    assert blocked.get_json()["error"] == "blocked by time"
+    assert blocked.get_json()["error"] == "서버의 Arcade 테스트 우회 모드가 꺼져 있습니다. ARCADE_DEBUG_ALLOW_ANY_TIME=1로 실행해야 합니다."
 
     monkeypatch.setattr(arcade_routes.config, "ARCADE_DEBUG_ALLOW_ANY_TIME", True)
     host_page = client.get("/arcade/party/host?grade=2&section=4")

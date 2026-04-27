@@ -311,9 +311,9 @@
   function createSession() {
     if (!enabled || !grade || !section) {
       setError('Board에서 인증된 상태로 Party를 열어 주세요.');
-      return;
+      return Promise.reject(new Error('Board에서 인증된 상태로 Party를 열어 주세요.'));
     }
-    postJson('/api/arcade/party/sessions', {
+    return postJson('/api/arcade/party/sessions', {
       grade: grade,
       section: section,
       debugAllowAnyTime: debugAllowAnyTime
@@ -395,8 +395,18 @@
       },
       allowAnyTime: function () {
         debugAllowAnyTime = true;
-        createSession();
-        return '시간 제한 우회 Party를 요청했습니다.';
+        return createSession().then(function (state) {
+          return {
+            ok: true,
+            message: '시간 제한 우회 Party 세션이 열렸습니다.',
+            code: state.code
+          };
+        }).catch(function (error) {
+          return {
+            ok: false,
+            message: error.message
+          };
+        });
       },
       bots: function (count) {
         var total = Math.max(1, Math.min(Number(count) || 8, 50));

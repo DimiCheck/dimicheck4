@@ -1501,6 +1501,8 @@ def create_arcade_session():
     section = int(payload.get("section") or 0)
     if not grade or not section or not _host_allowed(grade, section):
         return jsonify({"error": "not allowed"}), 403
+    if bool(payload.get("debugAllowAnyTime")) and not config.ARCADE_DEBUG_ALLOW_ANY_TIME:
+        return jsonify({"error": "서버의 Arcade 테스트 우회 모드가 꺼져 있습니다. ARCADE_DEBUG_ALLOW_ANY_TIME=1로 실행해야 합니다."}), 400
     allow_any_time = bool(payload.get("debugAllowAnyTime")) and config.ARCADE_DEBUG_ALLOW_ANY_TIME
     session_obj, error = arcade_manager.create_session(grade, section, allow_any_time=allow_any_time)
     if error or not session_obj:
@@ -1543,6 +1545,8 @@ def create_party_session():
     section = int(payload.get("section") or 0)
     if not grade or not section or not _host_allowed(grade, section):
         return jsonify({"error": "not allowed"}), 403
+    if bool(payload.get("debugAllowAnyTime")) and not config.ARCADE_DEBUG_ALLOW_ANY_TIME:
+        return jsonify({"error": "서버의 Arcade 테스트 우회 모드가 꺼져 있습니다. ARCADE_DEBUG_ALLOW_ANY_TIME=1로 실행해야 합니다."}), 400
     allow_any_time = bool(payload.get("debugAllowAnyTime")) and config.ARCADE_DEBUG_ALLOW_ANY_TIME
     session_obj, error = party_manager.create_session(grade, section, allow_any_time=allow_any_time)
     if error or not session_obj:
