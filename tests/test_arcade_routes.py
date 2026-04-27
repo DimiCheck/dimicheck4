@@ -306,6 +306,7 @@ def test_turtle_session_routes_create_join_start_and_rank(monkeypatch, tmp_path)
     assert payload["mode"] == "turtle"
     assert payload["status"] == "lobby"
     assert payload["raceSeconds"] == 22
+    assert payload["tapProgress"] == 0.012
 
     code = payload["code"]
     join_page = client.get(f"/arcade/turtle/join/{code}")
@@ -449,13 +450,18 @@ def test_party_late_or_stale_submit_is_ignored_without_error():
 def test_party_minigame_pack_covers_engine_types():
     arcade_routes = importlib.import_module("arcade_routes")
     games = arcade_routes.PARTY_MINIGAMES
+    assert arcade_routes.PARTY_WAIT_SECONDS == 3
+    assert arcade_routes.PARTY_INTRO_SECONDS == 2
+    assert arcade_routes.PARTY_RESULT_SECONDS == 3
     assert len(games) >= 25
     engines = {game["engine"] for game in games}
     assert {"reaction", "timing", "memory", "choice", "majority", "luck", "mash", "target", "risk", "slider", "order"} <= engines
     assert all(game["title"] and game["instruction"] for game in games)
+    assert max(int(game["duration"]) for game in games) <= 7
     assert any(game["id"] == "reaction_fake" and game["config"].get("fake") for game in games)
     assert any(game["id"] == "stroop" and game["config"].get("cueColor") for game in games)
     assert any(game["id"] == "forbidden_color" and game["config"].get("forbidden") for game in games)
+    assert any(game["id"] == "balloon_pop" and game["engine"] == "mash" for game in games)
 
 
 def test_party_score_engines_handle_common_round_types():

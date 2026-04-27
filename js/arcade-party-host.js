@@ -150,8 +150,20 @@
     });
   }
 
+  function renderFinalResults(state) {
+    els.results.innerHTML = '';
+    var ranking = ((state.rankings || {}).total || []).slice(0, 5);
+    ranking.forEach(function (player, index) {
+      var card = document.createElement('div');
+      card.className = 'result-card final-card rank-top-' + (index + 1);
+      card.textContent = (index + 1) + '위 ' + player.nickname + ' · ' + player.score + '점';
+      els.results.appendChild(card);
+    });
+  }
+
   function renderRankings(state) {
     els.rankings.innerHTML = '';
+    els.rankings.className = 'rankings' + (state.status === 'ended' ? ' final-rankings' : '');
     appendRankingGroup('총점', ((state.rankings || {}).total || []).slice(0, 10));
     appendRankingGroup('평균', ((state.rankings || {}).average || []).filter(function (player) {
       return player.roundsPlayed > 0;
@@ -168,7 +180,7 @@
     group.appendChild(titleChip);
     ranking.forEach(function (player, index) {
       var chip = document.createElement('div');
-      chip.className = 'chip';
+      chip.className = 'chip rank-top-' + (index + 1);
       chip.textContent = title === '평균'
         ? (index + 1) + '위 ' + player.nickname + ' ' + player.averageScore + '점'
         : (index + 1) + '위 ' + player.nickname + ' ' + player.score + '점';
@@ -197,6 +209,13 @@
     els.results.innerHTML = '';
     latestCueText = '';
     setPromptText('', '');
+    if (state.status === 'ended') {
+      els.roundTitle.textContent = '최종 순위';
+      els.instruction.textContent = '오늘의 Party 결과입니다.';
+      setPromptText('🏆', 'ready');
+      renderFinalResults(state);
+      return;
+    }
     if (!round) {
       els.roundTitle.textContent = state.status === 'ended' ? 'Party 종료' : '입장 대기';
       els.instruction.textContent = state.status === 'ended' ? '최종 순위를 확인하세요.' : '학생들이 QR로 입장하면 시작할 수 있습니다.';
@@ -228,6 +247,7 @@
       renderSequence(round.prompt.options || []);
     } else if (round.engine === 'mash') {
       setPromptText('연타!', 'ready');
+      renderMashVisual(round);
     } else if (round.engine === 'target') {
       setPromptText('빛나는 칸을 잡으세요', 'ready');
     } else if (round.engine === 'risk') {
@@ -242,6 +262,14 @@
     if (round.status === 'round_result') {
       renderResults(round.results || []);
     }
+  }
+
+  function renderMashVisual(round) {
+    els.sequence.innerHTML = '';
+    var visual = document.createElement('div');
+    visual.className = 'mash-visual' + (round.gameId === 'balloon_pop' ? ' balloon-visual' : '');
+    visual.textContent = round.gameId === 'balloon_pop' ? '🎈' : '⚡';
+    els.sequence.appendChild(visual);
   }
 
   function renderState(state) {
@@ -263,7 +291,7 @@
     updateClock();
     updateLiveCue();
     if (state.status === 'ended') {
-      scheduleBoardReturn(10);
+      scheduleBoardReturn(20);
     }
   }
 

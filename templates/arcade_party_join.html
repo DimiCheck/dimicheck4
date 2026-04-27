@@ -236,6 +236,25 @@
       font-size: 28px;
       animation: buttonFloat 2.2s ease-in-out infinite;
     }
+    .mash-visual {
+      display: grid;
+      place-items: center;
+      min-height: 118px;
+      border-radius: 32px;
+      background: #fff;
+      font-size: 86px;
+      transform: scale(var(--mash-scale, 0.86));
+      transition: transform 0.08s ease-out;
+      box-shadow: inset 0 -8px 0 rgba(36, 48, 68, 0.05);
+    }
+    .balloon-visual {
+      background: radial-gradient(circle at 35% 28%, #fff 0 12%, #ff8fab 13% 55%, #ff5f7a 56% 100%);
+      animation: balloonFloat 0.9s ease-in-out infinite alternate;
+    }
+    @keyframes balloonFloat {
+      from { transform: translateY(4px) scale(var(--mash-scale, 0.86)); }
+      to { transform: translateY(-5px) scale(var(--mash-scale, 0.86)); }
+    }
     .big-button.ready {
       background: linear-gradient(135deg, #75d66f, #ffde59);
       box-shadow: 0 10px 0 rgba(36, 48, 68, 0.15), 0 0 0 8px rgba(117, 214, 111, 0.16);

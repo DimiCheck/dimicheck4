@@ -337,24 +337,46 @@
   function renderMashControls(round) {
     els.controls.innerHTML = '';
     var count = 0;
+    var submitted = false;
     var counter = document.createElement('div');
     counter.className = 'sequence-answer';
     counter.textContent = '0회';
+    var visual = document.createElement('div');
+    visual.className = 'mash-visual' + (round.gameId === 'balloon_pop' ? ' balloon-visual' : '');
+    visual.textContent = round.gameId === 'balloon_pop' ? '🎈' : '⚡';
     var button = document.createElement('button');
     button.className = 'big-button ready';
     button.type = 'button';
     button.textContent = (round.prompt && round.prompt.label ? round.prompt.label : '연타') + '!';
     button.addEventListener('click', function () {
+      if (submitted) return;
       count += 1;
       counter.textContent = count + '회';
+      visual.style.setProperty('--mash-scale', String(Math.min(1.55, 0.86 + count * 0.035)));
+      if (round.gameId === 'balloon_pop' && count >= 18) {
+        visual.textContent = '💥';
+      }
       button.style.transform = 'translateY(5px) scale(0.98)';
       window.setTimeout(function () {
         button.style.transform = '';
       }, 60);
     });
+    var submitButton = document.createElement('button');
+    submitButton.type = 'button';
+    submitButton.className = 'compact-submit';
+    submitButton.textContent = '지금 제출';
+    submitButton.addEventListener('click', function () {
+      if (submitted) return;
+      submitted = true;
+      submitRound(round, count);
+    });
     els.controls.appendChild(counter);
+    els.controls.appendChild(visual);
     els.controls.appendChild(button);
+    els.controls.appendChild(submitButton);
     autoSubmitAtRoundEnd(round, function () {
+      if (submitted) return;
+      submitted = true;
       submitRound(round, count);
     });
   }
@@ -621,7 +643,7 @@
     autoSubmitTimer = window.setTimeout(function () {
       if (submittedRoundId === round.id) return;
       callback();
-    }, Math.max(300, round.endsAt - currentServerNow() - 120));
+    }, Math.max(300, round.endsAt - currentServerNow() - 550));
   }
 
   function clearAutoSubmitTimer() {

@@ -61,14 +61,14 @@ ITEM_RADIUS = {
     "star": 1,
     "bomb": 2,
 }
-PARTY_WAIT_SECONDS = 5
-PARTY_INTRO_SECONDS = 3
-PARTY_RESULT_SECONDS = 5
+PARTY_WAIT_SECONDS = 3
+PARTY_INTRO_SECONDS = 2
+PARTY_RESULT_SECONDS = 3
 PARTY_MAX_ROUNDS = 6
 PARTY_ROOM_PREFIX = "arcade:party:"
 TURTLE_WAIT_SECONDS = 5
 TURTLE_RACE_SECONDS = 22
-TURTLE_TAP_PROGRESS = 0.006
+TURTLE_TAP_PROGRESS = 0.012
 TURTLE_MAX_TAPS_PER_EVENT = 12
 TURTLE_MAX_TAPS_PER_SECOND = 18
 TURTLE_ROOM_PREFIX = "arcade:turtle:"
@@ -79,7 +79,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "반응 버튼",
         "instruction": "초록 신호가 뜨면 가장 빨리 누르세요.",
         "minPlayers": 1,
-        "duration": 5,
+        "duration": 4,
         "config": {"signal": "초록"},
     },
     {
@@ -88,7 +88,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "거짓 신호",
         "instruction": "진짜 신호가 뜰 때만 누르세요.",
         "minPlayers": 1,
-        "duration": 6,
+        "duration": 4,
         "config": {"signal": "진짜", "fake": True},
     },
     {
@@ -97,7 +97,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "늦게 누르기",
         "instruction": "시간 안에서 가장 늦게 누르면 높은 점수입니다.",
         "minPlayers": 1,
-        "duration": 6,
+        "duration": 4,
         "config": {"late": True},
     },
     {
@@ -106,7 +106,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "중앙 정지",
         "instruction": "움직이는 바가 목표 지점에 가까울 때 멈추세요.",
         "minPlayers": 1,
-        "duration": 8,
+        "duration": 5,
         "config": {"targetMs": 3600, "toleranceMs": 2200},
     },
     {
@@ -115,7 +115,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "목표 시간",
         "instruction": "감으로 목표 시간에 맞춰 멈추세요.",
         "minPlayers": 1,
-        "duration": 7,
+        "duration": 5,
         "config": {"targetMs": 5000, "toleranceMs": 2500},
     },
     {
@@ -124,7 +124,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "종례 카운트다운",
         "instruction": "카운트다운의 끝에 가장 가깝게 누르세요.",
         "minPlayers": 1,
-        "duration": 6,
+        "duration": 5,
         "config": {"targetMs": 4800, "toleranceMs": 1800},
     },
     {
@@ -133,7 +133,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "홀드 앤 릴리즈",
         "instruction": "버튼을 누르고 있다가 목표 구간에서 떼세요.",
         "minPlayers": 1,
-        "duration": 7,
+        "duration": 5,
         "config": {"targetMs": 4200, "toleranceMs": 2000, "hold": True},
     },
     {
@@ -142,7 +142,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "급식 러시",
         "instruction": "제한 시간 동안 버튼을 최대한 많이 눌러 급식 줄을 뚫으세요.",
         "minPlayers": 1,
-        "duration": 6,
+        "duration": 4,
         "config": {"label": "달리기"},
     },
     {
@@ -151,7 +151,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "풍선 터뜨리기",
         "instruction": "빠르게 연타해서 풍선을 먼저 터뜨리세요.",
         "minPlayers": 1,
-        "duration": 6,
+        "duration": 4,
         "config": {"label": "펑!"},
     },
     {
@@ -160,7 +160,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "별사탕 캐치",
         "instruction": "반짝이는 칸이 바뀔 때마다 정확히 눌러 점수를 모으세요.",
         "minPlayers": 1,
-        "duration": 8,
+        "duration": 5,
         "config": {"cells": 9, "stepMs": 760, "label": "별"},
     },
     {
@@ -169,7 +169,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "폭탄 피하기",
         "instruction": "안전한 칸만 빠르게 누르세요. 폭탄 칸은 감점입니다.",
         "minPlayers": 1,
-        "duration": 8,
+        "duration": 5,
         "config": {"cells": 9, "stepMs": 700, "label": "안전"},
     },
     {
@@ -178,7 +178,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "눈대중 슬라이더",
         "instruction": "목표 위치에 최대한 가깝게 슬라이더를 맞추세요.",
         "minPlayers": 1,
-        "duration": 9,
+        "duration": 6,
         "config": {"label": "위치", "unit": "%"},
     },
     {
@@ -187,7 +187,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "볼륨 맞추기",
         "instruction": "전자칠판의 목표 볼륨과 가장 비슷하게 맞추세요.",
         "minPlayers": 1,
-        "duration": 9,
+        "duration": 6,
         "config": {"label": "볼륨", "unit": "%"},
     },
     {
@@ -196,7 +196,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "줄 세우기",
         "instruction": "낮은 숫자부터 차례대로 눌러 순서를 완성하세요.",
         "minPlayers": 1,
-        "duration": 12,
+        "duration": 7,
         "config": {"items": ["142", "156", "163", "171"], "direction": "asc", "label": "작은 숫자부터"},
     },
     {
@@ -205,7 +205,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "급식 순서",
         "instruction": "급식판에 올릴 순서를 기억해 차례대로 누르세요.",
         "minPlayers": 1,
-        "duration": 12,
+        "duration": 7,
         "config": {"items": ["밥", "국", "반찬", "후식"], "direction": "given", "label": "왼쪽부터"},
     },
     {
@@ -214,7 +214,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "색 순서 기억",
         "instruction": "보이는 색 순서를 그대로 입력하세요.",
         "minPlayers": 1,
-        "duration": 12,
+        "duration": 7,
         "config": {"kind": "colors", "length": 5},
     },
     {
@@ -223,7 +223,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "방향 기억",
         "instruction": "화살표 순서를 기억해 그대로 누르세요.",
         "minPlayers": 1,
-        "duration": 12,
+        "duration": 7,
         "config": {"kind": "directions", "length": 5},
     },
     {
@@ -232,7 +232,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "숫자 기억",
         "instruction": "숫자열을 기억해서 입력하세요.",
         "minPlayers": 1,
-        "duration": 12,
+        "duration": 7,
         "config": {"kind": "numbers", "length": 6},
     },
     {
@@ -241,7 +241,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "금지 색 피하기",
         "instruction": "화면에 표시된 금지 색만 피하세요. 금지 색이 아닌 아무 색이나 누르면 됩니다.",
         "minPlayers": 1,
-        "duration": 8,
+        "duration": 5,
         "config": {"options": ["빨강", "파랑", "노랑", "초록"], "forbidden": "빨강"},
     },
     {
@@ -250,7 +250,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "글자색 고르기",
         "instruction": "글자가 무슨 색이라고 쓰여 있는지는 무시하고, 실제로 칠해진 색을 누르세요.",
         "minPlayers": 1,
-        "duration": 8,
+        "duration": 5,
         "config": {"options": ["빨강", "파랑", "노랑", "초록"], "correct": "파랑", "cue": "빨강", "cueColor": "파랑"},
     },
     {
@@ -259,7 +259,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "다수결 함정",
         "instruction": "사람이 적게 고른 쪽이 이깁니다.",
         "minPlayers": 3,
-        "duration": 8,
+        "duration": 5,
         "config": {"options": ["A", "B"]},
     },
     {
@@ -268,7 +268,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "눈치게임",
         "instruction": "겹치지 않는 숫자를 고르면 점수입니다.",
         "minPlayers": 2,
-        "duration": 8,
+        "duration": 5,
         "config": {"options": ["1", "2", "3", "4", "5"], "unique": True},
     },
     {
@@ -277,7 +277,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "운명의 문",
         "instruction": "문 하나를 고르세요. 결과는 열어 봐야 압니다.",
         "minPlayers": 1,
-        "duration": 7,
+        "duration": 5,
         "config": {"options": ["1번 문", "2번 문", "3번 문"]},
     },
     {
@@ -286,7 +286,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "보물상자",
         "instruction": "상자 하나를 열어 보세요.",
         "minPlayers": 1,
-        "duration": 7,
+        "duration": 5,
         "config": {"options": ["빨강 상자", "파랑 상자", "노랑 상자", "초록 상자"]},
     },
     {
@@ -295,7 +295,7 @@ PARTY_MINIGAMES: tuple[dict[str, Any], ...] = (
         "title": "위험한 다리",
         "instruction": "안전한 길은 적은 점수, 위험한 길은 큰 점수입니다.",
         "minPlayers": 1,
-        "duration": 7,
+        "duration": 5,
         "config": {"options": ["안전한 길", "흔들리는 길", "수상한 지름길"]},
     },
 )
@@ -1234,7 +1234,7 @@ class PartySessionManager:
         return [player for player in session_obj.players.values() if player.connected]
 
     def _has_round_time_locked(self, session_obj: PartySession) -> bool:
-        return session_obj.ends_at - _now() >= PARTY_WAIT_SECONDS + PARTY_INTRO_SECONDS + PARTY_RESULT_SECONDS + 8
+        return session_obj.ends_at - _now() >= PARTY_WAIT_SECONDS + PARTY_INTRO_SECONDS + PARTY_RESULT_SECONDS + 5
 
     def _advance_locked(self, session_obj: PartySession) -> bool:
         now_ts = _now()

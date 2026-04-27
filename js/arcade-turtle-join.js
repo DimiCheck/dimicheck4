@@ -158,7 +158,7 @@
     els.tapCount.textContent = (player ? player.taps : 0) + ' taps';
     if (sessionState && sessionState.status === 'racing' && player && !player.finished) {
       els.tapButton.disabled = false;
-      els.tapButton.textContent = '🐢 밀기';
+      els.tapButton.textContent = '🐢 전진';
     } else {
       els.tapButton.disabled = true;
       els.tapButton.textContent = sessionState && sessionState.status === 'countdown' ? '준비' : '대기';
@@ -205,7 +205,7 @@
     pendingTaps += 1;
     if (player) {
       player.taps += 1;
-      player.progressPercent = Math.min(100, (player.progressPercent || 0) + 0.6);
+      player.progressPercent = Math.min(100, (player.progressPercent || 0) + 1.2);
       player.progress = player.progressPercent / 100;
       renderPlayer();
     }

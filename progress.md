@@ -21,3 +21,5 @@ Original prompt: 구현 시작
 - Fixed forbidden-color visibility: host now shows `금지: <색>` as the main prompt and mobile marks the forbidden color button with a small `금지` badge.
 - Added more distinct Party inputs: slider games (`눈대중 슬라이더`, `볼륨 맞추기`) and ordering games (`줄 세우기`, `급식 순서`), plus engine-aware round selection to avoid repeating the same input style back-to-back.
 - Added new Live Arcade `거북이 경주`: separate host/join pages, server-authoritative turtle sessions, batched mobile tap events, countdown/race/end states, finish-line progress, and final rankings.
+- Party pacing/visibility pass: shortened wait/intro/result timings and minigame durations, added balloon visuals plus explicit submit for mash games, highlighted live top rankings, and made the final ranking screen much larger.
+- Rebalanced Turtle Race from 0.6% to 1.2% progress per tap so finishing is realistic, and changed the mobile action label from `밀기` to `전진`.
