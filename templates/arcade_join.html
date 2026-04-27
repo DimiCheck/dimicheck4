@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DimiCheck Arcade 참여</title>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <style>
+    :root {
+      --bg: #080b13;
+      --panel: rgba(255, 255, 255, 0.09);
+      --line: rgba(255, 255, 255, 0.15);
+      --text: #f8fafc;
+      --muted: #aeb7c8;
+      --red: #ff6b7a;
+      --blue: #5bbcff;
+      --gold: #ffd166;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 20% 0%, rgba(255, 107, 122, 0.24), transparent 32%),
+        radial-gradient(circle at 85% 18%, rgba(91, 188, 255, 0.22), transparent 30%),
+        linear-gradient(160deg, #080b13 0%, #111827 58%, #090b12 100%);
+      touch-action: manipulation;
+    }
+
+    .shell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 18px;
+    }
+
+    .card {
+      width: min(460px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 30px;
+      background: var(--panel);
+      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(18px);
+      padding: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .brand img {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+    }
+
+    h1, h2, p { margin: 0; }
+
+    h1 {
+      font-size: 30px;
+      letter-spacing: -0.05em;
+    }
+
+    .muted {
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .code {
+      display: inline-flex;
+      margin-top: 4px;
+      border-radius: 999px;
+      padding: 7px 11px;
+      background: rgba(255, 209, 102, 0.16);
+      color: var(--gold);
+      font-weight: 900;
+      letter-spacing: 0.08em;
+    }
+
+    form {
+      display: grid;
+      gap: 14px;
+      margin-top: 22px;
+    }
+
+    label {
+      color: #e5e7eb;
+      font-weight: 800;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 20px;
+      padding: 16px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.09);
+      font: inherit;
+      font-size: 18px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: rgba(255, 209, 102, 0.7);
+      box-shadow: 0 0 0 4px rgba(255, 209, 102, 0.12);
+    }
+
+    button {
+      border: 0;
+      border-radius: 20px;
+      padding: 16px;
+      color: #17110d;
+      background: linear-gradient(135deg, #ffd166, #ff8f66);
+      font: inherit;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .error {
+      margin-top: 12px;
+      border-radius: 16px;
+      padding: 12px 14px;
+      background: rgba(255, 107, 122, 0.15);
+      color: #ffd4d9;
+      line-height: 1.45;
+    }
+
+    .game {
+      display: none;
+      gap: 18px;
+    }
+
+    .game.active { display: grid; }
+    .entry.hidden { display: none; }
+
+    .team-card {
+      display: grid;
+      gap: 6px;
+      border-radius: 24px;
+      padding: 18px;
+      background: rgba(255, 255, 255, 0.09);
+    }
+
+    .team-name {
+      font-size: 34px;
+      font-weight: 950;
+      letter-spacing: -0.04em;
+    }
+
+    .team-card.red .team-name { color: var(--red); }
+    .team-card.blue .team-name { color: var(--blue); }
+
+    .score-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .mini {
+      border-radius: 18px;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .mini b {
+      display: block;
+      margin-top: 6px;
+      font-size: 26px;
+    }
+
+    .pad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      user-select: none;
+    }
+
+    .pad button {
+      min-height: 76px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.11);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+      font-size: 26px;
+    }
+
+    .pad .empty {
+      visibility: hidden;
+    }
+
+    .hint {
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <main class="shell" data-code="{{ code }}" data-enabled="{{ '1' if arcade_enabled else '0' }}">
+    <section class="card">
+      <div class="brand">
+        <img src="/logo.png" alt="">
+        <div>
+          <h1>Arcade 참여</h1>
+          <p class="muted">입장 코드 <span class="code">{{ code }}</span></p>
+        </div>
+      </div>
+
+      <div id="entryPanel" class="entry">
+        <p class="muted">닉네임만 입력하면 바로 들어갑니다. 로그인은 필요 없습니다.</p>
+        <form id="joinForm">
+          <label for="nicknameInput">닉네임</label>
+          <input id="nicknameInput" autocomplete="nickname" maxlength="8" placeholder="예: 민준" required>
+          <button id="joinButton" type="submit">입장하기</button>
+        </form>
+      </div>
+
+      <div id="gamePanel" class="game">
+        <section class="team-card" id="teamCard">
+          <p class="muted" id="statusText">연결 중</p>
+          <div class="team-name" id="teamName">--</div>
+          <p class="muted" id="playerName"></p>
+        </section>
+
+        <section class="score-row">
+          <div class="mini">내 점령<b id="myScore">0</b></div>
+          <div class="mini">남은 시간<b id="remainingTime">--</b></div>
+        </section>
+
+        <section class="pad" aria-label="이동 방향">
+          <div class="empty"></div>
+          <button type="button" data-dir="up">↑</button>
+          <div class="empty"></div>
+          <button type="button" data-dir="left">←</button>
+          <button type="button" data-dir="down">↓</button>
+          <button type="button" data-dir="right">→</button>
+        </section>
+
+        <p class="hint">화면 버튼을 누르거나 키보드 방향키/WASD로 움직일 수 있습니다.</p>
+      </div>
+
+      <div id="errorBox" class="error" hidden></div>
+    </section>
+  </main>
+  <script src="/js/arcade-join.js?v={{ asset_version }}"></script>
+</body>
+</html>

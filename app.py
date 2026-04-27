@@ -26,6 +26,7 @@ from class_routes import blueprint as class_bp
 from exports_routes import blueprint as export_bp
 from chat_routes import blueprint as chat_bp
 from vote_routes import blueprint as vote_bp
+from arcade_routes import blueprint as arcade_bp, init_arcade_socketio
 from public_api import public_api_bp, broadcast_public_status_update
 from developer_routes import blueprint as developer_bp
 from oauth import blueprint as oauth_bp
@@ -82,6 +83,7 @@ app.register_blueprint(class_bp)
 app.register_blueprint(export_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(vote_bp)
+app.register_blueprint(arcade_bp)
 app.register_blueprint(public_api_bp)
 app.register_blueprint(developer_bp)
 app.register_blueprint(oauth_bp)
@@ -111,6 +113,7 @@ CORS(
 )
 for ns in namespaces:
     socketio.on_namespace(ns)
+init_arcade_socketio(socketio)
 
 app.before_request(before_request)
 app.after_request(after_request)

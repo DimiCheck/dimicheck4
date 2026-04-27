@@ -96,6 +96,7 @@ _CSRF_EXEMPT_PREFIXES = (
     "/healthz",
     "/metrics",
     "/api/qrng",
+    "/api/arcade",
     "/manifest.webmanifest",
     "/service-worker.js",
     "/sitemap.xml",

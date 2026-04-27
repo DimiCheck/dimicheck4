@@ -11,6 +11,7 @@
   const whatsNewModal = document.getElementById('whatsNewModal');
   const whatsNewClose = document.getElementById('whatsNewClose');
   const whatsNewConfirm = document.getElementById('whatsNewConfirm');
+  const arcadeItem = document.getElementById('arcadeItem');
 
   if (!infoFab || !infoMenu) {
     return;
@@ -157,6 +158,15 @@
 
   whatsNewItem?.addEventListener('click', () => {
     openWhatsNewModal();
+  });
+
+  arcadeItem?.addEventListener('click', () => {
+    const grade = window.boardGrade || new URLSearchParams(window.location.search).get('grade');
+    const section = window.boardSection || new URLSearchParams(window.location.search).get('section');
+    if (!grade || !section) {
+      return;
+    }
+    window.location.href = `/arcade/host?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}`;
   });
 
   whatsNewClose?.addEventListener('click', closeWhatsNewModal);

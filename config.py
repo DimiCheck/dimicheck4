@@ -26,9 +26,14 @@ def _default_asset_version() -> str:
         "js/magnet.js",
         "js/etc.js",
         "js/info.js",
+        "js/arcade-host.js",
+        "js/arcade-join.js",
         "js/reset.js",
+        "arcade_routes.py",
         "main.css",
         "templates/index.html",
+        "templates/arcade_host.html",
+        "templates/arcade_join.html",
     )
     latest_mtime = 0
     for rel_path in tracked_files:
@@ -112,6 +117,11 @@ class Config:
     # Cache busting - use timestamp or version from env
     ASSET_VERSION: str = os.getenv("ASSET_VERSION", _default_asset_version())
     APP_VERSION: str = os.getenv("APP_VERSION", "4.1")
+    ARCADE_ENABLED: bool = _env_bool("ARCADE_ENABLED", True)
+    ARCADE_MAX_ACTIVE_SESSIONS: int = int(os.getenv("ARCADE_MAX_ACTIVE_SESSIONS", "6"))
+    ARCADE_MAX_PLAYERS: int = int(os.getenv("ARCADE_MAX_PLAYERS", "60"))
+    ARCADE_SESSION_TTL_SECONDS: int = int(os.getenv("ARCADE_SESSION_TTL_SECONDS", "1200"))
+    ARCADE_TICK_MS: int = int(os.getenv("ARCADE_TICK_MS", "320"))
 
     # Google Analytics (Measurement Protocol)
     GA4_MEASUREMENT_ID: str | None = os.getenv("GA4_MEASUREMENT_ID")
