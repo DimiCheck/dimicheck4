@@ -325,9 +325,11 @@
       selectedSabotageItem = '';
     }
     var remaining = vote.endsAt ? formatSeconds(vote.endsAt - currentServerNow()) : '--';
-    els.sabotageStatus.textContent = voteId === votedVoteId
+    var targetName = selectedSabotageTarget ? selectedTargetName() : '';
+    var itemName = selectedSabotageItem ? selectedItemName() : '';
+    els.sabotageStatus.textContent = votedVoteId && voteId === votedVoteId
       ? '투표 완료 · 다음 투표까지 ' + remaining + '초'
-      : '대상과 아이템을 고르세요 · ' + remaining + '초';
+      : (targetName || itemName ? '선택: ' + (targetName || '대상 미선택') + ' / ' + (itemName || '아이템 미선택') + ' · ' + remaining + '초' : '대상과 아이템을 고르세요 · ' + remaining + '초');
     renderSabotageTargets(voteId);
     renderSabotageItems(voteId);
   }
@@ -341,7 +343,7 @@
       button.type = 'button';
       button.textContent = target.nickname + ' · ' + Math.round(target.progressPercent || 0) + '%';
       button.classList.toggle('is-selected', selectedSabotageTarget === target.id);
-      button.disabled = voteId === votedVoteId;
+      button.disabled = !!votedVoteId && voteId === votedVoteId;
       button.addEventListener('click', function () {
         selectedSabotageTarget = target.id;
         maybeSubmitSabotageVote(voteId);
@@ -358,7 +360,7 @@
       button.textContent = item.label;
       button.title = item.description || '';
       button.classList.toggle('is-selected', selectedSabotageItem === item.id);
-      button.disabled = voteId === votedVoteId;
+      button.disabled = !!votedVoteId && voteId === votedVoteId;
       button.addEventListener('click', function () {
         selectedSabotageItem = item.id;
         maybeSubmitSabotageVote(voteId);
@@ -378,6 +380,22 @@
       itemId: selectedSabotageItem
     });
     renderSabotagePanel();
+  }
+
+  function selectedTargetName() {
+    var targets = (sessionState && sessionState.players) || [];
+    for (var i = 0; i < targets.length; i += 1) {
+      if (targets[i].id === selectedSabotageTarget) return targets[i].nickname;
+    }
+    return '';
+  }
+
+  function selectedItemName() {
+    var items = (sessionState && sessionState.sabotageItems) || [];
+    for (var i = 0; i < items.length; i += 1) {
+      if (items[i].id === selectedSabotageItem) return items[i].label;
+    }
+    return '';
   }
 
   els.tapButton.addEventListener('click', function () {

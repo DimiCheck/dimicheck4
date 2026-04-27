@@ -388,7 +388,7 @@ def test_turtle_start_with_short_remaining_window_does_not_end_lobby(monkeypatch
     assert player is not None
     assert second is not None
 
-    session_obj.safe_end_at = time.time() + arcade_routes.TURTLE_WAIT_SECONDS + 5
+    session_obj.safe_end_at = time.time() + arcade_routes.TURTLE_WAIT_SECONDS + arcade_routes.TURTLE_RACE_SECONDS - 1
     updated, start_error = manager.start_now(session_obj.code)
 
     assert updated is session_obj
@@ -480,6 +480,59 @@ def test_turtle_requires_two_racers_and_applies_saboteur_votes(monkeypatch):
     assert snapshot["connectedSaboteurs"] == 1
     assert snapshot["rankings"]
     assert all(player["role"] == "player" for player in snapshot["rankings"])
+
+
+def test_turtle_taps_are_not_limited_per_second(monkeypatch):
+    arcade_routes = importlib.import_module("arcade_routes")
+    monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: _allowed_window())
+
+    manager = arcade_routes.TurtleRaceSessionManager()
+    session_obj, error = manager.create_session(2, 4)
+    assert error is None
+    assert session_obj is not None
+    manager.join_player(session_obj.code, "p1", "하나", 0, role="player")
+    manager.join_player(session_obj.code, "p2", "둘둘", 1, role="player")
+    updated, start_error = manager.start_now(session_obj.code)
+    assert start_error is None
+    assert updated is session_obj
+
+    with manager._lock:
+      session_obj.starts_at = time.time() - 1
+      assert manager._advance_locked(session_obj) is True
+
+    manager.add_taps(session_obj.code, "p1", 12)
+    manager.add_taps(session_obj.code, "p1", 12)
+
+    assert session_obj.players["p1"].taps == 24
+    assert session_obj.players["p1"].progress == 24 * arcade_routes.TURTLE_TAP_PROGRESS
+
+
+def test_turtle_sabotage_vote_tie_chooses_one_top_vote(monkeypatch):
+    arcade_routes = importlib.import_module("arcade_routes")
+    monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: _allowed_window())
+
+    manager = arcade_routes.TurtleRaceSessionManager()
+    session_obj, error = manager.create_session(2, 4)
+    assert error is None
+    assert session_obj is not None
+    manager.join_player(session_obj.code, "p1", "하나", 0, role="player")
+    manager.join_player(session_obj.code, "p2", "둘둘", 1, role="player")
+    manager.join_player(session_obj.code, "s1", "방해1", 2, role="saboteur")
+    manager.join_player(session_obj.code, "s2", "방해2", 3, role="saboteur")
+    updated, start_error = manager.start_now(session_obj.code)
+    assert start_error is None
+    assert updated is session_obj
+
+    with manager._lock:
+      session_obj.starts_at = time.time() - 1
+      assert manager._advance_locked(session_obj) is True
+
+    manager.submit_sabotage_vote(session_obj.code, "s1", "p1", "banana")
+    manager.submit_sabotage_vote(session_obj.code, "s2", "p2", "shrink")
+    session_obj.sabotage_vote_ends_at = time.time() - 1
+    assert manager._advance_locked(session_obj) is True
+
+    assert session_obj.recent_events[-1]["itemId"] in {"banana", "shrink"}
 
 
 def test_party_round_scores_and_late_join_waits_for_next_round(monkeypatch):

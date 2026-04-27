@@ -70,7 +70,6 @@ TURTLE_WAIT_SECONDS = 5
 TURTLE_RACE_SECONDS = 40
 TURTLE_TAP_PROGRESS = 0.007
 TURTLE_MAX_TAPS_PER_EVENT = 12
-TURTLE_MAX_TAPS_PER_SECOND = 16
 TURTLE_MIN_RACERS = 2
 TURTLE_SABOTEUR_VOTE_SECONDS = 5
 TURTLE_ROOM_PREFIX = "arcade:turtle:"
@@ -1592,8 +1591,6 @@ class TurtlePlayer:
     last_seen_at: float = field(default_factory=_now)
     finished_at: float | None = None
     rank: int | None = None
-    tap_bucket_started_at: float = field(default_factory=_now)
-    tap_bucket_count: int = 0
     shrink_until: float = 0.0
     fake_reset_until: float = 0.0
 
@@ -1680,7 +1677,7 @@ class TurtleRaceSessionManager:
                 return None, "현재 열린 Arcade가 너무 많습니다."
             starts_at = now_ts + TURTLE_WAIT_SECONDS
             ends_at = min(starts_at + TURTLE_RACE_SECONDS, float(window["safeEndAt"]))
-            if ends_at - starts_at < 10:
+            if ends_at - starts_at < TURTLE_RACE_SECONDS - 0.05:
                 return None, "경주를 진행하기에 시간이 부족합니다."
             code = self._new_code_locked()
             session_obj = TurtleSession(
@@ -1825,7 +1822,7 @@ class TurtleRaceSessionManager:
             now_ts = _now()
             starts_at = now_ts + TURTLE_WAIT_SECONDS
             ends_at = min(starts_at + TURTLE_RACE_SECONDS, session_obj.safe_end_at)
-            if ends_at - starts_at < 10:
+            if ends_at - starts_at < TURTLE_RACE_SECONDS - 0.05:
                 return session_obj, "남은 시간이 부족합니다."
             session_obj.status = "countdown"
             session_obj.starts_at = starts_at
@@ -1840,8 +1837,6 @@ class TurtleRaceSessionManager:
                 player.taps = 0
                 player.finished_at = None
                 player.rank = None
-                player.tap_bucket_started_at = now_ts
-                player.tap_bucket_count = 0
                 player.shrink_until = 0.0
                 player.fake_reset_until = 0.0
             return session_obj, None
@@ -1862,14 +1857,7 @@ class TurtleRaceSessionManager:
             except (TypeError, ValueError):
                 requested = 1
             requested = max(1, min(requested, TURTLE_MAX_TAPS_PER_EVENT))
-            if now_ts - player.tap_bucket_started_at >= 1.0:
-                player.tap_bucket_started_at = now_ts
-                player.tap_bucket_count = 0
-            allowed = max(0, TURTLE_MAX_TAPS_PER_SECOND - player.tap_bucket_count)
-            accepted = min(requested, allowed)
-            if accepted <= 0:
-                return session_obj, None
-            player.tap_bucket_count += accepted
+            accepted = requested
             player.taps += accepted
             player.progress = min(1.0, player.progress + accepted * TURTLE_TAP_PROGRESS)
             player.last_seen_at = now_ts
@@ -2027,7 +2015,9 @@ class TurtleRaceSessionManager:
             tallies[key] = tallies.get(key, 0) + 1
         if not tallies:
             return
-        target_id, item_id = sorted(tallies.items(), key=lambda entry: (-entry[1], entry[0][0], entry[0][1]))[0][0]
+        top_count = max(tallies.values())
+        winners = [key for key, count in tallies.items() if count == top_count]
+        target_id, item_id = random.choice(sorted(winners))
         target = session_obj.players.get(target_id)
         if not target or target.role != "player" or target.finished_at is not None:
             return
