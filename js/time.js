@@ -50,6 +50,9 @@ const APRIL_FOOLS_SESSION_SCALE_MS = 4 * 60 * 1000;
 const APRIL_FOOLS_SESSION_START_REAL_MS = Date.now();
 const CLOCK_RENDER_INTERVAL_MS = 50;
 const APRIL_FOOLS_BSOD_STORAGE_KEY = 'dimicheck:april-fools-bsod';
+const ARCADE_MENU_END_BUFFER_SECONDS = 5 * 60;
+const ARCADE_MENU_MIN_START_WINDOW_SECONDS = 15 + 5 + 30;
+let lastBoardArcadeAvailabilityKey = null;
 const APRIL_FOOLS_BSOD_WINDOWS = Object.freeze([
   { id: 'evening-1', startMin: 17 * 60 + 20, endMin: 19 * 60 + 40 },
   { id: 'evening-2', startMin: 20 * 60 + 10, endMin: 22 * 60 + 50 },
@@ -451,6 +454,79 @@ function getPhasesForDate(now) {
     return { ...phase, startMin: shiftedStart };
   });
 }
+
+function isArcadePhaseLabel(label) {
+  const text = String(label || '');
+  return ['쉬는', '점심', '저녁', '중식', '석식', '휴식'].some((token) => text.includes(token));
+}
+
+function makeBoardArcadeAvailability(label, endSecondOfDay, secondOfDay) {
+  const remainingSafeSeconds = Math.floor(endSecondOfDay - ARCADE_MENU_END_BUFFER_SECONDS - secondOfDay);
+  const allowed = isArcadePhaseLabel(label) && remainingSafeSeconds >= ARCADE_MENU_MIN_START_WINDOW_SECONDS;
+  return {
+    allowed,
+    label: allowed ? label : '',
+    remainingSafeSeconds: Math.max(0, remainingSafeSeconds),
+    startsInSeconds: 0,
+    reason: allowed ? '' : '다음 일정 준비 시간이 가까워 Arcade를 시작할 수 없습니다.',
+  };
+}
+
+function getNextBoardArcadeStartSeconds(phases, secondOfDay) {
+  let nextStart = null;
+  phases.forEach((phase) => {
+    const phaseStart = phase.startMin * 60;
+    if (isArcadePhaseLabel(phase.label) && phaseStart > secondOfDay) {
+      nextStart = nextStart === null ? phaseStart : Math.min(nextStart, phaseStart);
+    }
+  });
+  return nextStart;
+}
+
+function getBoardArcadeLocalAvailability(now = new Date()) {
+  const phases = getPhasesForDate(now);
+  const secondOfDay = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  for (const phase of phases) {
+    const phaseStart = phase.startMin * 60;
+    const phaseEnd = phase.endMin * 60;
+    if (phaseStart <= secondOfDay && secondOfDay < phaseEnd) {
+      return makeBoardArcadeAvailability(phase.label, phaseEnd, secondOfDay);
+    }
+  }
+
+  const nextStart = getNextBoardArcadeStartSeconds(phases, secondOfDay);
+  return {
+    allowed: false,
+    label: '',
+    remainingSafeSeconds: 0,
+    startsInSeconds: nextStart === null ? null : Math.max(0, nextStart - secondOfDay),
+    reason: '지금은 Arcade를 시작할 수 있는 시간이 아닙니다.',
+  };
+}
+
+function dispatchBoardArcadeAvailability(availability) {
+  if (typeof window.CustomEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('dimicheck:arcade-availability', { detail: availability }));
+    return;
+  }
+  const event = document.createEvent('CustomEvent');
+  event.initCustomEvent('dimicheck:arcade-availability', false, false, availability);
+  window.dispatchEvent(event);
+}
+
+function publishBoardArcadeAvailability(now = new Date()) {
+  const availability = getBoardArcadeLocalAvailability(now);
+  window.boardArcadeAvailability = availability;
+  const key = `${availability.allowed}:${availability.label}`;
+  if (key !== lastBoardArcadeAvailabilityKey) {
+    lastBoardArcadeAvailabilityKey = key;
+    dispatchBoardArcadeAvailability(availability);
+  }
+  return availability;
+}
+
+window.getBoardArcadeLocalAvailability = getBoardArcadeLocalAvailability;
+window.refreshBoardArcadeAvailability = publishBoardArcadeAvailability;
 
 function getCountdownTarget(now) {
   // 현재 적용된 시간표의 "끝" 구간 시작 시간을 가져옴
@@ -1056,6 +1132,7 @@ function updateClock() {
   for (const p of phases) {
     if (curMin >= p.startMin && curMin < p.endMin) { phase = p; break; }
   }
+  publishBoardArcadeAvailability(now);
 
   const countdownState = getCountdownState(now, actualHourNumber, actualMinuteNumber, actualSecondNumber);
   const countdownActive = countdownState.type !== 'none';

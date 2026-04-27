@@ -132,44 +132,6 @@ def _initial_grid() -> list[list[str]]:
     return [["red" if x < midpoint else "blue" for x in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
 
 
-def _is_class_phase(label: str) -> bool:
-    return "수업" in str(label or "")
-
-
-def _class_break_window(
-    phase: dict[str, Any],
-    now_ts: float,
-    second_of_day: int,
-    day_start_ts: float,
-) -> dict[str, Any] | None:
-    if not _is_class_phase(str(phase.get("label") or "")):
-        return None
-    phase_start = int(phase["start"]) * 60
-    phase_end = int(phase["end"]) * 60
-    lesson_seconds = 50 * 60
-    break_seconds = 10 * 60
-    cursor = phase_start
-    while cursor + lesson_seconds + break_seconds <= phase_end:
-        break_start = cursor + lesson_seconds
-        break_end = break_start + break_seconds
-        if break_start <= second_of_day < break_end:
-            phase_end_ts = day_start_ts + break_end
-            safe_end_ts = phase_end_ts - END_BUFFER_SECONDS
-            remaining_safe_seconds = int(safe_end_ts - now_ts)
-            allowed = remaining_safe_seconds >= MIN_START_WINDOW_SECONDS
-            return {
-                "allowed": allowed,
-                "label": "쉬는 시간",
-                "safeEndAt": safe_end_ts,
-                "phaseEndAt": phase_end_ts,
-                "remainingSafeSeconds": max(0, remaining_safe_seconds),
-                "startsInSeconds": 0,
-                "reason": "" if allowed else "다음 수업 준비 시간이 가까워 Arcade를 시작할 수 없습니다.",
-            }
-        cursor += lesson_seconds + break_seconds
-    return None
-
-
 def _play_window(grade: int, now_ts: float | None = None) -> dict[str, Any]:
     now_ts = now_ts or _now()
     now_dt = datetime.fromtimestamp(now_ts, KST)
@@ -179,9 +141,6 @@ def _play_window(grade: int, now_ts: float | None = None) -> dict[str, Any]:
 
     for phase in _phases_for_grade(grade, now_dt):
         if phase["start"] <= minute < phase["end"]:
-            class_break = _class_break_window(phase, now_ts, second_of_day, day_start.timestamp())
-            if class_break:
-                return class_break
             phase_end_ts = day_start.timestamp() + phase["end"] * 60
             safe_end_ts = phase_end_ts - END_BUFFER_SECONDS
             remaining_safe_seconds = int(safe_end_ts - now_ts)
@@ -739,6 +698,43 @@ arcade_manager = ArcadeSessionManager()
 
 def _host_allowed(grade: int, section: int) -> bool:
     return is_teacher_session_active() or is_board_session_active(grade, section)
+
+
+def _availability_payload(grade: int, section: int) -> dict[str, Any]:
+    if not config.ARCADE_ENABLED:
+        return {
+            "allowed": False,
+            "reason": "Arcade가 비활성화되어 있습니다.",
+            "debugOverride": False,
+        }
+    if config.ARCADE_DEBUG_ALLOW_ANY_TIME:
+        return {
+            "allowed": True,
+            "reason": "테스트 모드",
+            "debugOverride": True,
+        }
+    window = _play_window(grade)
+    return {
+        "allowed": bool(window.get("allowed")),
+        "reason": window.get("reason") or "",
+        "label": window.get("label") or "",
+        "startsInSeconds": window.get("startsInSeconds"),
+        "remainingSafeSeconds": window.get("remainingSafeSeconds"),
+        "debugOverride": False,
+    }
+
+
+@blueprint.get("/api/arcade/availability")
+def arcade_availability():
+    grade = request.args.get("grade", type=int)
+    section = request.args.get("section", type=int)
+    if not grade or not section or not _host_allowed(grade, section):
+        response = jsonify({"allowed": False, "reason": "not allowed", "debugOverride": False})
+        response.headers["Cache-Control"] = "no-store"
+        return response, 403
+    response = jsonify(_availability_payload(grade, section))
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @blueprint.get("/arcade/host")

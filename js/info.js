@@ -122,6 +122,51 @@
     }
   }
 
+  function getBoardContext() {
+    const params = new URLSearchParams(window.location.search);
+    const grade = window.boardGrade || params.get('grade');
+    const section = window.boardSection || params.get('section');
+    if (!grade || !section) {
+      return null;
+    }
+    return { grade, section };
+  }
+
+  function setArcadeMenuVisible(visible) {
+    if (!arcadeItem) {
+      return;
+    }
+    arcadeItem.hidden = !visible;
+    arcadeItem.setAttribute('aria-hidden', String(!visible));
+  }
+
+  function isArcadeDebugAllowAnyTime() {
+    return arcadeItem?.dataset?.arcadeDebugAllowAnyTime === 'true';
+  }
+
+  function applyArcadeAvailability(availability) {
+    setArcadeMenuVisible(isArcadeDebugAllowAnyTime() || Boolean(availability?.allowed));
+  }
+
+  function refreshArcadeAvailability() {
+    if (!arcadeItem) {
+      return;
+    }
+    if (isArcadeDebugAllowAnyTime()) {
+      setArcadeMenuVisible(true);
+      return;
+    }
+    if (typeof window.refreshBoardArcadeAvailability === 'function') {
+      applyArcadeAvailability(window.refreshBoardArcadeAvailability());
+      return;
+    }
+    if (typeof window.getBoardArcadeLocalAvailability === 'function') {
+      applyArcadeAvailability(window.getBoardArcadeLocalAvailability());
+      return;
+    }
+    applyArcadeAvailability(window.boardArcadeAvailability);
+  }
+
   function closeWhatsNewModal() {
     if (!whatsNewModal) return;
     whatsNewModal.hidden = true;
@@ -161,12 +206,14 @@
   });
 
   arcadeItem?.addEventListener('click', () => {
-    const grade = window.boardGrade || new URLSearchParams(window.location.search).get('grade');
-    const section = window.boardSection || new URLSearchParams(window.location.search).get('section');
-    if (!grade || !section) {
+    if (arcadeItem.hidden) {
       return;
     }
-    window.location.href = `/arcade?grade=${encodeURIComponent(grade)}&section=${encodeURIComponent(section)}`;
+    const context = getBoardContext();
+    if (!context) {
+      return;
+    }
+    window.location.href = `/arcade?grade=${encodeURIComponent(context.grade)}&section=${encodeURIComponent(context.section)}`;
   });
 
   whatsNewClose?.addEventListener('click', closeWhatsNewModal);
@@ -189,4 +236,13 @@
 
   ensureExposureWindow();
   updateWhatsNewIndicators();
+  refreshArcadeAvailability();
+  window.addEventListener('dimicheck:arcade-availability', (event) => {
+    applyArcadeAvailability(event.detail);
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      refreshArcadeAvailability();
+    }
+  });
 })();

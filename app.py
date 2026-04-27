@@ -638,8 +638,8 @@ def board():
     grade = request.args.get("grade", type=int)
     section = request.args.get("section", type=int)
 
-    config = CLASS_CONFIGS.get((grade, section))
-    if not config:
+    class_config = CLASS_CONFIGS.get((grade, section))
+    if not class_config:
         return send_from_directory(".", "404.html")
 
     guard_key = pin_guard_key(f"board:{grade}:{section}")
@@ -650,11 +650,11 @@ def board():
             return make_response("Too many attempts. 잠시 후 다시 시도해주세요.", 429)
 
         pin = request.form.get("pin")
-        if str(config["pin"]) == pin:
+        if str(class_config["pin"]) == pin:
             session[f"board_verified_{grade}_{section}"] = True
             session.permanent = True
             pin_guard_reset(guard_key)
-            return render_template("index.html")
+            return render_template("index.html", arcade_debug_allow_any_time=config.ARCADE_DEBUG_ALLOW_ANY_TIME)
 
         attempts_left, lock_remaining = pin_guard_register_failure(
             guard_key, max_attempts=5, window_seconds=300, lock_seconds=900
@@ -663,7 +663,7 @@ def board():
         return make_response("잘못된 PIN 입니다.", status_code)
 
     if session.get(f"board_verified_{grade}_{section}"):
-        return render_template("index.html")
+        return render_template("index.html", arcade_debug_allow_any_time=config.ARCADE_DEBUG_ALLOW_ANY_TIME)
 
     return send_from_directory(".", "enter_pin.html")
 

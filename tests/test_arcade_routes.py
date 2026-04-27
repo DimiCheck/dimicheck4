@@ -127,6 +127,57 @@ def test_arcade_session_routes_require_board_session_and_create(monkeypatch, tmp
     assert b"Arcade" in turf_host.data
 
 
+def test_arcade_availability_hides_menu_outside_allowed_window(monkeypatch, tmp_path):
+    app_module = _load_app(monkeypatch, tmp_path)
+    arcade_routes = importlib.import_module("arcade_routes")
+    blocked_window = {
+        "allowed": False,
+        "label": "",
+        "safeEndAt": None,
+        "phaseEndAt": None,
+        "remainingSafeSeconds": 0,
+        "startsInSeconds": 300,
+        "reason": "수업 시간에는 Arcade를 열 수 없습니다.",
+    }
+    monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: blocked_window)
+
+    client = app_module.app.test_client()
+    forbidden = client.get("/api/arcade/availability?grade=2&section=4")
+    assert forbidden.status_code == 403
+    assert forbidden.get_json()["allowed"] is False
+
+    with client.session_transaction() as session_state:
+        session_state["board_verified_2_4"] = True
+
+    blocked = client.get("/api/arcade/availability?grade=2&section=4")
+    assert blocked.status_code == 200
+    assert "no-store" in blocked.headers["Cache-Control"]
+    assert blocked.get_json() == {
+        "allowed": False,
+        "debugOverride": False,
+        "label": "",
+        "reason": "수업 시간에는 Arcade를 열 수 없습니다.",
+        "remainingSafeSeconds": 0,
+        "startsInSeconds": 300,
+    }
+
+    monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: _allowed_window())
+    allowed = client.get("/api/arcade/availability?grade=2&section=4")
+    assert allowed.status_code == 200
+    assert allowed.get_json()["allowed"] is True
+    assert allowed.get_json()["label"] == "점심시간"
+
+    monkeypatch.setattr(arcade_routes, "_play_window", lambda _grade: blocked_window)
+    monkeypatch.setattr(arcade_routes.config, "ARCADE_DEBUG_ALLOW_ANY_TIME", True)
+    debug_allowed = client.get("/api/arcade/availability?grade=2&section=4")
+    assert debug_allowed.status_code == 200
+    assert debug_allowed.get_json() == {
+        "allowed": True,
+        "debugOverride": True,
+        "reason": "테스트 모드",
+    }
+
+
 def test_arcade_debug_any_time_requires_explicit_server_flag(monkeypatch, tmp_path):
     app_module = _load_app(monkeypatch, tmp_path)
     arcade_routes = importlib.import_module("arcade_routes")
@@ -291,7 +342,7 @@ def test_arcade_items_create_area_claims_and_speed_boost(monkeypatch):
     assert player.x == 13
 
 
-def test_arcade_play_window_includes_regular_class_breaks(monkeypatch):
+def test_arcade_play_window_does_not_infer_regular_class_breaks(monkeypatch):
     arcade_routes = importlib.import_module("arcade_routes")
     monkeypatch.setattr(
         arcade_routes,
@@ -303,8 +354,8 @@ def test_arcade_play_window_includes_regular_class_breaks(monkeypatch):
     )
 
     break_start = datetime(2026, 4, 27, 9, 50, 10, tzinfo=arcade_routes.KST).timestamp()
-    assert arcade_routes._play_window(2, break_start)["allowed"] is True
-    assert arcade_routes._play_window(2, break_start)["label"] == "쉬는 시간"
+    assert arcade_routes._play_window(2, break_start)["allowed"] is False
 
-    too_late = datetime(2026, 4, 27, 9, 55, 1, tzinfo=arcade_routes.KST).timestamp()
-    assert arcade_routes._play_window(2, too_late)["allowed"] is False
+    lunch_start = datetime(2026, 4, 27, 12, 50, 10, tzinfo=arcade_routes.KST).timestamp()
+    assert arcade_routes._play_window(2, lunch_start)["allowed"] is True
+    assert arcade_routes._play_window(2, lunch_start)["label"] == "점심 시간"

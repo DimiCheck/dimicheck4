@@ -281,7 +281,14 @@
       </button>
       <button class="fab-item" role="menuitem" id="foodItem">오늘 급식 보기</button>
       <button class="fab-item" role="menuitem" id="timeItem">오늘 시간표</button>
-      <button class="fab-item" role="menuitem" id="arcadeItem">Arcade 열기</button>
+      <button
+        class="fab-item"
+        role="menuitem"
+        id="arcadeItem"
+        data-arcade-debug-allow-any-time="{{ 'true' if arcade_debug_allow_any_time else 'false' }}"
+        hidden
+        aria-hidden="true"
+      >Arcade 열기</button>
       <button class="fab-item" role="menuitem" id="wallpaperItem">배경화면 변경</button>
     </div>
   </div>
