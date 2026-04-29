@@ -222,6 +222,87 @@
       border: 1px solid var(--border);
     }
 
+    .shop-entry-card {
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 18px;
+      background:
+        radial-gradient(circle at 8% 12%, color-mix(in oklab, #ffd15a 42%, transparent), transparent 38%),
+        linear-gradient(135deg, color-mix(in oklab, var(--card) 80%, #fff 20%), var(--card-2));
+    }
+
+    .shop-entry-card::after {
+      content: '';
+      position: absolute;
+      right: -52px;
+      top: -62px;
+      width: 160px;
+      height: 160px;
+      border-radius: 999px;
+      background: conic-gradient(from 90deg, #ffd15a, #53d3c3, #ff7a4f, #ffd15a);
+      opacity: 0.22;
+    }
+
+    .shop-entry-meta {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 6px;
+    }
+
+    .shop-entry-eyebrow {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .shop-entry-meta h3 {
+      margin: 0;
+      font-size: 1.08rem;
+    }
+
+    .shop-entry-meta p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .shop-entry-wallet {
+      color: color-mix(in oklab, var(--primary) 80%, #ffd15a 20%);
+      font-weight: 900;
+    }
+
+    .shop-entry-actions {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .shop-entry-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 999px;
+      color: #fff;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #2f6f73, #163d42);
+      box-shadow: 0 12px 24px rgba(47, 111, 115, 0.25);
+    }
+
     .developer-card {
       padding: 0;
       overflow: hidden;
@@ -681,6 +762,13 @@
         flex-direction: column;
         align-items: flex-start;
       }
+      .shop-entry-card {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .shop-entry-actions {
+        justify-content: flex-start;
+      }
       .logout-card {
         flex-direction: column;
         align-items: flex-start;
@@ -882,6 +970,18 @@
       <div class="profile-meta">
         <h2 id="studentMeta">불러오는 중...</h2>
         <p>DIMI Check 계정</p>
+      </div>
+    </section>
+
+    <section class="card shop-entry-card fade-up" id="shopEntryCard">
+      <div class="shop-entry-meta">
+        <span class="shop-entry-eyebrow">Wallet</span>
+        <h3>전자칠판 이펙트 상점</h3>
+        <p>내 자석이 이동하거나 드래그될 때 보이는 효과를 고릅니다.</p>
+        <p class="shop-entry-wallet" id="shopEntryWallet">코인 정보를 불러오는 중...</p>
+      </div>
+      <div class="shop-entry-actions">
+        <a class="shop-entry-button" href="/shop.html">상점 열기</a>
       </div>
     </section>
 

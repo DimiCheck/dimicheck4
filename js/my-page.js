@@ -41,6 +41,7 @@ class MyPageController {
     this.notificationDisabled = document.getElementById('notificationUnavailable');
     this.logoutBtn = document.getElementById('logoutBtn');
     this.toast = document.getElementById('myToast');
+    this.shopEntryWallet = document.getElementById('shopEntryWallet');
     this.mcpSection = document.getElementById('mcpSection');
     this.mcpNameInput = document.getElementById('mcpNameInput');
     this.mcpRedirectInput = document.getElementById('mcpRedirectInput');
@@ -194,6 +195,7 @@ class MyPageController {
       await this.updateProfileCard();
       this.syncClassContext();
       await this.loadNickname();
+      this.loadShopSummary();
 
       this.userType = (data.type || data.user_type || '').toLowerCase();
       this.renderMcpSection();
@@ -337,6 +339,25 @@ class MyPageController {
       }
     } catch (error) {
       console.warn('[MyPage] Failed to load nickname.', error);
+    }
+  }
+
+  async loadShopSummary() {
+    if (!this.shopEntryWallet) return;
+    try {
+      const res = await fetch('/api/shop/me', { credentials: 'include', cache: 'no-store' });
+      if (!res.ok) {
+        this.shopEntryWallet.textContent = '상점 정보를 불러오지 못했습니다.';
+        return;
+      }
+      const data = await res.json();
+      const wallet = data.wallet || {};
+      const coins = Number(wallet.coins || 0);
+      const level = Number(wallet.level || 1);
+      this.shopEntryWallet.textContent = `${coins.toLocaleString('ko-KR')} 코인 · Lv. ${level}`;
+    } catch (error) {
+      console.warn('[MyPage] Failed to load shop summary.', error);
+      this.shopEntryWallet.textContent = '상점 정보를 불러오지 못했습니다.';
     }
   }
 

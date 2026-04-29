@@ -1466,7 +1466,13 @@ async function loadBoardNotices() {
 
 async function initBoard() {
   await createMagnetsFromServer(grade, section);
+  if (typeof window.loadBoardCosmetics === 'function') {
+    await window.loadBoardCosmetics();
+  }
   await loadState(grade, section);
+  if (typeof window.boardCosmetics?.applyAllAuras === 'function') {
+    window.boardCosmetics.applyAllAuras();
+  }
   if (typeof window.loadBoardFavorites === 'function') {
     await window.loadBoardFavorites();
   }
@@ -1571,6 +1577,15 @@ function connectBoardRealtime() {
     }
     if (typeof window.applyBoardFavoriteUpdate === 'function') {
       window.applyBoardFavoriteUpdate(payload?.studentNumber, payload?.favoriteStatus ?? null);
+    }
+  });
+
+  boardSocket.on('cosmetics_updated', (payload) => {
+    if (Number(payload?.grade) !== Number(grade) || Number(payload?.section) !== Number(section)) {
+      return;
+    }
+    if (typeof window.boardCosmetics?.applyUpdate === 'function') {
+      window.boardCosmetics.applyUpdate(payload?.studentNumber, payload?.equipment || null);
     }
   });
 

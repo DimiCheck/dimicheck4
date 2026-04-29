@@ -297,6 +297,91 @@ body::before {
   margin: 4px;
 }
 
+.magnet.magnet-cosmetic-aura-soft-glow {
+  box-shadow:
+    0 14px 34px rgba(79, 226, 199, 0.34),
+    0 0 0 7px rgba(96, 234, 208, 0.13),
+    inset 0 -4px 14px rgba(0, 0, 0, 0.24),
+    0 0 24px var(--ornament-glow);
+}
+
+.magnet.magnet-cosmetic-return-pop {
+  animation: magnetCosmeticReturnPop 0.34s cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+
+.board-cosmetic-particle,
+.board-cosmetic-trail {
+  position: fixed;
+  z-index: 2400;
+  left: 0;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  background: var(--particle-color, #fff2a8);
+  box-shadow: 0 0 16px var(--particle-color, #fff2a8);
+  animation: boardCosmeticSpark 0.68s ease-out forwards;
+}
+
+.board-cosmetic-particle--swirl {
+  width: 9px;
+  height: 9px;
+  animation-name: boardCosmeticSwirl;
+}
+
+.board-cosmetic-trail {
+  width: 38px;
+  height: 12px;
+  border-radius: 999px;
+  opacity: 0.72;
+  background: linear-gradient(90deg, transparent, rgba(255, 242, 168, 0.82), transparent);
+  box-shadow: 0 0 18px rgba(255, 242, 168, 0.36);
+  animation: boardCosmeticTrail 0.46s ease-out forwards;
+}
+
+.board-cosmetic-trail--fire {
+  background: linear-gradient(90deg, transparent, rgba(255, 67, 36, 0.88), rgba(255, 205, 69, 0.92), transparent);
+  box-shadow: 0 0 22px rgba(255, 98, 42, 0.44);
+}
+
+.board-cosmetic-trail--neon {
+  background: linear-gradient(90deg, transparent, rgba(81, 229, 255, 0.9), rgba(255, 91, 239, 0.9), transparent);
+  box-shadow: 0 0 24px rgba(93, 221, 255, 0.48);
+}
+
+@keyframes boardCosmeticSpark {
+  to {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) scale(0.18);
+  }
+}
+
+@keyframes boardCosmeticSwirl {
+  to {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) rotate(260deg) scale(0.24);
+  }
+}
+
+@keyframes boardCosmeticTrail {
+  from {
+    opacity: 0.75;
+    transform: translate(-50%, -50%) scaleX(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scaleX(0.35) scaleY(0.72);
+  }
+}
+
+@keyframes magnetCosmeticReturnPop {
+  0% { transform: scale(0.94); }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
 .thought-bubble {
   position: absolute;
   transform: translate(-50%, -100%);

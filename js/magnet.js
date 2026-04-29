@@ -1226,6 +1226,9 @@ function applyMagnetQuickAction(target, action, options = {}) {
   if (typeof window.updateThoughtBubblePositionForMagnet === 'function') {
     window.updateThoughtBubblePositionForMagnet(target);
   }
+  if (window.boardCosmetics && typeof window.boardCosmetics.playMoveEffect === 'function') {
+    window.boardCosmetics.playMoveEffect(target, action);
+  }
   if (!skipSave) {
     saveState(grade, section);
   }
@@ -1604,6 +1607,9 @@ function createMagnets(end = 31, skipNumbers = [12]) {
 
       container.appendChild(m);
       addDragFunctionality(m);
+      if (window.boardCosmetics && typeof window.boardCosmetics.applyAuraToMagnet === 'function') {
+        window.boardCosmetics.applyAuraToMagnet(m);
+      }
 
       n++;
     }
@@ -2416,6 +2422,9 @@ function addDragFunctionality(el) {
     });
     if (quickDropEligible) {
       setMagnetQuickDropHover(getMagnetQuickDropActionAt(clientX, clientY));
+    }
+    if (window.boardCosmetics && typeof window.boardCosmetics.emitDragTrail === 'function') {
+      window.boardCosmetics.emitDragTrail(el, clientX, clientY);
     }
 
     updateMagnetOutline();

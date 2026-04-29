@@ -199,6 +199,76 @@ class StudentStatusFavorite(db.Model):
     user = db.relationship("User", backref=db.backref("status_favorite", uselist=False))
 
 
+class StudentWallet(db.Model):
+    __tablename__ = "student_wallets"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), unique=True, nullable=False)
+    grade = db.Column(db.Integer, nullable=False)
+    section = db.Column(db.Integer, nullable=False)
+    student_number = db.Column(db.Integer, nullable=False)
+    coins = db.Column(db.Integer, default=0, nullable=False)
+    xp = db.Column(db.Integer, default=0, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index("idx_student_wallets_class_student", "grade", "section", "student_number"),
+    )
+
+    user = db.relationship("User", backref=db.backref("wallet", uselist=False))
+
+
+class WalletTransaction(db.Model):
+    __tablename__ = "wallet_transactions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    wallet_id = db.Column(db.Integer, db.ForeignKey("student_wallets.id"), nullable=True)
+    coin_delta = db.Column(db.Integer, default=0, nullable=False)
+    xp_delta = db.Column(db.Integer, default=0, nullable=False)
+    source = db.Column(db.String(64), nullable=False)
+    source_detail = db.Column(db.String(128), nullable=True)
+    balance_after = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index("idx_wallet_transactions_user_created", "user_id", "created_at"),
+    )
+
+
+class StudentCosmeticItem(db.Model):
+    __tablename__ = "student_cosmetic_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    item_key = db.Column(db.String(64), nullable=False)
+    purchased_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "item_key", name="uq_student_cosmetic_item"),
+        db.Index("idx_student_cosmetic_items_user", "user_id"),
+    )
+
+
+class StudentCosmeticEquipment(db.Model):
+    __tablename__ = "student_cosmetic_equipment"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), unique=True, nullable=False)
+    grade = db.Column(db.Integer, nullable=False)
+    section = db.Column(db.Integer, nullable=False)
+    student_number = db.Column(db.Integer, nullable=False)
+    move_effect = db.Column(db.String(64), nullable=True)
+    drag_effect = db.Column(db.String(64), nullable=True)
+    aura_effect = db.Column(db.String(64), nullable=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index("idx_student_cosmetic_equipment_class_student", "grade", "section", "student_number"),
+    )
+
+
 class ClassConfig(db.Model):
     __tablename__ = "class_configs"
 
