@@ -122,6 +122,7 @@ class TeacherEventsController {
       if (this.rewardInput) this.rewardInput.value = '20';
       if (this.targetAllInput) this.targetAllInput.checked = true;
       this.syncTargetControls();
+      this.syncModeControls();
       this.showCouponCode(couponCode);
       this.showToast(this.mode === 'coupon' ? '코드를 발급했습니다.' : '이벤트를 만들었습니다.');
       await this.load();
