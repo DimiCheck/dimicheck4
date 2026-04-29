@@ -99,6 +99,15 @@ SHOP_CATALOG: tuple[ShopItem, ...] = (
         preview="ghost",
     ),
     ShopItem(
+        key="drag_comet_tail",
+        slot="drag_effect",
+        name="혜성의 꼬리",
+        description="긴 우주빛 꼬리가 뻗고 끝부분이 별가루처럼 부서집니다.",
+        price=4200,
+        rarity="legendary",
+        preview="comet",
+    ),
+    ShopItem(
         key="aura_soft_glow",
         slot="aura_effect",
         name="아우라 링",

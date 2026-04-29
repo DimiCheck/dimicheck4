@@ -478,6 +478,46 @@
       box-shadow: 0 0 32px rgba(80, 236, 255, 0.62), 0 0 54px rgba(255, 92, 252, 0.38);
     }
 
+    .preview[data-preview='comet'] {
+      background:
+        radial-gradient(circle at 64% 48%, rgba(255, 255, 255, 0.82), transparent 13%),
+        radial-gradient(circle at 48% 52%, rgba(89, 207, 255, 0.44), transparent 35%),
+        linear-gradient(135deg, rgba(51, 92, 255, 0.18), rgba(217, 137, 255, 0.12));
+    }
+
+    .preview[data-preview='comet'] .preview-ring,
+    .preview[data-preview='comet'] .preview-bolt,
+    .preview[data-preview='comet'] .preview-ghost,
+    .preview[data-preview='comet'] .preview-pop {
+      display: none;
+    }
+
+    .preview[data-preview='comet'] .preview-magnet {
+      background: linear-gradient(145deg, #ffffff, #72dcff 48%, #8f7cff);
+      box-shadow: 0 0 40px rgba(108, 221, 255, 0.68), inset 0 4px 10px rgba(255, 255, 255, 0.5);
+      animation: previewCometHead 1.55s ease-in-out infinite;
+    }
+
+    .preview[data-preview='comet'] .preview-trail {
+      left: 0%;
+      top: 50%;
+      width: 210px;
+      height: 38px;
+      border-radius: 999px 40px 40px 999px;
+      background:
+        linear-gradient(90deg, transparent, rgba(123, 111, 255, 0.35), rgba(104, 218, 255, 0.82), rgba(255, 255, 255, 0.96));
+      box-shadow: 0 0 34px rgba(104, 218, 255, 0.72), 0 0 68px rgba(143, 124, 255, 0.44);
+      transform-origin: right center;
+      animation: previewCometTail 1.55s ease-in-out infinite;
+    }
+
+    .preview[data-preview='comet'] .preview-trail--two {
+      top: 58%;
+      height: 18px;
+      opacity: 0.48;
+      animation-delay: -0.34s;
+    }
+
     .preview[data-preview='aura'] .preview-trail,
     .preview[data-preview='aura'] .preview-bolt,
     .preview[data-preview='aura'] .preview-ghost,
@@ -527,6 +567,10 @@
 
     .rarity[data-rarity='rare'] { background: #2f6f73; }
     .rarity[data-rarity='epic'] { background: #7c4bc2; }
+    .rarity[data-rarity='legendary'] {
+      background: linear-gradient(135deg, #ff9f1c, #ff3d77, #7857ff);
+      box-shadow: 0 0 18px rgba(255, 121, 64, 0.35);
+    }
 
     .item-desc {
       margin: 10px 0 14px;
@@ -697,6 +741,16 @@
     @keyframes previewFirePop {
       0% { opacity: 0.85; transform: translate(-50%, -50%) scale(0.4); }
       100% { opacity: 0; transform: translate(-50%, -50%) scale(3); filter: blur(5px); }
+    }
+
+    @keyframes previewCometHead {
+      0%, 100% { transform: translate(-6px, -50%) scale(1); }
+      50% { transform: translate(34px, -50%) scale(1.1); filter: brightness(1.2); }
+    }
+
+    @keyframes previewCometTail {
+      0%, 100% { transform: translateX(-34px) scaleX(0.74); opacity: 0.45; filter: blur(4px); }
+      50% { transform: translateX(10px) scaleX(1.12); opacity: 1; filter: blur(0); }
     }
 
     @keyframes cardIn {

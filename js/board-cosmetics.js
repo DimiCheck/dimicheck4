@@ -3,7 +3,24 @@
   const dragTrailState = new WeakMap();
   const DRAG_TRAIL_INTERVAL_MS = 54;
   const MOVE_EFFECT_LIMIT_MS = 240;
+  const TRAIL_POINT_LIMIT = 18;
+  const TRAIL_PARTICLE_LIMIT = 90;
+  const TRAIL_DPR_LIMIT = 2;
+  const TRAIL_CONFIG = {
+    ribbon: { keepMs: 560, baseWidth: 22 },
+    fire: { keepMs: 820, baseWidth: 32 },
+    neon: { keepMs: 760, baseWidth: 28 },
+    comet: { keepMs: 1180, baseWidth: 34 }
+  };
   let lastMoveEffectAt = 0;
+  let trailCanvas = null;
+  let trailCtx = null;
+  let trailDpr = 1;
+  let trailWidth = 0;
+  let trailHeight = 0;
+  let trailRaf = 0;
+  let trailResizeBound = false;
+  const activeTrails = new Map();
 
   function normalizeNumber(value) {
     const number = Number(value);
@@ -287,37 +304,369 @@
     ghost.style.height = `${rect.height}px`;
   }
 
+  function nowMs() {
+    return window.performance && typeof window.performance.now === 'function'
+      ? window.performance.now()
+      : Date.now();
+  }
+
+  function ensureTrailCanvas() {
+    if (!trailCanvas) {
+      trailCanvas = document.createElement('canvas');
+      trailCanvas.className = 'board-cosmetic-trail-canvas';
+      trailCanvas.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(trailCanvas);
+    }
+    if (!trailCtx) {
+      trailCtx = trailCanvas.getContext('2d');
+    }
+    resizeTrailCanvas();
+    if (!trailResizeBound) {
+      window.addEventListener('resize', resizeTrailCanvas);
+      trailResizeBound = true;
+    }
+    return trailCtx;
+  }
+
+  function resizeTrailCanvas() {
+    if (!trailCanvas) return;
+    const width = window.innerWidth || document.documentElement.clientWidth || 0;
+    const height = window.innerHeight || document.documentElement.clientHeight || 0;
+    const dpr = Math.min(TRAIL_DPR_LIMIT, Math.max(1, window.devicePixelRatio || 1));
+    if (width === trailWidth && height === trailHeight && dpr === trailDpr) return;
+    trailWidth = width;
+    trailHeight = height;
+    trailDpr = dpr;
+    trailCanvas.width = Math.max(1, Math.round(width * dpr));
+    trailCanvas.height = Math.max(1, Math.round(height * dpr));
+    trailCanvas.style.width = `${width}px`;
+    trailCanvas.style.height = `${height}px`;
+    if (trailCtx) {
+      trailCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+  }
+
+  function normalizeDragEffect(effect) {
+    if (effect === 'drag_fire_trail') return 'fire';
+    if (effect === 'drag_neon_afterimage') return 'neon';
+    if (effect === 'drag_comet_tail') return 'comet';
+    return 'ribbon';
+  }
+
+  function getOrCreateTrail(number, effect) {
+    let trail = activeTrails.get(number);
+    if (!trail) {
+      trail = {
+        effect,
+        points: [],
+        particles: [],
+        lastSeen: 0,
+        lastGhostAt: 0
+      };
+      activeTrails.set(number, trail);
+    }
+    trail.effect = effect;
+    return trail;
+  }
+
+  function trimTrail(trail, now, config) {
+    trail.points = trail.points
+      .filter((point) => now - point.t <= config.keepMs)
+      .slice(-TRAIL_POINT_LIMIT);
+    trail.particles = trail.particles.filter((particle) => now - particle.t <= particle.life);
+    if (trail.particles.length > TRAIL_PARTICLE_LIMIT) {
+      trail.particles.splice(0, trail.particles.length - TRAIL_PARTICLE_LIMIT);
+    }
+  }
+
+  function unitVector(from, to) {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy) || 1;
+    return { x: dx / length, y: dy / length, length };
+  }
+
+  function addTrailParticles(trail, point, previousPoint, now) {
+    const effect = trail.effect;
+    const direction = previousPoint ? unitVector(previousPoint, point) : { x: 1, y: 0, length: 1 };
+    const back = { x: -direction.x, y: -direction.y };
+    const perp = { x: -direction.y, y: direction.x };
+    const speedBoost = Math.min(1.8, Math.max(0.7, direction.length / 22));
+    const counts = { ribbon: 1, fire: 5, neon: 2, comet: 4 };
+    const count = counts[effect] || 1;
+
+    for (let i = 0; i < count; i += 1) {
+      const side = (Math.random() - 0.5) * (effect === 'comet' ? 44 : effect === 'fire' ? 34 : 24);
+      const backSpeed = (effect === 'comet' ? 0.18 : effect === 'fire' ? 0.12 : 0.09) * speedBoost;
+      const drift = (Math.random() - 0.5) * (effect === 'fire' ? 0.12 : 0.06);
+      const colors = {
+        ribbon: ['#ffffff', '#fff2a8', '#ffd15a'],
+        fire: ['#fff8b8', '#ffd15a', '#ff7a2f', '#ff351f'],
+        neon: ['#ffffff', '#55e9ff', '#ff5cf2'],
+        comet: ['#ffffff', '#b9f6ff', '#82b6ff', '#d7b7ff']
+      };
+      trail.particles.push({
+        x: point.x + perp.x * side,
+        y: point.y + perp.y * side,
+        vx: back.x * (0.08 + Math.random() * backSpeed) + perp.x * drift,
+        vy: back.y * (0.08 + Math.random() * backSpeed) + perp.y * drift - (effect === 'fire' ? 0.055 + Math.random() * 0.055 : 0),
+        t: now,
+        life: effect === 'comet' ? 760 + Math.random() * 420 : effect === 'fire' ? 460 + Math.random() * 320 : 520 + Math.random() * 260,
+        size: effect === 'comet' ? 2.2 + Math.random() * 4.8 : effect === 'fire' ? 2.8 + Math.random() * 6.2 : 2 + Math.random() * 4,
+        color: colors[effect][Math.floor(Math.random() * colors[effect].length)],
+        spin: Math.random() * Math.PI
+      });
+    }
+  }
+
+  function scheduleTrailFrame() {
+    if (trailRaf) return;
+    trailRaf = window.requestAnimationFrame(renderTrailFrame);
+  }
+
+  function drawTrailLayer(ctx, points, now, config, options) {
+    if (points.length < 2) return;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.globalCompositeOperation = options.composite || 'source-over';
+    ctx.shadowColor = options.shadowColor || options.color;
+    ctx.shadowBlur = options.blur || 0;
+
+    for (let i = 1; i < points.length; i += 1) {
+      const prev = points[i - 1];
+      const point = points[i];
+      const age = Math.max(0, Math.min(1, (now - point.t) / config.keepMs));
+      const position = i / Math.max(1, points.length - 1);
+      const alpha = options.alpha * (1 - age) * (0.18 + position * 0.82);
+      if (alpha <= 0.02) continue;
+      const width = options.width * (0.24 + position * 0.96) * (1 - age * 0.52);
+      const midX = (prev.x + point.x) / 2;
+      const midY = (prev.y + point.y) / 2;
+      const wobble = options.wobble
+        ? Math.sin(point.t * 0.045 + i * 1.7) * options.wobble * (1 - position * 0.35)
+        : 0;
+      const direction = unitVector(prev, point);
+      const controlX = prev.x + (-direction.y * wobble);
+      const controlY = prev.y + (direction.x * wobble);
+
+      ctx.globalAlpha = alpha;
+      ctx.lineWidth = Math.max(1, width);
+      ctx.strokeStyle = typeof options.color === 'function'
+        ? options.color(position, age, i)
+        : options.color;
+      ctx.beginPath();
+      ctx.moveTo(prev.x, prev.y);
+      ctx.quadraticCurveTo(controlX, controlY, midX, midY);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(midX, midY);
+      ctx.quadraticCurveTo(point.x, point.y, point.x, point.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawTrailShape(ctx, trail, now) {
+    const config = TRAIL_CONFIG[trail.effect] || TRAIL_CONFIG.ribbon;
+    const points = trail.points;
+    if (trail.effect === 'fire') {
+      drawTrailLayer(ctx, points, now, config, {
+        width: config.baseWidth * 2.3,
+        color: 'rgba(255, 58, 24, 0.34)',
+        shadowColor: 'rgba(255, 72, 24, 0.8)',
+        blur: 30,
+        alpha: 0.8,
+        wobble: 18,
+        composite: 'lighter'
+      });
+      drawTrailLayer(ctx, points, now, config, {
+        width: config.baseWidth * 1.12,
+        color: (position) => position > 0.72 ? '#fff7b0' : position > 0.42 ? '#ffd15a' : '#ff5a24',
+        shadowColor: '#ff7a2f',
+        blur: 12,
+        alpha: 0.95,
+        wobble: 12,
+        composite: 'lighter'
+      });
+      return;
+    }
+
+    if (trail.effect === 'comet') {
+      drawTrailLayer(ctx, points, now, config, {
+        width: config.baseWidth * 2.6,
+        color: 'rgba(95, 190, 255, 0.3)',
+        shadowColor: 'rgba(111, 206, 255, 0.9)',
+        blur: 34,
+        alpha: 0.82,
+        wobble: 4,
+        composite: 'lighter'
+      });
+      drawTrailLayer(ctx, points, now, config, {
+        width: config.baseWidth * 1.28,
+        color: (position) => position > 0.78 ? '#ffffff' : position > 0.42 ? '#b8f4ff' : '#8a9bff',
+        shadowColor: '#8ddfff',
+        blur: 16,
+        alpha: 0.92,
+        wobble: 2,
+        composite: 'lighter'
+      });
+      drawTrailLayer(ctx, points, now, config, {
+        width: config.baseWidth * 0.38,
+        color: '#ffffff',
+        shadowColor: '#ffffff',
+        blur: 7,
+        alpha: 0.94,
+        composite: 'lighter'
+      });
+      return;
+    }
+
+    if (trail.effect === 'neon') {
+      drawTrailLayer(ctx, points, now, config, {
+        width: config.baseWidth * 1.9,
+        color: 'rgba(80, 229, 255, 0.35)',
+        shadowColor: '#55e9ff',
+        blur: 24,
+        alpha: 0.76,
+        composite: 'lighter'
+      });
+      drawTrailLayer(ctx, points, now, config, {
+        width: config.baseWidth * 0.92,
+        color: (position) => position > 0.5 ? '#ff5cf2' : '#55e9ff',
+        shadowColor: '#ff5cf2',
+        blur: 12,
+        alpha: 0.9,
+        composite: 'lighter'
+      });
+      return;
+    }
+
+    drawTrailLayer(ctx, points, now, config, {
+      width: config.baseWidth * 1.6,
+      color: 'rgba(255, 240, 160, 0.38)',
+      shadowColor: '#fff2a8',
+      blur: 20,
+      alpha: 0.72,
+      composite: 'lighter'
+    });
+    drawTrailLayer(ctx, points, now, config, {
+      width: config.baseWidth * 0.72,
+      color: '#fff8c8',
+      shadowColor: '#ffffff',
+      blur: 8,
+      alpha: 0.82,
+      composite: 'lighter'
+    });
+  }
+
+  function drawSpark(ctx, x, y, size, alpha, color, spin) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(spin);
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1, size * 0.34);
+    ctx.shadowColor = color;
+    ctx.shadowBlur = size * 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-size, 0);
+    ctx.lineTo(size, 0);
+    ctx.moveTo(0, -size);
+    ctx.lineTo(0, size);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawTrailParticles(ctx, trail, now) {
+    trail.particles.forEach((particle) => {
+      const age = (now - particle.t) / particle.life;
+      if (age < 0 || age > 1) return;
+      const x = particle.x + particle.vx * (now - particle.t);
+      const y = particle.y + particle.vy * (now - particle.t) + (trail.effect === 'fire' ? Math.sin(age * 8 + particle.spin) * 10 : 0);
+      const alpha = (1 - age) * (trail.effect === 'fire' ? (0.5 + Math.sin(age * Math.PI) * 0.5) : 1);
+      if (trail.effect === 'comet' && age > 0.2 && Math.random() < 0.34) {
+        drawSpark(ctx, x, y, particle.size * (1 - age * 0.42), alpha, particle.color, particle.spin + age * 2);
+        return;
+      }
+
+      const radius = particle.size * (1 - age * 0.55);
+      const gradient = ctx.createRadialGradient(x, y, 0, x, y, Math.max(1, radius * 2.7));
+      gradient.addColorStop(0, `rgba(255,255,255,${Math.min(1, alpha)})`);
+      gradient.addColorStop(0.38, particle.color);
+      gradient.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(1, radius * 2.2), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  function renderTrailFrame() {
+    trailRaf = 0;
+    const ctx = ensureTrailCanvas();
+    if (!ctx) return;
+    const now = nowMs();
+    ctx.clearRect(0, 0, trailWidth, trailHeight);
+
+    activeTrails.forEach((trail, number) => {
+      const config = TRAIL_CONFIG[trail.effect] || TRAIL_CONFIG.ribbon;
+      trimTrail(trail, now, config);
+      drawTrailShape(ctx, trail, now);
+      drawTrailParticles(ctx, trail, now);
+      const stillAlive = trail.points.length > 1 || trail.particles.length > 0 || now - trail.lastSeen < config.keepMs;
+      if (!stillAlive) {
+        activeTrails.delete(number);
+      }
+    });
+
+    if (activeTrails.size) {
+      scheduleTrailFrame();
+    } else {
+      ctx.clearRect(0, 0, trailWidth, trailHeight);
+    }
+  }
+
   function emitDragTrail(magnet, clientX, clientY) {
     const equipment = getEquipmentForMagnet(magnet);
-    const effect = equipment?.drag_effect;
-    if (!effect) return;
-    const now = Date.now();
+    const rawEffect = equipment?.drag_effect;
+    if (!rawEffect) return;
+    const now = nowMs();
     const last = dragTrailState.get(magnet) || 0;
     if (now - last < DRAG_TRAIL_INTERVAL_MS) return;
     dragTrailState.set(magnet, now);
 
+    const number = getMagnetNumber(magnet);
+    if (!number) return;
     const rect = magnet.getBoundingClientRect();
-    const x = Number.isFinite(clientX) ? clientX : rect.left + rect.width / 2;
-    const y = Number.isFinite(clientY) ? clientY : rect.top + rect.height / 2;
-
-    if (effect === 'drag_fire_trail') {
-      makeEffectNode('board-cosmetic-trail board-cosmetic-trail--fire', x, y, { duration: 760 });
-      makeEffectNode('board-cosmetic-fire-pop', x + (Math.random() * 26 - 13), y + (Math.random() * 24 - 12), {
-        duration: 680
-      });
-      makeGhost(magnet, x, y, 'fire');
+    const point = {
+      x: Number.isFinite(clientX) ? clientX : rect.left + rect.width / 2,
+      y: Number.isFinite(clientY) ? clientY : rect.top + rect.height / 2,
+      t: now
+    };
+    const effect = normalizeDragEffect(rawEffect);
+    const config = TRAIL_CONFIG[effect] || TRAIL_CONFIG.ribbon;
+    ensureTrailCanvas();
+    const trail = getOrCreateTrail(number, effect);
+    const previousPoint = trail.points[trail.points.length - 1] || null;
+    if (previousPoint && Math.hypot(point.x - previousPoint.x, point.y - previousPoint.y) < 3) {
       return;
     }
+    trail.points.push(point);
+    trail.lastSeen = now;
+    trimTrail(trail, now, config);
+    addTrailParticles(trail, point, previousPoint, now);
 
-    if (effect === 'drag_neon_afterimage') {
-      makeEffectNode('board-cosmetic-trail board-cosmetic-trail--neon', x, y, { duration: 860 });
-      makeGhost(magnet, x, y, 'neon');
-      makeEffectNode('board-cosmetic-neon-star', x, y, { duration: 760 });
-      return;
+    if ((effect === 'neon' || effect === 'fire') && now - trail.lastGhostAt > 140) {
+      makeGhost(magnet, point.x, point.y, effect);
+      trail.lastGhostAt = now;
     }
 
-    makeEffectNode('board-cosmetic-trail board-cosmetic-trail--ribbon', x, y, { duration: 640 });
-    makeGhost(magnet, x, y, 'ribbon');
+    scheduleTrailFrame();
   }
 
   window.boardCosmetics = {
