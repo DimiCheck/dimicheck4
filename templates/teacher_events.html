@@ -29,9 +29,12 @@
       font-family: "Pretendard", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: var(--text);
       background:
+        linear-gradient(rgba(255,255,255,0.16) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.16) 1px, transparent 1px),
         radial-gradient(circle at 12% 18%, rgba(255, 214, 170, 0.75), transparent 26%),
         radial-gradient(circle at 82% 14%, rgba(249, 195, 176, 0.55), transparent 25%),
         linear-gradient(180deg, #fffaf5 0%, #fff4eb 48%, #fff8f2 100%);
+      background-size: 36px 36px, 36px 36px, auto, auto, auto;
       padding: 32px 24px 48px;
     }
 
@@ -95,6 +98,30 @@
       border-radius: 28px;
       box-shadow: var(--shadow);
       backdrop-filter: blur(18px);
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      right: -76px;
+      top: -92px;
+      width: 230px;
+      height: 230px;
+      border-radius: 999px;
+      background: conic-gradient(from 110deg, rgba(246, 205, 123, 0.72), rgba(219, 135, 83, 0.58), rgba(127, 168, 139, 0.48), rgba(246, 205, 123, 0.72));
+      opacity: 0.55;
+      animation: spinOrb 14s linear infinite;
+      pointer-events: none;
+    }
+
+    .hero > * {
+      position: relative;
+      z-index: 1;
     }
 
     .hero,
@@ -237,6 +264,13 @@
       background: var(--surface-strong);
       display: grid;
       gap: 12px;
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+
+    .event-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(219, 135, 83, 0.26);
+      box-shadow: 0 28px 68px rgba(153, 115, 76, 0.18);
     }
 
     .event-card.inactive {
@@ -264,6 +298,10 @@
       font-size: 12px;
       font-weight: 900;
       white-space: nowrap;
+    }
+
+    @keyframes spinOrb {
+      to { transform: rotate(360deg); }
     }
 
     .empty {

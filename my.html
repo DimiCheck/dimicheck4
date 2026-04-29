@@ -231,7 +231,8 @@
       gap: 18px;
       background:
         radial-gradient(circle at 8% 12%, color-mix(in oklab, #ffd15a 42%, transparent), transparent 38%),
-        linear-gradient(135deg, color-mix(in oklab, var(--card) 80%, #fff 20%), var(--card-2));
+        radial-gradient(circle at 94% 18%, color-mix(in oklab, #53d3c3 28%, transparent), transparent 32%),
+        linear-gradient(135deg, color-mix(in oklab, var(--card) 84%, #fff 16%), var(--card-2));
     }
 
     .shop-entry-card::after {
@@ -301,6 +302,18 @@
       font-weight: 800;
       background: linear-gradient(135deg, #2f6f73, #163d42);
       box-shadow: 0 12px 24px rgba(47, 111, 115, 0.25);
+      transition: transform 0.16s ease, box-shadow 0.16s ease;
+    }
+
+    .shop-entry-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 30px rgba(47, 111, 115, 0.32);
+    }
+
+    .shop-entry-button.event {
+      color: #281b0f;
+      background: linear-gradient(135deg, #ffd15a, #ff9f5a);
+      box-shadow: 0 12px 24px rgba(217, 149, 18, 0.24);
     }
 
     .developer-card {
@@ -981,7 +994,7 @@
         <p class="shop-entry-wallet" id="shopEntryWallet">코인 정보를 불러오는 중...</p>
       </div>
       <div class="shop-entry-actions">
-        <a class="shop-entry-button" href="/events.html">이벤트 참여</a>
+        <a class="shop-entry-button event" href="/events.html">이벤트 참여</a>
         <a class="shop-entry-button" href="/shop.html">상점 열기</a>
       </div>
     </section>
