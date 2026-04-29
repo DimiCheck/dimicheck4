@@ -72,6 +72,15 @@ SHOP_CATALOG: tuple[ShopItem, ...] = (
         preview="wormhole",
     ),
     ShopItem(
+        key="move_supernova",
+        slot="move_effect",
+        name="초신성 폭발",
+        description="도착 순간 하얀 별핵이 터지고 우주빛 파편이 크게 퍼집니다.",
+        price=5600,
+        rarity="legendary",
+        preview="supernova",
+    ),
+    ShopItem(
         key="drag_soft_trail",
         slot="drag_effect",
         name="라이트 리본",

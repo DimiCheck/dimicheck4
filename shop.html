@@ -393,6 +393,67 @@
       display: none;
     }
 
+    .preview[data-preview='supernova'] {
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.82), transparent 13%),
+        radial-gradient(circle at 50% 50%, rgba(255, 229, 123, 0.48), transparent 32%),
+        radial-gradient(circle at 54% 48%, rgba(96, 207, 255, 0.32), transparent 50%),
+        linear-gradient(135deg, rgba(255, 117, 75, 0.16), rgba(71, 101, 255, 0.13));
+    }
+
+    .preview[data-preview='supernova'] .preview-ring {
+      width: 168px;
+      height: 168px;
+      border: 4px solid rgba(255, 244, 174, 0.86);
+      box-shadow: 0 0 46px rgba(255, 235, 126, 0.64), 0 0 72px rgba(94, 211, 255, 0.32), inset 0 0 28px rgba(255, 255, 255, 0.42);
+      animation: previewSupernovaRing 1.28s cubic-bezier(0.08, 0.82, 0.18, 1) infinite;
+    }
+
+    .preview[data-preview='supernova'] .preview-ring--two {
+      width: 104px;
+      height: 104px;
+      border-color: rgba(110, 218, 255, 0.82);
+      animation-delay: -0.34s;
+    }
+
+    .preview[data-preview='supernova'] .preview-magnet {
+      color: #221a11;
+      background: radial-gradient(circle at 50% 44%, #fff 0 22%, #fff4ab 23% 52%, #65d6ff 53% 76%, #ff7c51 77% 100%);
+      box-shadow: 0 0 42px rgba(255, 255, 255, 0.82), 0 0 72px rgba(255, 230, 121, 0.54);
+      animation: previewSupernovaCore 1.28s cubic-bezier(0.08, 0.82, 0.18, 1) infinite;
+    }
+
+    .preview[data-preview='supernova'] .preview-bolt {
+      display: block;
+      opacity: 1;
+      color: #fff5a8;
+      transform-origin: center 70%;
+      animation: previewSupernovaRay 1.28s steps(2, end) infinite;
+    }
+
+    .preview[data-preview='supernova'] .preview-pop {
+      display: block;
+      background: radial-gradient(circle, #fff 0 20%, #fff3a6 21% 48%, #6fdcff 49% 72%, transparent 74%);
+      box-shadow: 0 0 28px rgba(255, 241, 156, 0.8), 0 0 48px rgba(92, 211, 255, 0.46);
+      animation: previewSupernovaPop 1.28s ease-out infinite;
+    }
+
+    .preview[data-preview='supernova'] .preview-pop--one {
+      left: 31%;
+      top: 61%;
+    }
+
+    .preview[data-preview='supernova'] .preview-pop--two {
+      left: 69%;
+      top: 35%;
+      animation-delay: -0.46s;
+    }
+
+    .preview[data-preview='supernova'] .preview-trail,
+    .preview[data-preview='supernova'] .preview-ghost {
+      display: none;
+    }
+
     .preview[data-preview='wormhole'] {
       background:
         radial-gradient(circle at 50% 50%, rgba(54, 197, 255, 0.5), rgba(42, 65, 201, 0.2) 36%, rgba(255, 255, 255, 0.06));
@@ -710,6 +771,28 @@
       0% { opacity: 0.95; transform: translate(-50%, -50%) rotate(0deg) scale(0.84); }
       50% { opacity: 0.72; transform: translate(-50%, -50%) rotate(210deg) scale(1.2); }
       100% { opacity: 0.95; transform: translate(-50%, -50%) rotate(420deg) scale(0.84); }
+    }
+
+    @keyframes previewSupernovaRing {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.28); filter: blur(0); }
+      24% { opacity: 0.95; transform: translate(-50%, -50%) scale(0.86); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(1.28); filter: blur(5px); }
+    }
+
+    @keyframes previewSupernovaCore {
+      0%, 100% { transform: translate(-50%, -50%) scale(0.92); filter: brightness(1); }
+      22% { transform: translate(-50%, -50%) scale(1.28); filter: brightness(1.55); }
+      46% { transform: translate(-50%, -50%) scale(1.05); filter: brightness(1.18); }
+    }
+
+    @keyframes previewSupernovaRay {
+      0%, 46%, 100% { opacity: 0; transform: translate(-50%, 0) scaleY(0.38) rotate(-8deg); }
+      12%, 28% { opacity: 1; transform: translate(-50%, 0) scaleY(1.24) rotate(8deg); }
+    }
+
+    @keyframes previewSupernovaPop {
+      0% { opacity: 0.9; transform: translate(-50%, -50%) scale(0.32); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(3.2); filter: blur(5px); }
     }
 
     @keyframes previewMagnetWarp {

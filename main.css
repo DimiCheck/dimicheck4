@@ -328,6 +328,8 @@ body::before {
 .board-cosmetic-portal,
 .board-cosmetic-shockwave,
 .board-cosmetic-impact-flare,
+.board-cosmetic-supernova-core,
+.board-cosmetic-supernova-rays,
 .board-cosmetic-lightning,
 .board-cosmetic-drag-ghost,
 .board-cosmetic-fire-pop,
@@ -353,6 +355,14 @@ body::before {
   width: 20px;
   height: 20px;
   animation-name: boardCosmeticSwirl;
+}
+
+.board-cosmetic-particle--supernova {
+  width: 19px;
+  height: 19px;
+  background: radial-gradient(circle, #fff 0 22%, var(--particle-color, #79d8ff) 23% 68%, transparent 70%);
+  box-shadow: 0 0 28px var(--particle-color, #79d8ff), 0 0 62px var(--particle-color, #79d8ff);
+  animation-name: boardCosmeticSupernovaSpark;
 }
 
 .board-cosmetic-portal {
@@ -396,6 +406,15 @@ body::before {
   box-shadow: 0 0 84px rgba(76, 209, 255, 0.88), inset 0 0 52px rgba(255, 255, 255, 0.34);
 }
 
+.board-cosmetic-shockwave--supernova {
+  border-width: 8px;
+  border-color: rgba(255, 246, 188, 0.95);
+  box-shadow:
+    0 0 92px rgba(255, 246, 188, 0.9),
+    0 0 148px rgba(98, 214, 255, 0.46),
+    inset 0 0 58px rgba(255, 255, 255, 0.42);
+}
+
 .board-cosmetic-shockwave--late {
   animation-delay: 0.08s;
   opacity: 0.72;
@@ -415,6 +434,12 @@ body::before {
   background: radial-gradient(circle, rgba(255, 255, 255, 0.88) 0 5%, rgba(65, 218, 255, 0.52) 6% 24%, rgba(82, 87, 255, 0.24) 25% 45%, transparent 66%);
 }
 
+.board-cosmetic-impact-flare--supernova {
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.96) 0 4%, rgba(255, 246, 184, 0.66) 5% 18%, rgba(114, 219, 255, 0.32) 19% 36%, rgba(255, 116, 73, 0.18) 37% 52%, transparent 68%),
+    conic-gradient(from 12deg, transparent, rgba(255, 242, 149, 0.28), transparent 18%, rgba(105, 209, 255, 0.24), transparent 42%, rgba(255, 116, 73, 0.2), transparent 64%);
+}
+
 .board-cosmetic-impact-flare--basic {
   background: radial-gradient(circle, rgba(255, 255, 255, 0.72) 0 6%, rgba(255, 236, 142, 0.38) 7% 30%, transparent 62%);
 }
@@ -432,6 +457,34 @@ body::before {
   line-height: 1;
   text-shadow: 0 0 24px #fff, 0 0 56px rgba(255, 214, 72, 1), 0 0 96px rgba(255, 142, 40, 0.6);
   animation: boardCosmeticLightning 0.62s steps(2, end) forwards;
+}
+
+.board-cosmetic-supernova-core {
+  width: var(--supernova-size, 150px);
+  height: var(--supernova-size, 150px);
+  z-index: 2425;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, #fff 0 18%, #fff6bd 19% 42%, rgba(113, 218, 255, 0.72) 43% 62%, rgba(255, 117, 75, 0.28) 63% 76%, transparent 78%);
+  box-shadow:
+    0 0 36px rgba(255, 255, 255, 0.96),
+    0 0 84px rgba(255, 237, 128, 0.78),
+    0 0 128px rgba(92, 211, 255, 0.44);
+  mix-blend-mode: screen;
+  animation: boardCosmeticSupernovaCore 1.18s cubic-bezier(0.08, 0.82, 0.18, 1) forwards;
+}
+
+.board-cosmetic-supernova-rays {
+  width: var(--supernova-ray-size, 420px);
+  height: var(--supernova-ray-size, 420px);
+  z-index: 2415;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.82) 0 6%, transparent 7%),
+    conic-gradient(from 8deg, transparent 0 5%, rgba(255, 244, 162, 0.86) 6% 8%, transparent 9% 16%, rgba(121, 216, 255, 0.7) 17% 19%, transparent 20% 27%, rgba(255, 124, 82, 0.52) 28% 30%, transparent 31% 40%, rgba(255, 244, 162, 0.74) 41% 43%, transparent 44% 55%, rgba(121, 216, 255, 0.62) 56% 58%, transparent 59% 72%, rgba(255, 244, 162, 0.78) 73% 75%, transparent 76% 100%);
+  filter: blur(0.3px);
+  mix-blend-mode: screen;
+  animation: boardCosmeticSupernovaRays 1.24s cubic-bezier(0.08, 0.82, 0.18, 1) forwards;
 }
 
 .board-cosmetic-trail {
@@ -548,7 +601,26 @@ body::before {
   42% { opacity: 0.2; }
   58% { opacity: 1; }
   100% { opacity: 0; transform: translate(-50%, -50%) scaleY(0.86) scaleX(1.35); }
-  }
+}
+
+@keyframes boardCosmeticSupernovaCore {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.18); filter: blur(0) brightness(1.4); }
+  16% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); filter: blur(0) brightness(1.9); }
+  48% { opacity: 0.78; transform: translate(-50%, -50%) scale(1.42); filter: blur(1px) brightness(1.35); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(2.35); filter: blur(14px) brightness(1); }
+}
+
+@keyframes boardCosmeticSupernovaRays {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(-18deg) scale(0.2); }
+  18% { opacity: 0.96; transform: translate(-50%, -50%) rotate(22deg) scale(0.82); }
+  58% { opacity: 0.48; transform: translate(-50%, -50%) rotate(96deg) scale(1.08); }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(172deg) scale(1.24); filter: blur(9px); }
+}
+
+@keyframes boardCosmeticSupernovaSpark {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  70% { opacity: 0.9; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.24) rotate(var(--spin)); filter: blur(3px); }
 }
 
 @keyframes boardCosmeticTrail {

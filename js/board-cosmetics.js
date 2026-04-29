@@ -173,11 +173,13 @@
     if (!center) return;
     const size = variant === 'wormhole'
       ? center.size * 9.2
+      : variant === 'supernova'
+        ? center.size * 11.4
       : variant === 'starburst'
         ? center.size * 7.6
         : center.size * 5.8;
     makeEffectNode(`board-cosmetic-impact-flare board-cosmetic-impact-flare--${variant}`, center.x, center.y, {
-      duration: variant === 'wormhole' ? 1180 : 980,
+      duration: variant === 'supernova' ? 1240 : variant === 'wormhole' ? 1180 : 980,
       vars: { '--flare-size': `${size}px` }
     });
   }
@@ -202,16 +204,30 @@
     if (!center) return;
     const size = variant === 'wormhole'
       ? center.size * 10.4
+      : variant === 'supernova'
+        ? center.size * 13.2
       : variant === 'starburst'
         ? center.size * 8.5
         : center.size * 6.8;
     makeEffectNode(`board-cosmetic-shockwave board-cosmetic-shockwave--${variant}`, center.x, center.y, {
-      duration: variant === 'wormhole' ? 1050 : 820,
+      duration: variant === 'supernova' ? 1160 : variant === 'wormhole' ? 1050 : 820,
       vars: { '--wave-size': `${size}px` }
     });
     makeEffectNode(`board-cosmetic-shockwave board-cosmetic-shockwave--${variant} board-cosmetic-shockwave--late`, center.x, center.y, {
-      duration: variant === 'wormhole' ? 1260 : 980,
+      duration: variant === 'supernova' ? 1380 : variant === 'wormhole' ? 1260 : 980,
       vars: { '--wave-size': `${size * 0.74}px` }
+    });
+  }
+
+  function playSupernovaCore(center) {
+    if (!center) return;
+    makeEffectNode('board-cosmetic-supernova-core', center.x, center.y, {
+      duration: 1180,
+      vars: { '--supernova-size': `${center.size * 3.2}px` }
+    });
+    makeEffectNode('board-cosmetic-supernova-rays', center.x, center.y, {
+      duration: 1240,
+      vars: { '--supernova-ray-size': `${center.size * 8.8}px` }
     });
   }
 
@@ -237,7 +253,31 @@
     const origin = options.origin || null;
     const destination = getCenterFromMagnet(magnet);
 
-    if (effect === 'move_blue_swirl') {
+    if (effect === 'move_supernova') {
+      playPortal(origin, 'starburst', 'exit');
+      playSupernovaCore(destination);
+      playImpactFlare(destination, 'supernova');
+      playShockwave(destination, 'supernova');
+      burstParticles(destination, {
+        count: 58,
+        color: '#fff4b8',
+        spread: 255,
+        duration: 1160
+      });
+      burstParticles(destination, {
+        count: 34,
+        color: '#79d8ff',
+        spread: 220,
+        duration: 1240,
+        className: 'board-cosmetic-particle board-cosmetic-particle--supernova'
+      });
+      burstParticles(destination, {
+        count: 22,
+        color: '#ff7a4f',
+        spread: 185,
+        duration: 980
+      });
+    } else if (effect === 'move_blue_swirl') {
       playPortal(origin, 'wormhole', 'exit');
       playPortal(destination, 'wormhole', 'enter');
       playImpactFlare(destination, 'wormhole');
