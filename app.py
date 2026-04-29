@@ -28,6 +28,7 @@ from chat_routes import blueprint as chat_bp
 from vote_routes import blueprint as vote_bp
 from arcade_routes import blueprint as arcade_bp, init_arcade_socketio
 from shop_routes import blueprint as shop_bp
+from event_routes import blueprint as event_bp
 from public_api import public_api_bp, broadcast_public_status_update
 from developer_routes import blueprint as developer_bp
 from oauth import blueprint as oauth_bp
@@ -86,6 +87,7 @@ app.register_blueprint(chat_bp)
 app.register_blueprint(vote_bp)
 app.register_blueprint(arcade_bp)
 app.register_blueprint(shop_bp)
+app.register_blueprint(event_bp)
 app.register_blueprint(public_api_bp)
 app.register_blueprint(developer_bp)
 app.register_blueprint(oauth_bp)
@@ -775,6 +777,13 @@ def teacher_wallpapers_page():
     if not _teacher_session_valid():
         return redirect(url_for("teacher_dashboard"))
     return render_template("teacher_wallpapers.html", csrf_token=session.get("csrf_token"))
+
+
+@app.get("/teacher/events")
+def teacher_events_page():
+    if not _teacher_session_valid():
+        return redirect(url_for("teacher_dashboard"))
+    return render_template("teacher_events.html", csrf_token=session.get("csrf_token"))
 
 
 @app.get("/teacher.html")

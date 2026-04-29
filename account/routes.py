@@ -18,6 +18,8 @@ from models import (
     ChatMessageRead,
     ChatReaction,
     ClassEmoji,
+    CoinEventAttempt,
+    CoinEventClaim,
     Counter,
     HomeTarget,
     MealVote,
@@ -27,6 +29,9 @@ from models import (
     PresenceState,
     RememberedSession,
     StudentStatusFavorite,
+    StudentCosmeticEquipment,
+    StudentCosmeticItem,
+    StudentWallet,
     TeacherNoticeRead,
     TermsConsent,
     User,
@@ -34,6 +39,7 @@ from models import (
     UserNickname,
     Vote,
     VoteResponse,
+    WalletTransaction,
 )
 
 blueprint = Blueprint("account", __name__, url_prefix="/account", template_folder="templates")
@@ -62,6 +68,12 @@ def _query_ids(model, *conditions) -> list[int]:
 
 def _delete_user_related_records(user: User) -> None:
     StudentStatusFavorite.__table__.create(bind=db.engine, checkfirst=True)
+    StudentWallet.__table__.create(bind=db.engine, checkfirst=True)
+    WalletTransaction.__table__.create(bind=db.engine, checkfirst=True)
+    StudentCosmeticItem.__table__.create(bind=db.engine, checkfirst=True)
+    StudentCosmeticEquipment.__table__.create(bind=db.engine, checkfirst=True)
+    CoinEventClaim.__table__.create(bind=db.engine, checkfirst=True)
+    CoinEventAttempt.__table__.create(bind=db.engine, checkfirst=True)
     api_key_ids = _query_ids(APIKey, APIKey.user_id == user.id)
     if api_key_ids:
         APIRateLimit.query.filter(APIRateLimit.api_key_id.in_(api_key_ids)).delete(synchronize_session=False)
@@ -76,6 +88,12 @@ def _delete_user_related_records(user: User) -> None:
         RememberedSession,
         APIKey,
         StudentStatusFavorite,
+        WalletTransaction,
+        StudentCosmeticItem,
+        StudentCosmeticEquipment,
+        CoinEventClaim,
+        CoinEventAttempt,
+        StudentWallet,
     ):
         model.query.filter_by(user_id=user.id).delete(synchronize_session=False)
 

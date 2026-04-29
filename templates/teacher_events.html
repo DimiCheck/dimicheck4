@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f8efe5" />
+  <script>window.__csrfToken = {{ csrf_token|tojson }};</script>
+  <script defer src="/js/pwa.js"></script>
+  <script defer src="/js/teacher-events.js"></script>
+  <title>DimiCheck 이벤트 관리</title>
+  <style>
+    :root {
+      --bg: #fff8f1;
+      --surface: rgba(255, 255, 255, 0.74);
+      --surface-strong: rgba(255, 255, 255, 0.92);
+      --border: rgba(110, 83, 56, 0.12);
+      --text: #3f3024;
+      --muted: #7f6956;
+      --accent: #db8753;
+      --sun: #f6cd7b;
+      --shadow: 0 24px 60px rgba(153, 115, 76, 0.14);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Pretendard", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 18%, rgba(255, 214, 170, 0.75), transparent 26%),
+        radial-gradient(circle at 82% 14%, rgba(249, 195, 176, 0.55), transparent 25%),
+        linear-gradient(180deg, #fffaf5 0%, #fff4eb 48%, #fff8f2 100%);
+      padding: 32px 24px 48px;
+    }
+
+    .nav-sidebar {
+      width: 196px;
+      background: rgba(255,255,255,0.72);
+      border: 1px solid var(--border);
+      border-left: none;
+      border-radius: 0 24px 24px 0;
+      box-shadow: var(--shadow);
+      padding: 24px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      z-index: 30;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.62);
+      padding: 14px 16px;
+      font-weight: 700;
+      color: var(--muted);
+      text-decoration: none;
+      transition: transform .18s ease, background .18s ease, color .18s ease;
+    }
+
+    .nav-item:hover { transform: translateY(-1px); }
+    .nav-item.active {
+      background: linear-gradient(135deg, #f4c8ae, #efdbb3 60%, #eeb38b);
+      color: #5b3a24;
+      box-shadow: 0 10px 22px rgba(228, 160, 116, 0.18);
+    }
+
+    .nav-icon { width: 18px; height: 18px; flex: 0 0 18px; }
+
+    main {
+      margin-left: 190px;
+      padding: 0 24px;
+    }
+
+    .content {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      display: grid;
+      gap: 18px;
+    }
+
+    .hero,
+    .panel,
+    .event-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .hero,
+    .panel {
+      padding: 26px;
+    }
+
+    h1,
+    h2,
+    h3,
+    p { margin-top: 0; }
+
+    h1 {
+      font-size: clamp(30px, 4vw, 46px);
+      letter-spacing: -0.05em;
+      margin-bottom: 10px;
+    }
+
+    .muted {
+      color: var(--muted);
+      line-height: 1.55;
+      margin-bottom: 0;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .field.full { grid-column: 1 / -1; }
+
+    label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      border-radius: 16px;
+      border: 1px solid rgba(124, 96, 69, 0.14);
+      background: rgba(255, 255, 255, 0.76);
+      color: var(--text);
+      padding: 13px 14px;
+      font: inherit;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 92px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      border-color: rgba(219, 135, 83, 0.55);
+      box-shadow: 0 0 0 4px rgba(237, 187, 151, 0.28);
+    }
+
+    .target-row,
+    .actions,
+    .list-head,
+    .event-meta {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .target-row {
+      align-items: flex-end;
+    }
+
+    .target-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 12px 14px;
+      background: rgba(255,255,255,0.62);
+      border: 1px solid rgba(124, 96, 69, 0.1);
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .solid-btn,
+    .ghost-btn {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font: inherit;
+      font-weight: 850;
+      cursor: pointer;
+      transition: transform .18s ease, opacity .18s ease;
+    }
+
+    .solid-btn {
+      color: #fffaf7;
+      background: linear-gradient(135deg, #da8852, #f0c38c);
+      box-shadow: 0 12px 24px rgba(218, 136, 82, 0.24);
+    }
+
+    .ghost-btn {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.62);
+      border: 1px solid rgba(124, 96, 69, 0.12);
+    }
+
+    .solid-btn:hover,
+    .ghost-btn:hover { transform: translateY(-1px); }
+    .solid-btn:disabled,
+    .ghost-btn:disabled {
+      opacity: 0.55;
+      cursor: default;
+      transform: none;
+    }
+
+    .helper {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .event-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .event-card {
+      padding: 18px;
+      background: var(--surface-strong);
+      display: grid;
+      gap: 12px;
+    }
+
+    .event-card.inactive {
+      opacity: 0.62;
+    }
+
+    .event-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .event-title-row h3 {
+      margin-bottom: 4px;
+      letter-spacing: -0.03em;
+    }
+
+    .badge {
+      display: inline-flex;
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(246, 205, 123, 0.34);
+      color: #8b5c18;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .empty {
+      border-radius: 18px;
+      border: 1px dashed rgba(124, 96, 69, 0.18);
+      background: rgba(255,255,255,0.56);
+      color: var(--muted);
+      padding: 16px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      z-index: 1000;
+      transform: translate(-50%, 20px);
+      opacity: 0;
+      pointer-events: none;
+      color: #fff;
+      background: rgba(65, 42, 25, 0.92);
+      border-radius: 999px;
+      padding: 12px 16px;
+      font-weight: 850;
+      box-shadow: 0 16px 34px rgba(0, 0, 0, 0.24);
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    @media (max-width: 920px) {
+      body { padding: 22px 14px 36px; }
+      .nav-sidebar {
+        position: static;
+        width: 100%;
+        border-radius: 24px;
+        border-left: 1px solid var(--border);
+        flex-direction: row;
+        overflow-x: auto;
+        margin-bottom: 16px;
+      }
+      main {
+        margin-left: 0;
+        padding: 0;
+      }
+      .form-grid { grid-template-columns: 1fr; }
+      .event-title-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <aside class="nav-sidebar" aria-label="페이지 이동">
+    <a class="nav-item" href="/teacher">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5 12 5l8 7.5V20a1 1 0 0 1-1 1h-4.5v-5.5h-5V21H5a1 1 0 0 1-1-1v-7.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      전체 현황
+    </a>
+    <a class="nav-item" href="/teacher/notices">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 7.5A2.5 2.5 0 0 1 8.5 5H18a1 1 0 0 1 1 1v9.5A2.5 2.5 0 0 1 16.5 18H9l-4 2.5V8.5A1 1 0 0 1 6 7.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 9h6M9 12h6M9 15h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      공지사항
+    </a>
+    <a class="nav-item active" href="/teacher/events">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5.5h14v13H5v-13Z" stroke="currentColor" stroke-width="1.8"/><path d="M8 9h8M8 12h5M8 15h7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      이벤트
+    </a>
+    <a class="nav-item" href="/teacher/wallpapers">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 6.5A1.5 1.5 0 0 1 6.5 5h11A1.5 1.5 0 0 1 19 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 17.5v-11Z" stroke="currentColor" stroke-width="1.8"/><path d="m7.5 16 3.2-3.2a1 1 0 0 1 1.4 0l1.4 1.4a1 1 0 0 0 1.4 0l1.6-1.6a1 1 0 0 1 1.4 0L19 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="9" r="1.25" fill="currentColor"/></svg>
+      배경화면
+    </a>
+  </aside>
+
+  <main>
+    <div class="content">
+      <section class="hero">
+        <h1>이벤트 관리</h1>
+        <p class="muted">짧은 퀴즈를 만들고, 맞힌 학생에게 10~50코인을 지급합니다. 학생은 하루에 퀴즈 보상을 최대 3개까지만 받을 수 있어요.</p>
+      </section>
+
+      <section class="panel">
+        <h2>퀴즈 만들기</h2>
+        <form id="eventForm" class="form-grid">
+          <div class="field">
+            <label for="eventTitle">제목</label>
+            <input id="eventTitle" maxlength="120" placeholder="예: 정보 퀴즈" required />
+          </div>
+          <div class="field">
+            <label for="eventReward">보상 코인</label>
+            <input id="eventReward" type="number" min="10" max="50" step="1" value="20" required />
+          </div>
+          <div class="field full">
+            <label for="eventQuestion">문제</label>
+            <textarea id="eventQuestion" maxlength="500" placeholder="예: OSI 7계층의 5계층은? 세_ 계층" required></textarea>
+          </div>
+          <div class="field full">
+            <label for="eventHint">힌트</label>
+            <input id="eventHint" maxlength="240" placeholder="선택 사항" />
+          </div>
+          <div class="field full">
+            <label for="eventDescription">설명</label>
+            <input id="eventDescription" maxlength="500" placeholder="선택 사항" />
+          </div>
+          <div class="field">
+            <label for="eventAnswer">정답</label>
+            <input id="eventAnswer" maxlength="120" placeholder="예: 세션" required />
+          </div>
+          <div class="field">
+            <label for="eventAliases">추가 정답</label>
+            <input id="eventAliases" maxlength="240" placeholder="쉼표로 구분. 예: 세션계층, session" />
+          </div>
+          <div class="field">
+            <label for="eventStartsAt">시작</label>
+            <input id="eventStartsAt" type="datetime-local" />
+          </div>
+          <div class="field">
+            <label for="eventEndsAt">종료</label>
+            <input id="eventEndsAt" type="datetime-local" />
+          </div>
+          <div class="field full">
+            <label>대상</label>
+            <div class="target-row">
+              <label class="target-toggle"><input id="targetAll" type="checkbox" checked /> 전체 반</label>
+              <select id="targetGrade" disabled>
+                <option value="1">1학년</option>
+                <option value="2">2학년</option>
+                <option value="3">3학년</option>
+              </select>
+              <select id="targetSection" disabled>
+                <option value="1">1반</option>
+                <option value="2">2반</option>
+                <option value="3">3반</option>
+                <option value="4">4반</option>
+                <option value="5">5반</option>
+                <option value="6">6반</option>
+              </select>
+            </div>
+          </div>
+          <div class="actions field full">
+            <button id="eventSubmitBtn" class="solid-btn" type="submit">이벤트 만들기</button>
+            <span id="eventHelper" class="helper"></span>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="list-head">
+          <h2 style="margin-bottom:0">최근 이벤트</h2>
+          <button id="refreshBtn" class="ghost-btn" type="button">새로고침</button>
+        </div>
+        <div id="eventList" class="event-list" aria-live="polite"></div>
+      </section>
+    </div>
+  </main>
+  <div id="teacherEventToast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

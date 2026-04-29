@@ -237,6 +237,70 @@ class WalletTransaction(db.Model):
     )
 
 
+class CoinEvent(db.Model):
+    __tablename__ = "coin_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    event_type = db.Column(db.String(24), default="quiz", nullable=False)
+    title = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.String(500), nullable=True)
+    question = db.Column(db.String(500), nullable=False)
+    hint = db.Column(db.String(240), nullable=True)
+    answer_salt = db.Column(db.String(64), nullable=False)
+    answer_hashes = db.Column(db.Text, nullable=False)
+    reward_coins = db.Column(db.Integer, nullable=False)
+    target_all = db.Column(db.Boolean, default=False, nullable=False)
+    target_grade = db.Column(db.Integer, nullable=True)
+    target_section = db.Column(db.Integer, nullable=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    starts_at = db.Column(db.DateTime, nullable=True)
+    ends_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index("idx_coin_events_target_active", "is_active", "target_all", "target_grade", "target_section"),
+        db.Index("idx_coin_events_window", "starts_at", "ends_at"),
+    )
+
+
+class CoinEventClaim(db.Model):
+    __tablename__ = "coin_event_claims"
+
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey("coin_events.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    grade = db.Column(db.Integer, nullable=False)
+    section = db.Column(db.Integer, nullable=False)
+    student_number = db.Column(db.Integer, nullable=False)
+    reward_coins = db.Column(db.Integer, nullable=False)
+    claim_date = db.Column(db.String(10), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("event_id", "user_id", name="uq_coin_event_claim_event_user"),
+        db.Index("idx_coin_event_claims_user_date", "user_id", "claim_date"),
+        db.Index("idx_coin_event_claims_event", "event_id"),
+    )
+
+
+class CoinEventAttempt(db.Model):
+    __tablename__ = "coin_event_attempts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey("coin_events.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    grade = db.Column(db.Integer, nullable=False)
+    section = db.Column(db.Integer, nullable=False)
+    student_number = db.Column(db.Integer, nullable=False)
+    is_correct = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index("idx_coin_event_attempts_user_event", "user_id", "event_id", "created_at"),
+    )
+
+
 class StudentCosmeticItem(db.Model):
     __tablename__ = "student_cosmetic_items"
 
