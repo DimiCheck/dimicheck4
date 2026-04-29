@@ -299,69 +299,217 @@ body::before {
 
 .magnet.magnet-cosmetic-aura-soft-glow {
   box-shadow:
-    0 14px 34px rgba(79, 226, 199, 0.34),
-    0 0 0 7px rgba(96, 234, 208, 0.13),
+    0 18px 42px rgba(79, 226, 199, 0.48),
+    0 0 0 9px rgba(96, 234, 208, 0.18),
+    0 0 34px rgba(90, 255, 215, 0.46),
     inset 0 -4px 14px rgba(0, 0, 0, 0.24),
     0 0 24px var(--ornament-glow);
+  animation: magnetCosmeticAuraPulse 1.6s ease-in-out infinite;
 }
 
 .magnet.magnet-cosmetic-return-pop {
-  animation: magnetCosmeticReturnPop 0.34s cubic-bezier(0.2, 0.8, 0.25, 1);
+  animation: magnetCosmeticReturnPop 0.46s cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+
+.magnet.magnet-cosmetic-impact-pop {
+  animation: magnetCosmeticImpactPop 0.5s cubic-bezier(0.12, 0.9, 0.18, 1);
 }
 
 .board-cosmetic-particle,
-.board-cosmetic-trail {
+.board-cosmetic-trail,
+.board-cosmetic-portal,
+.board-cosmetic-shockwave,
+.board-cosmetic-lightning,
+.board-cosmetic-drag-ghost,
+.board-cosmetic-fire-pop,
+.board-cosmetic-neon-star {
   position: fixed;
   z-index: 2400;
   left: 0;
   top: 0;
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
   pointer-events: none;
   transform: translate(-50%, -50%);
-  background: var(--particle-color, #fff2a8);
-  box-shadow: 0 0 16px var(--particle-color, #fff2a8);
-  animation: boardCosmeticSpark 0.68s ease-out forwards;
 }
 
-.board-cosmetic-particle--swirl {
-  width: 9px;
-  height: 9px;
+.board-cosmetic-particle {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: var(--particle-color, #fff2a8);
+  box-shadow: 0 0 22px var(--particle-color, #fff2a8), 0 0 44px var(--particle-color, #fff2a8);
+  animation: boardCosmeticSpark 0.82s ease-out forwards;
+}
+
+.board-cosmetic-particle--wormhole {
+  width: 15px;
+  height: 15px;
   animation-name: boardCosmeticSwirl;
 }
 
-.board-cosmetic-trail {
-  width: 38px;
-  height: 12px;
+.board-cosmetic-portal {
+  width: var(--portal-size, 260px);
+  height: var(--portal-size, 260px);
+  z-index: 2320;
   border-radius: 999px;
-  opacity: 0.72;
-  background: linear-gradient(90deg, transparent, rgba(255, 242, 168, 0.82), transparent);
-  box-shadow: 0 0 18px rgba(255, 242, 168, 0.36);
-  animation: boardCosmeticTrail 0.46s ease-out forwards;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.98) 0 9%, transparent 10%),
+    conic-gradient(from 40deg, rgba(255, 211, 90, 0), rgba(255, 211, 90, 0.92), rgba(255, 111, 71, 0.74), rgba(255, 211, 90, 0));
+  box-shadow: 0 0 36px rgba(255, 211, 90, 0.52), inset 0 0 28px rgba(255, 255, 255, 0.42);
+  mix-blend-mode: screen;
+  opacity: 0;
+  animation: boardCosmeticPortal 0.9s ease-out forwards;
+}
+
+.board-cosmetic-portal--wormhole {
+  background:
+    radial-gradient(circle, rgba(232, 251, 255, 0.98) 0 8%, rgba(38, 128, 255, 0.22) 9% 24%, transparent 25%),
+    conic-gradient(from 20deg, rgba(26, 82, 255, 0), rgba(65, 218, 255, 0.94), rgba(82, 87, 255, 0.9), rgba(21, 230, 255, 0.82), rgba(26, 82, 255, 0));
+  box-shadow: 0 0 46px rgba(72, 198, 255, 0.74), inset 0 0 36px rgba(255, 255, 255, 0.42);
+  animation-duration: 1.12s;
+}
+
+.board-cosmetic-portal--exit {
+  animation-name: boardCosmeticPortalExit;
+}
+
+.board-cosmetic-shockwave {
+  width: var(--wave-size, 260px);
+  height: var(--wave-size, 260px);
+  z-index: 2310;
+  border-radius: 999px;
+  border: 5px solid rgba(255, 215, 92, 0.78);
+  box-shadow: 0 0 46px rgba(255, 215, 92, 0.55), inset 0 0 34px rgba(255, 255, 255, 0.28);
+  animation: boardCosmeticShockwave 0.82s ease-out forwards;
+}
+
+.board-cosmetic-shockwave--wormhole {
+  border-color: rgba(76, 209, 255, 0.86);
+  box-shadow: 0 0 56px rgba(76, 209, 255, 0.72), inset 0 0 38px rgba(255, 255, 255, 0.3);
+}
+
+.board-cosmetic-shockwave--basic {
+  width: calc(var(--wave-size, 220px) * 0.72);
+  height: calc(var(--wave-size, 220px) * 0.72);
+  border-width: 4px;
+}
+
+.board-cosmetic-lightning {
+  z-index: 2410;
+  color: #fff7b0;
+  font-size: 96px;
+  line-height: 1;
+  text-shadow: 0 0 18px #fff, 0 0 42px rgba(255, 214, 72, 0.92);
+  animation: boardCosmeticLightning 0.62s steps(2, end) forwards;
+}
+
+.board-cosmetic-trail {
+  width: 116px;
+  height: 22px;
+  border-radius: 999px;
+  opacity: 0.82;
+  background: linear-gradient(90deg, transparent, rgba(255, 242, 168, 0.9), rgba(255, 255, 255, 0.95), transparent);
+  box-shadow: 0 0 28px rgba(255, 242, 168, 0.5);
+  filter: blur(0.4px);
+  animation: boardCosmeticTrail 0.7s ease-out forwards;
 }
 
 .board-cosmetic-trail--fire {
-  background: linear-gradient(90deg, transparent, rgba(255, 67, 36, 0.88), rgba(255, 205, 69, 0.92), transparent);
-  box-shadow: 0 0 22px rgba(255, 98, 42, 0.44);
+  width: 140px;
+  height: 28px;
+  background: linear-gradient(90deg, transparent, rgba(255, 35, 16, 0.94), rgba(255, 202, 52, 1), rgba(255, 255, 255, 0.82), transparent);
+  box-shadow: 0 0 36px rgba(255, 98, 42, 0.72), 0 0 66px rgba(255, 64, 24, 0.42);
 }
 
 .board-cosmetic-trail--neon {
-  background: linear-gradient(90deg, transparent, rgba(81, 229, 255, 0.9), rgba(255, 91, 239, 0.9), transparent);
-  box-shadow: 0 0 24px rgba(93, 221, 255, 0.48);
+  width: 152px;
+  height: 24px;
+  background: linear-gradient(90deg, transparent, rgba(81, 229, 255, 0.95), rgba(255, 91, 239, 0.95), rgba(255, 255, 255, 0.9), transparent);
+  box-shadow: 0 0 34px rgba(93, 221, 255, 0.72), 0 0 64px rgba(255, 91, 239, 0.48);
+}
+
+.board-cosmetic-drag-ghost {
+  z-index: 2390;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.84);
+  font-weight: 900;
+  font-size: 20px;
+  background: rgba(255, 255, 255, 0.22);
+  border: 2px solid rgba(255, 255, 255, 0.48);
+  box-shadow: 0 0 28px rgba(255, 255, 255, 0.34);
+  animation: boardCosmeticGhost 0.58s ease-out forwards;
+}
+
+.board-cosmetic-drag-ghost--fire {
+  background: rgba(255, 90, 28, 0.26);
+  border-color: rgba(255, 221, 96, 0.78);
+  box-shadow: 0 0 34px rgba(255, 88, 34, 0.7);
+}
+
+.board-cosmetic-drag-ghost--neon {
+  color: #fff;
+  background: rgba(76, 223, 255, 0.18);
+  border-color: rgba(255, 91, 239, 0.9);
+  box-shadow: 0 0 40px rgba(80, 229, 255, 0.78), 0 0 70px rgba(255, 91, 239, 0.5);
+}
+
+.board-cosmetic-fire-pop {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: radial-gradient(circle, #fff 0 12%, #ffe063 13% 42%, #ff431d 43% 72%, transparent 73%);
+  box-shadow: 0 0 28px rgba(255, 71, 28, 0.74);
+  animation: boardCosmeticFirePop 0.68s ease-out forwards;
+}
+
+.board-cosmetic-neon-star {
+  width: 42px;
+  height: 42px;
+  background:
+    linear-gradient(90deg, transparent 44%, rgba(255, 255, 255, 0.95) 45% 55%, transparent 56%),
+    linear-gradient(0deg, transparent 44%, rgba(80, 236, 255, 0.95) 45% 55%, transparent 56%);
+  filter: drop-shadow(0 0 16px rgba(80, 236, 255, 0.92));
+  animation: boardCosmeticNeonStar 0.76s ease-out forwards;
 }
 
 @keyframes boardCosmeticSpark {
   to {
     opacity: 0;
-    transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) scale(0.18);
+    transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) rotate(var(--spin, 0deg)) scale(0.12);
   }
 }
 
 @keyframes boardCosmeticSwirl {
   to {
     opacity: 0;
-    transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) rotate(260deg) scale(0.24);
+    transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) rotate(520deg) scale(0.16);
+  }
+}
+
+@keyframes boardCosmeticPortal {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(0deg) scale(0.15); }
+  42% { opacity: 0.95; transform: translate(-50%, -50%) rotate(210deg) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(520deg) scale(1.18); }
+}
+
+@keyframes boardCosmeticPortalExit {
+  0% { opacity: 0.9; transform: translate(-50%, -50%) rotate(0deg) scale(1.05); }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(-420deg) scale(0.08); }
+}
+
+@keyframes boardCosmeticShockwave {
+  0% { opacity: 0.92; transform: translate(-50%, -50%) scale(0.12); }
+  70% { opacity: 0.38; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.18); }
+}
+
+@keyframes boardCosmeticLightning {
+  0% { opacity: 0; transform: translate(-50%, -50%) scaleY(0.2) scaleX(0.72); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scaleY(1.2) scaleX(1.1); }
+  42% { opacity: 0.2; }
+  58% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scaleY(0.86) scaleX(1.35); }
   }
 }
 
@@ -372,14 +520,50 @@ body::before {
   }
   to {
     opacity: 0;
-    transform: translate(-50%, -50%) scaleX(0.35) scaleY(0.72);
+    transform: translate(-50%, -50%) scaleX(0.2) scaleY(0.65);
+    filter: blur(8px);
+  }
+}
+
+@keyframes boardCosmeticGhost {
+  0% { opacity: 0.58; transform: translate(-50%, -50%) scale(1.02); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.46); filter: blur(5px); }
+}
+
+@keyframes boardCosmeticFirePop {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.8);
+    filter: blur(5px);
+  }
+}
+
+@keyframes boardCosmeticNeonStar {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(180deg) scale(2.4);
   }
 }
 
 @keyframes magnetCosmeticReturnPop {
   0% { transform: scale(0.94); }
-  60% { transform: scale(1.08); }
+  60% { transform: scale(1.16); }
   100% { transform: scale(1); }
+}
+
+@keyframes magnetCosmeticImpactPop {
+  0% { transform: scale(0.88) rotate(-2deg); }
+  45% { transform: scale(1.2) rotate(2deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+@keyframes magnetCosmeticAuraPulse {
+  0%, 100% {
+    filter: saturate(1);
+  }
+  50% {
+    filter: saturate(1.35) brightness(1.08);
+  }
 }
 
 .thought-bubble {

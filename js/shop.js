@@ -222,7 +222,18 @@ class ShopController {
 
     return `
       <article class="item-card" style="animation-delay:${Math.min(index * 45, 180)}ms">
-        <div class="preview" data-preview="${this.escapeHtml(item.preview || 'spark')}"></div>
+        <div class="preview" data-preview="${this.escapeHtml(item.preview || 'spark')}">
+          <span class="preview-ring preview-ring--one"></span>
+          <span class="preview-ring preview-ring--two"></span>
+          <span class="preview-bolt">⚡</span>
+          <span class="preview-trail preview-trail--one"></span>
+          <span class="preview-trail preview-trail--two"></span>
+          <span class="preview-magnet">7</span>
+          <span class="preview-ghost preview-ghost--one">7</span>
+          <span class="preview-ghost preview-ghost--two">7</span>
+          <span class="preview-pop preview-pop--one"></span>
+          <span class="preview-pop preview-pop--two"></span>
+        </div>
         <div class="item-body">
           <div class="item-top">
             <h2 class="item-name">${this.escapeHtml(item.name)}</h2>

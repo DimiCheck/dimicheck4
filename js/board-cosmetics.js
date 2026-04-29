@@ -1,8 +1,9 @@
 (function () {
   const cosmeticsByNumber = Object.create(null);
   const dragTrailState = new WeakMap();
-  const MAX_PARTICLES_PER_EFFECT = 14;
-  const DRAG_TRAIL_INTERVAL_MS = 72;
+  const DRAG_TRAIL_INTERVAL_MS = 54;
+  const MOVE_EFFECT_LIMIT_MS = 360;
+  let lastMoveEffectAt = 0;
 
   function normalizeNumber(value) {
     const number = Number(value);
@@ -29,6 +30,22 @@
     const number = getMagnetNumber(magnet);
     if (!number) return null;
     return cosmeticsByNumber[number] || null;
+  }
+
+  function getCenterFromMagnet(magnet) {
+    const rect = magnet.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+      size: Math.max(rect.width, rect.height),
+      width: rect.width,
+      height: rect.height
+    };
+  }
+
+  function captureMoveOrigin(magnet) {
+    if (!magnet) return null;
+    return getCenterFromMagnet(magnet);
   }
 
   function setCosmeticsSnapshot(snapshot) {
@@ -93,65 +110,145 @@
     }
   }
 
-  function getCenterFromMagnet(magnet) {
-    const rect = magnet.getBoundingClientRect();
-    return {
-      x: rect.left + rect.width / 2,
-      y: rect.top + rect.height / 2,
-      size: Math.max(rect.width, rect.height)
-    };
-  }
-
-  function makeParticle(x, y, className, options = {}) {
-    const particle = document.createElement('span');
-    particle.className = className;
-    particle.style.left = `${x}px`;
-    particle.style.top = `${y}px`;
-    if (options.color) {
-      particle.style.setProperty('--particle-color', options.color);
+  function makeEffectNode(className, x, y, options = {}) {
+    const node = document.createElement('span');
+    node.className = className;
+    node.style.left = `${x}px`;
+    node.style.top = `${y}px`;
+    Object.entries(options.vars || {}).forEach(([key, value]) => {
+      node.style.setProperty(key, value);
+    });
+    if (options.text) {
+      node.textContent = options.text;
     }
-    if (options.dx !== undefined) {
-      particle.style.setProperty('--dx', `${options.dx}px`);
-    }
-    if (options.dy !== undefined) {
-      particle.style.setProperty('--dy', `${options.dy}px`);
-    }
-    document.body.appendChild(particle);
-    const duration = Number(options.duration || 680);
+    document.body.appendChild(node);
+    const duration = Number(options.duration || 900);
     window.setTimeout(() => {
-      particle.remove();
-    }, duration + 80);
-    return particle;
+      node.remove();
+    }, duration + 120);
+    return node;
   }
 
-  function playMoveEffect(magnet, action) {
+  function burstParticles(center, options = {}) {
+    const count = Number(options.count || 20);
+    const color = options.color || '#ffd15a';
+    const spread = Number(options.spread || 110);
+    const className = options.className || 'board-cosmetic-particle board-cosmetic-particle--spark';
+    for (let i = 0; i < count; i += 1) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.42;
+      const distance = spread * (0.42 + Math.random() * 0.68);
+      makeEffectNode(className, center.x, center.y, {
+        duration: options.duration || 820,
+        vars: {
+          '--particle-color': color,
+          '--dx': `${Math.cos(angle) * distance}px`,
+          '--dy': `${Math.sin(angle) * distance}px`,
+          '--spin': `${Math.random() * 260 - 130}deg`
+        }
+      });
+    }
+  }
+
+  function playPortal(center, variant, phase) {
+    if (!center) return;
+    const isBlue = variant === 'wormhole';
+    makeEffectNode(
+      `board-cosmetic-portal board-cosmetic-portal--${isBlue ? 'wormhole' : 'starburst'} board-cosmetic-portal--${phase}`,
+      center.x,
+      center.y,
+      {
+        duration: isBlue ? 1120 : 900,
+        vars: {
+          '--portal-size': `${isBlue ? center.size * 5.8 : center.size * 4.7}px`
+        }
+      }
+    );
+  }
+
+  function playShockwave(center, variant) {
+    if (!center) return;
+    const size = variant === 'wormhole' ? center.size * 7.2 : center.size * 5.4;
+    makeEffectNode(`board-cosmetic-shockwave board-cosmetic-shockwave--${variant}`, center.x, center.y, {
+      duration: variant === 'wormhole' ? 1050 : 820,
+      vars: { '--wave-size': `${size}px` }
+    });
+  }
+
+  function playLightning(center) {
+    if (!center) return;
+    makeEffectNode('board-cosmetic-lightning', center.x, center.y - center.size * 0.45, {
+      duration: 620,
+      text: '⚡'
+    });
+  }
+
+  function playMoveEffect(magnet, action, options = {}) {
     const equipment = getEquipmentForMagnet(magnet);
     const effect = equipment?.move_effect;
     if (!effect) return;
-    const center = getCenterFromMagnet(magnet);
-    const count = effect === 'move_blue_swirl' ? 10 : MAX_PARTICLES_PER_EFFECT;
-    const color = effect === 'move_blue_swirl' ? '#55b9ff' : effect === 'move_stardust' ? '#ffd15a' : '#fff2a8';
-    const className = effect === 'move_blue_swirl'
-      ? 'board-cosmetic-particle board-cosmetic-particle--swirl'
-      : 'board-cosmetic-particle board-cosmetic-particle--spark';
 
-    for (let i = 0; i < count; i += 1) {
-      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.35;
-      const distance = 24 + Math.random() * (effect === 'move_blue_swirl' ? 44 : 34);
-      makeParticle(center.x, center.y, className, {
-        color,
-        dx: Math.cos(angle) * distance,
-        dy: Math.sin(angle) * distance,
-        duration: effect === 'move_blue_swirl' ? 760 : 620
+    const now = Date.now();
+    if (now - lastMoveEffectAt < MOVE_EFFECT_LIMIT_MS) {
+      return;
+    }
+    lastMoveEffectAt = now;
+
+    const origin = options.origin || null;
+    const destination = getCenterFromMagnet(magnet);
+
+    if (effect === 'move_blue_swirl') {
+      playPortal(origin, 'wormhole', 'exit');
+      playPortal(destination, 'wormhole', 'enter');
+      playShockwave(destination, 'wormhole');
+      burstParticles(destination, {
+        count: 26,
+        color: '#54c7ff',
+        spread: 145,
+        duration: 980,
+        className: 'board-cosmetic-particle board-cosmetic-particle--wormhole'
+      });
+    } else if (effect === 'move_stardust') {
+      playPortal(origin, 'starburst', 'exit');
+      playShockwave(destination, 'starburst');
+      playLightning(destination);
+      burstParticles(destination, {
+        count: 28,
+        color: '#ffd15a',
+        spread: 130,
+        duration: 900
+      });
+    } else {
+      playShockwave(destination, 'basic');
+      burstParticles(destination, {
+        count: 18,
+        color: '#fff2a8',
+        spread: 84,
+        duration: 700
       });
     }
 
+    magnet.classList.add('magnet-cosmetic-impact-pop');
     if (action === 'classroom') {
       magnet.classList.add('magnet-cosmetic-return-pop');
-      window.setTimeout(() => {
-        magnet.classList.remove('magnet-cosmetic-return-pop');
-      }, 360);
     }
+    window.setTimeout(() => {
+      magnet.classList.remove('magnet-cosmetic-impact-pop', 'magnet-cosmetic-return-pop');
+    }, 520);
+  }
+
+  function makeGhost(magnet, x, y, effect) {
+    const rect = magnet.getBoundingClientRect();
+    const ghost = makeEffectNode(
+      `board-cosmetic-drag-ghost board-cosmetic-drag-ghost--${effect}`,
+      x,
+      y,
+      {
+        duration: effect === 'neon' ? 620 : 520,
+        text: magnet.dataset.number || ''
+      }
+    );
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.height = `${rect.height}px`;
   }
 
   function emitDragTrail(magnet, clientX, clientY) {
@@ -166,14 +263,25 @@
     const rect = magnet.getBoundingClientRect();
     const x = Number.isFinite(clientX) ? clientX : rect.left + rect.width / 2;
     const y = Number.isFinite(clientY) ? clientY : rect.top + rect.height / 2;
-    const className = [
-      'board-cosmetic-trail',
-      effect === 'drag_fire_trail' ? 'board-cosmetic-trail--fire' : '',
-      effect === 'drag_neon_afterimage' ? 'board-cosmetic-trail--neon' : ''
-    ].filter(Boolean).join(' ');
-    makeParticle(x, y, className, {
-      duration: effect === 'drag_neon_afterimage' ? 560 : 460
-    });
+
+    if (effect === 'drag_fire_trail') {
+      makeEffectNode('board-cosmetic-trail board-cosmetic-trail--fire', x, y, { duration: 760 });
+      makeEffectNode('board-cosmetic-fire-pop', x + (Math.random() * 26 - 13), y + (Math.random() * 24 - 12), {
+        duration: 680
+      });
+      makeGhost(magnet, x, y, 'fire');
+      return;
+    }
+
+    if (effect === 'drag_neon_afterimage') {
+      makeEffectNode('board-cosmetic-trail board-cosmetic-trail--neon', x, y, { duration: 860 });
+      makeGhost(magnet, x, y, 'neon');
+      makeEffectNode('board-cosmetic-neon-star', x, y, { duration: 760 });
+      return;
+    }
+
+    makeEffectNode('board-cosmetic-trail board-cosmetic-trail--ribbon', x, y, { duration: 640 });
+    makeGhost(magnet, x, y, 'ribbon');
   }
 
   window.boardCosmetics = {
@@ -182,6 +290,7 @@
     applyUpdate: applyCosmeticsUpdate,
     applyAllAuras,
     applyAuraToMagnet,
+    captureMoveOrigin,
     playMoveEffect,
     emitDragTrail
   };

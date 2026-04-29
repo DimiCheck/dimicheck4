@@ -1188,6 +1188,9 @@ function applyMagnetQuickAction(target, action, options = {}) {
   if (!container || !target) return;
 
   const { skipSave = false, deferReasonDialog = false } = options;
+  const cosmeticOrigin = window.boardCosmetics && typeof window.boardCosmetics.captureMoveOrigin === 'function'
+    ? window.boardCosmetics.captureMoveOrigin(target)
+    : null;
 
   if (action === 'classroom') {
     target.classList.remove('attached');
@@ -1227,7 +1230,7 @@ function applyMagnetQuickAction(target, action, options = {}) {
     window.updateThoughtBubblePositionForMagnet(target);
   }
   if (window.boardCosmetics && typeof window.boardCosmetics.playMoveEffect === 'function') {
-    window.boardCosmetics.playMoveEffect(target, action);
+    window.boardCosmetics.playMoveEffect(target, action, { origin: cosmeticOrigin });
   }
   if (!skipSave) {
     saveState(grade, section);
