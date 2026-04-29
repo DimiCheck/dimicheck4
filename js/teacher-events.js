@@ -1,12 +1,16 @@
 class TeacherEventsController {
   constructor() {
     this.events = [];
+    this.mode = 'quiz';
+    this.lastCouponCode = '';
     this.busy = false;
     this.toastTimer = null;
   }
 
   init() {
     this.form = document.getElementById('eventForm');
+    this.modeButtons = document.querySelectorAll('[data-mode]');
+    this.quizOnlyFields = document.querySelectorAll('[data-quiz-only]');
     this.titleInput = document.getElementById('eventTitle');
     this.rewardInput = document.getElementById('eventReward');
     this.questionInput = document.getElementById('eventQuestion');
@@ -21,6 +25,9 @@ class TeacherEventsController {
     this.targetSectionInput = document.getElementById('targetSection');
     this.submitBtn = document.getElementById('eventSubmitBtn');
     this.helper = document.getElementById('eventHelper');
+    this.couponResult = document.getElementById('couponResult');
+    this.createdCouponCode = document.getElementById('createdCouponCode');
+    this.copyCouponBtn = document.getElementById('copyCouponBtn');
     this.eventList = document.getElementById('eventList');
     this.refreshBtn = document.getElementById('refreshBtn');
     this.toast = document.getElementById('teacherEventToast');
@@ -29,8 +36,12 @@ class TeacherEventsController {
       event.preventDefault();
       this.createEvent();
     });
+    this.modeButtons.forEach((button) => {
+      button.addEventListener('click', () => this.setMode(button.dataset.mode || 'quiz'));
+    });
     this.targetAllInput?.addEventListener('change', () => this.syncTargetControls());
     this.refreshBtn?.addEventListener('click', () => this.load());
+    this.copyCouponBtn?.addEventListener('click', () => this.copyCouponCode());
     this.eventList?.addEventListener('click', (event) => {
       const button = event.target.closest('button[data-action][data-event-id]');
       if (!button || this.busy) return;
@@ -40,6 +51,7 @@ class TeacherEventsController {
     });
 
     this.syncTargetControls();
+    this.syncModeControls();
     this.load();
   }
 
@@ -51,16 +63,10 @@ class TeacherEventsController {
 
   buildPayload() {
     const targetAll = Boolean(this.targetAllInput?.checked);
-    return {
+    const payload = {
+      type: this.mode,
       title: this.titleInput?.value.trim(),
       description: this.descriptionInput?.value.trim(),
-      question: this.questionInput?.value.trim(),
-      hint: this.hintInput?.value.trim(),
-      answer: this.answerInput?.value.trim(),
-      answerAliases: String(this.aliasesInput?.value || '')
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean),
       rewardCoins: Number(this.rewardInput?.value || 0),
       targetAll,
       targetGrade: targetAll ? null : Number(this.targetGradeInput?.value || 0),
@@ -69,17 +75,32 @@ class TeacherEventsController {
       endsAt: this.endsAtInput?.value || null,
       active: true
     };
+    if (this.mode === 'quiz') {
+      payload.question = this.questionInput?.value.trim();
+      payload.hint = this.hintInput?.value.trim();
+      payload.answer = this.answerInput?.value.trim();
+      payload.answerAliases = String(this.aliasesInput?.value || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+    }
+    return payload;
   }
 
   async createEvent() {
     if (this.busy) return;
     const payload = this.buildPayload();
-    if (!payload.title || !payload.question || !payload.answer) {
+    if (!payload.title) {
+      this.setHelper('제목을 입력해주세요.');
+      return;
+    }
+    if (this.mode === 'quiz' && (!payload.question || !payload.answer)) {
       this.setHelper('제목, 문제, 정답을 입력해주세요.');
       return;
     }
-    if (payload.rewardCoins < 10 || payload.rewardCoins > 50) {
-      this.setHelper('보상은 10~50코인만 가능합니다.');
+    const maxReward = this.mode === 'coupon' ? 200 : 50;
+    if (payload.rewardCoins < 10 || payload.rewardCoins > maxReward) {
+      this.setHelper(`보상은 10~${maxReward}코인만 가능합니다.`);
       return;
     }
 
@@ -95,11 +116,14 @@ class TeacherEventsController {
         const error = await res.json().catch(() => ({}));
         throw new Error(this.humanizeError(error.error, res.status));
       }
+      const result = await res.json();
+      const couponCode = result.event?.couponCode || '';
       this.form?.reset();
       if (this.rewardInput) this.rewardInput.value = '20';
       if (this.targetAllInput) this.targetAllInput.checked = true;
       this.syncTargetControls();
-      this.showToast('이벤트를 만들었습니다.');
+      this.showCouponCode(couponCode);
+      this.showToast(this.mode === 'coupon' ? '코드를 발급했습니다.' : '이벤트를 만들었습니다.');
       await this.load();
     } catch (error) {
       this.showToast(error.message || '이벤트를 만들지 못했습니다.');
@@ -161,11 +185,12 @@ class TeacherEventsController {
     const active = Boolean(item.active);
     const target = item.targetAll ? '전체 반' : `${item.targetGrade}학년 ${item.targetSection}반`;
     const period = this.formatPeriod(item);
+    const typeLabel = item.type === 'coupon' ? '코드' : '퀴즈';
     return `
       <article class="event-card ${active ? '' : 'inactive'}">
         <div class="event-title-row">
           <div>
-            <h3>${this.escapeHtml(item.title)}</h3>
+            <h3>${this.escapeHtml(item.title)} <span class="helper">· ${typeLabel}</span></h3>
             <p class="muted">${this.escapeHtml(item.question)}</p>
           </div>
           <span class="badge">+${Number(item.rewardCoins || 0).toLocaleString('ko-KR')} 코인</span>
@@ -214,6 +239,54 @@ class TeacherEventsController {
     this.render();
   }
 
+  setMode(mode) {
+    this.mode = mode === 'coupon' ? 'coupon' : 'quiz';
+    this.syncModeControls();
+  }
+
+  syncModeControls() {
+    this.modeButtons.forEach((button) => {
+      button.classList.toggle('active', button.dataset.mode === this.mode);
+    });
+    this.quizOnlyFields.forEach((field) => {
+      field.hidden = this.mode === 'coupon';
+    });
+    if (this.questionInput) this.questionInput.required = this.mode === 'quiz';
+    if (this.answerInput) this.answerInput.required = this.mode === 'quiz';
+    if (this.rewardInput) {
+      this.rewardInput.max = this.mode === 'coupon' ? '200' : '50';
+      if (Number(this.rewardInput.value || 0) > Number(this.rewardInput.max)) {
+        this.rewardInput.value = this.rewardInput.max;
+      }
+    }
+    if (this.submitBtn) {
+      this.submitBtn.textContent = this.mode === 'coupon' ? '코드 발급하기' : '퀴즈 만들기';
+    }
+    this.setHelper(this.mode === 'coupon' ? '코드는 자동 발급되고, 생성 직후 한 번만 표시됩니다.' : '');
+  }
+
+  showCouponCode(code) {
+    this.lastCouponCode = code || '';
+    if (!this.couponResult || !this.createdCouponCode) return;
+    if (!this.lastCouponCode) {
+      this.couponResult.classList.remove('visible');
+      this.createdCouponCode.textContent = '';
+      return;
+    }
+    this.createdCouponCode.textContent = this.lastCouponCode;
+    this.couponResult.classList.add('visible');
+  }
+
+  async copyCouponCode() {
+    if (!this.lastCouponCode) return;
+    try {
+      await navigator.clipboard?.writeText(this.lastCouponCode);
+      this.showToast('코드를 복사했습니다.');
+    } catch {
+      this.showToast('복사하지 못했습니다. 코드를 직접 선택해주세요.');
+    }
+  }
+
   setHelper(message) {
     if (this.helper) this.helper.textContent = message;
   }
@@ -230,7 +303,9 @@ class TeacherEventsController {
 
   humanizeError(error, status) {
     if (error === 'reward must be between 10 and 50') return '보상은 10~50코인만 가능합니다.';
+    if (error === 'coupon reward must be between 10 and 200') return '코드 보상은 10~200코인만 가능합니다.';
     if (error === 'answer required') return '정답을 입력해주세요.';
+    if (error === 'coupon code required') return '코드를 만들지 못했습니다.';
     if (error === 'target class required') return '대상 반을 선택해주세요.';
     if (status === 403) return '선생님 권한이 필요합니다.';
     return error || '요청을 처리하지 못했습니다.';

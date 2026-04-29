@@ -21,6 +21,8 @@ blueprint = Blueprint("coin_events", __name__, url_prefix="/api/events")
 KST = ZoneInfo("Asia/Seoul")
 MIN_QUIZ_REWARD = 10
 MAX_QUIZ_REWARD = 50
+MIN_COUPON_REWARD = 10
+MAX_COUPON_REWARD = 200
 DAILY_QUIZ_CLAIM_LIMIT = 3
 
 
@@ -72,6 +74,19 @@ def _normalize_answer(value: str) -> str:
     return "".join(ch for ch in normalized if ch.isalnum())
 
 
+def _normalize_coupon_code(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", str(value or "")).casefold()
+    return "".join(ch for ch in normalized if ch.isalnum())
+
+
+def _generate_coupon_code() -> str:
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    parts = []
+    for _ in range(3):
+        parts.append("".join(secrets.choice(alphabet) for _ in range(4)))
+    return "-".join(parts)
+
+
 def _hash_answer(answer: str, salt: str) -> str:
     return hashlib.sha256(f"{salt}:{answer}".encode("utf-8")).hexdigest()
 
@@ -99,6 +114,14 @@ def _build_answer_hashes(answer_values: list[str]) -> tuple[str, str] | None:
     salt = secrets.token_hex(16)
     hashes = [_hash_answer(answer, salt) for answer in normalized]
     return salt, json.dumps(hashes)
+
+
+def _build_coupon_hash(code: str) -> tuple[str, str] | None:
+    normalized = _normalize_coupon_code(code)
+    if not normalized:
+        return None
+    salt = secrets.token_hex(16)
+    return salt, json.dumps([_hash_answer(normalized, salt)])
 
 
 def _ensure_event_tables() -> bool:
@@ -248,9 +271,26 @@ def _serialize_event_for_teacher(event: CoinEvent) -> dict:
     }
 
 
+def _serialize_coupon_for_teacher(event: CoinEvent, code: str) -> dict:
+    payload = _serialize_event_for_teacher(event)
+    payload["couponCode"] = code
+    return payload
+
+
 def _event_query_for_student(grade: int, section: int):
     return CoinEvent.query.filter(
         CoinEvent.event_type == "quiz",
+        CoinEvent.is_active.is_(True),
+        or_(
+            CoinEvent.target_all.is_(True),
+            (CoinEvent.target_grade == grade) & (CoinEvent.target_section == section),
+        ),
+    )
+
+
+def _coupon_query_for_student(grade: int, section: int):
+    return CoinEvent.query.filter(
+        CoinEvent.event_type == "coupon",
         CoinEvent.is_active.is_(True),
         or_(
             CoinEvent.target_all.is_(True),
@@ -316,6 +356,100 @@ def _apply_event_payload(event: CoinEvent, payload: dict, *, require_answer: boo
     return event, None
 
 
+def _apply_coupon_payload(
+    event: CoinEvent,
+    payload: dict,
+    *,
+    require_code: bool,
+) -> tuple[CoinEvent | None, str | None, tuple | None]:
+    title = str(payload.get("title") or "").strip()
+    description = str(payload.get("description") or "").strip()
+    reward = _normalize_int(payload.get("rewardCoins"))
+    target_all = bool(payload.get("targetAll"))
+    target_grade = _normalize_int(payload.get("targetGrade"))
+    target_section = _normalize_int(payload.get("targetSection"))
+    code = str(payload.get("couponCode") or "").strip()
+    generated_code = code or _generate_coupon_code()
+
+    if not title or len(title) > 120:
+        return None, None, _json_error("invalid title", 400)
+    if len(description) > 500:
+        description = description[:500]
+    if reward is None or reward < MIN_COUPON_REWARD or reward > MAX_COUPON_REWARD:
+        return None, None, _json_error("coupon reward must be between 10 and 200", 400)
+    if not target_all and (target_grade is None or target_section is None):
+        return None, None, _json_error("target class required", 400)
+    if target_grade is not None and target_grade not in {1, 2, 3}:
+        return None, None, _json_error("invalid target grade", 400)
+    if target_section is not None and not (1 <= target_section <= 6):
+        return None, None, _json_error("invalid target section", 400)
+    if target_all:
+        target_grade = None
+        target_section = None
+
+    event.title = title
+    event.description = description or None
+    event.question = "코드를 입력하면 코인을 받을 수 있습니다."
+    event.hint = None
+    event.reward_coins = reward
+    event.target_all = target_all
+    event.target_grade = target_grade
+    event.target_section = target_section
+    event.starts_at = _parse_kst_datetime(payload.get("startsAt"))
+    event.ends_at = _parse_kst_datetime(payload.get("endsAt"))
+    if event.starts_at and event.ends_at and event.starts_at >= event.ends_at:
+        return None, None, _json_error("invalid event window", 400)
+    if "active" in payload:
+        event.is_active = bool(payload.get("active"))
+
+    if code or require_code:
+        hashed = _build_coupon_hash(generated_code)
+        if not hashed:
+            return None, None, _json_error("coupon code required", 400)
+        event.answer_salt, event.answer_hashes = hashed
+
+    return event, generated_code, None
+
+
+def _grant_event_reward(
+    *,
+    event: CoinEvent,
+    db_user: User,
+    grade: int,
+    section: int,
+    number: int,
+    source: str,
+) -> tuple[StudentWallet, int]:
+    wallet = _get_or_create_wallet(db_user.id, grade, section, number)
+    reward = max(0, int(event.reward_coins or 0))
+    wallet.coins = int(wallet.coins or 0) + reward
+    wallet.updated_at = _utcnow_naive()
+    db.session.add(
+        CoinEventClaim(
+            event_id=event.id,
+            user_id=db_user.id,
+            grade=grade,
+            section=section,
+            student_number=number,
+            reward_coins=reward,
+            claim_date=_today_key(),
+        )
+    )
+    db.session.flush()
+    db.session.add(
+        WalletTransaction(
+            user_id=db_user.id,
+            wallet_id=wallet.id,
+            coin_delta=reward,
+            xp_delta=0,
+            source=source,
+            source_detail=str(event.id),
+            balance_after=wallet.coins,
+        )
+    )
+    return wallet, reward
+
+
 @blueprint.get("/me")
 def get_my_events():
     if not _ensure_event_tables():
@@ -334,6 +468,12 @@ def get_my_events():
         for event in _event_query_for_student(grade, section).order_by(CoinEvent.created_at.desc()).all()
         if _event_is_open(event, now)
     ]
+    coupon_count = (
+        _coupon_query_for_student(grade, section)
+        .filter(or_(CoinEvent.starts_at.is_(None), CoinEvent.starts_at <= now))
+        .filter(or_(CoinEvent.ends_at.is_(None), CoinEvent.ends_at > now))
+        .count()
+    )
     daily_count = _daily_quiz_claim_count(db_user.id, today)
     db.session.commit()
 
@@ -343,6 +483,7 @@ def get_my_events():
             "dailyLimit": DAILY_QUIZ_CLAIM_LIMIT,
             "dailyClaimed": min(daily_count, DAILY_QUIZ_CLAIM_LIMIT),
             "dailyRemaining": max(0, DAILY_QUIZ_CLAIM_LIMIT - daily_count),
+            "couponAvailable": coupon_count > 0,
             "events": [_serialize_event_for_student(event, claimed_ids) for event in events],
         }
     )
@@ -365,6 +506,8 @@ def claim_event(event_id: int):
     today = _today_key()
     if CoinEventClaim.query.filter_by(event_id=event.id, user_id=db_user.id).first():
         return _json_error("already claimed", 409)
+    if event.event_type != "quiz":
+        return _json_error("invalid event type", 400)
     if _daily_quiz_claim_count(db_user.id, today) >= DAILY_QUIZ_CLAIM_LIMIT:
         return _json_error("daily limit reached", 429)
 
@@ -383,31 +526,13 @@ def claim_event(event_id: int):
         db.session.commit()
         return _json_error("incorrect answer", 400)
 
-    wallet = _get_or_create_wallet(db_user.id, grade, section, number)
-    reward = max(MIN_QUIZ_REWARD, min(MAX_QUIZ_REWARD, int(event.reward_coins or 0)))
-    wallet.coins = int(wallet.coins or 0) + reward
-    wallet.updated_at = _utcnow_naive()
-    claim = CoinEventClaim(
-        event_id=event.id,
-        user_id=db_user.id,
+    wallet, reward = _grant_event_reward(
+        event=event,
+        db_user=db_user,
         grade=grade,
         section=section,
-        student_number=number,
-        reward_coins=reward,
-        claim_date=today,
-    )
-    db.session.add(claim)
-    db.session.flush()
-    db.session.add(
-        WalletTransaction(
-            user_id=db_user.id,
-            wallet_id=wallet.id,
-            coin_delta=reward,
-            xp_delta=0,
-            source="event_quiz",
-            source_detail=str(event.id),
-            balance_after=wallet.coins,
-        )
+        number=number,
+        source="event_quiz",
     )
     try:
         db.session.commit()
@@ -427,6 +552,58 @@ def claim_event(event_id: int):
     )
 
 
+@blueprint.post("/coupon/claim")
+def claim_coupon():
+    if not _ensure_event_tables():
+        return _json_error("event storage unavailable", 503)
+    db_user, grade, section, number, error = _require_student_context()
+    if error:
+        return error
+
+    payload = request.get_json(silent=True) or {}
+    code = _normalize_coupon_code(str(payload.get("code") or ""))
+    if not code:
+        return _json_error("coupon code required", 400)
+
+    matched_event = None
+    now = _utcnow_naive()
+    for event in _coupon_query_for_student(grade, section).order_by(CoinEvent.created_at.desc()).limit(200).all():
+        if not _event_is_open(event, now):
+            continue
+        if _answer_matches(event, code):
+            matched_event = event
+            break
+
+    if not matched_event:
+        return _json_error("invalid coupon", 404)
+    if CoinEventClaim.query.filter_by(event_id=matched_event.id, user_id=db_user.id).first():
+        return _json_error("already claimed", 409)
+
+    wallet, reward = _grant_event_reward(
+        event=matched_event,
+        db_user=db_user,
+        grade=grade,
+        section=section,
+        number=number,
+        source="event_coupon",
+    )
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return _json_error("already claimed", 409)
+
+    return jsonify(
+        {
+            "ok": True,
+            "eventId": matched_event.id,
+            "title": matched_event.title,
+            "rewardCoins": reward,
+            "wallet": _serialize_wallet(wallet),
+        }
+    )
+
+
 @blueprint.get("/teacher")
 def get_teacher_events():
     error = _require_teacher()
@@ -436,7 +613,7 @@ def get_teacher_events():
         return _json_error("event storage unavailable", 503)
     grade = request.args.get("grade", type=int)
     section = request.args.get("section", type=int)
-    query = CoinEvent.query.filter_by(event_type="quiz")
+    query = CoinEvent.query
     if grade is not None and section is not None:
         query = query.filter(
             or_(
@@ -456,6 +633,25 @@ def create_event():
     if not _ensure_event_tables():
         return _json_error("event storage unavailable", 503)
     payload = request.get_json(silent=True) or {}
+    event_type = str(payload.get("type") or payload.get("eventType") or "quiz").strip().lower()
+    if event_type == "coupon":
+        event = CoinEvent(
+            event_type="coupon",
+            title="",
+            question="코드를 입력하면 코인을 받을 수 있습니다.",
+            answer_salt="",
+            answer_hashes="[]",
+            reward_coins=MIN_COUPON_REWARD,
+            target_all=False,
+        )
+        event, code, payload_error = _apply_coupon_payload(event, payload, require_code=True)
+        if payload_error:
+            return payload_error
+        db.session.add(event)
+        db.session.commit()
+        return jsonify({"ok": True, "event": _serialize_coupon_for_teacher(event, code or "")}), 201
+    if event_type != "quiz":
+        return _json_error("invalid event type", 400)
     event = CoinEvent(
         event_type="quiz",
         title="",
@@ -487,9 +683,14 @@ def update_event(event_id: int):
     if set(payload.keys()).issubset({"active"}):
         event.is_active = bool(payload.get("active"))
     else:
-        event, payload_error = _apply_event_payload(event, payload, require_answer=False)
-        if payload_error:
-            return payload_error
+        if event.event_type == "coupon":
+            event, _, payload_error = _apply_coupon_payload(event, payload, require_code=False)
+            if payload_error:
+                return payload_error
+        else:
+            event, payload_error = _apply_event_payload(event, payload, require_answer=False)
+            if payload_error:
+                return payload_error
     event.updated_at = _utcnow_naive()
     db.session.commit()
     return jsonify({"ok": True, "event": _serialize_event_for_teacher(event)})

@@ -137,6 +137,21 @@ def _create_event(client, **overrides):
     return client.post("/api/events", json=payload, headers={"X-CSRF-Token": "csrf-token"})
 
 
+def _create_coupon(client, **overrides):
+    payload = {
+        "type": "coupon",
+        "title": "봄 코인",
+        "description": "코드 입력 이벤트",
+        "rewardCoins": 120,
+        "targetAll": False,
+        "targetGrade": 2,
+        "targetSection": 4,
+        "active": True,
+    }
+    payload.update(overrides)
+    return client.post("/api/events", json=payload, headers={"X-CSRF-Token": "csrf-token"})
+
+
 def test_teacher_can_create_quiz_event_and_reward_is_bounded(event_app):
     client = event_app.test_client()
     _login_teacher(client)
@@ -251,3 +266,78 @@ def test_student_only_sees_targeted_events(event_app):
     assert "내 반" in titles
     assert "전체" in titles
     assert "다른 반" not in titles
+
+
+def test_teacher_can_create_coupon_and_student_claims_by_code(event_app):
+    teacher = event_app.test_client()
+    _login_teacher(teacher)
+
+    bad = _create_coupon(teacher, rewardCoins=250)
+    assert bad.status_code == 400
+    assert bad.get_json()["error"] == "coupon reward must be between 10 and 200"
+
+    created = _create_coupon(teacher)
+    assert created.status_code == 201
+    event_payload = created.get_json()["event"]
+    coupon_code = event_payload["couponCode"]
+    assert coupon_code
+    assert event_payload["type"] == "coupon"
+    assert event_payload["rewardCoins"] == 120
+
+    listing = teacher.get("/api/events/teacher")
+    assert listing.status_code == 200
+    listed_event = listing.get_json()["events"][0]
+    assert listed_event["type"] == "coupon"
+    assert "couponCode" not in listed_event
+
+    user_id = _create_student(event_app, email="coupon@example.com", grade=2, section=4, number=10)
+    client = event_app.test_client()
+    _login_student(client, user_id, grade=2, section=4, number=10)
+
+    response = client.post(
+        "/api/events/coupon/claim",
+        json={"code": coupon_code.lower().replace("-", " ")},
+        headers={"X-CSRF-Token": "csrf-token"},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["wallet"]["coins"] == 120
+
+    duplicate = client.post(
+        "/api/events/coupon/claim",
+        json={"code": coupon_code},
+        headers={"X-CSRF-Token": "csrf-token"},
+    )
+    assert duplicate.status_code == 409
+
+    from models import CoinEventClaim, WalletTransaction
+
+    with event_app.app_context():
+        assert CoinEventClaim.query.filter_by(user_id=user_id, event_id=event_payload["id"]).count() == 1
+        tx = WalletTransaction.query.filter_by(user_id=user_id, source="event_coupon").first()
+        assert tx.coin_delta == 120
+
+
+def test_coupon_claim_does_not_consume_daily_quiz_limit(event_app):
+    teacher = event_app.test_client()
+    _login_teacher(teacher)
+    coupon_code = _create_coupon(teacher).get_json()["event"]["couponCode"]
+    quiz_id = _create_event(teacher, title="퀴즈", answer="정답").get_json()["event"]["id"]
+
+    user_id = _create_student(event_app, email="coupon-limit@example.com", grade=2, section=4, number=11)
+    client = event_app.test_client()
+    _login_student(client, user_id, grade=2, section=4, number=11)
+
+    coupon_response = client.post(
+        "/api/events/coupon/claim",
+        json={"code": coupon_code},
+        headers={"X-CSRF-Token": "csrf-token"},
+    )
+    assert coupon_response.status_code == 200
+
+    quiz_response = client.post(
+        f"/api/events/{quiz_id}/claim",
+        json={"answer": "정답"},
+        headers={"X-CSRF-Token": "csrf-token"},
+    )
+    assert quiz_response.status_code == 200
+    assert quiz_response.get_json()["dailyRemaining"] == 2

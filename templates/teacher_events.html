@@ -159,6 +159,66 @@
 
     .field.full { grid-column: 1 / -1; }
 
+    .mode-switch {
+      display: inline-flex;
+      gap: 6px;
+      padding: 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.62);
+      border: 1px solid rgba(124, 96, 69, 0.1);
+    }
+
+    .mode-btn {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-weight: 850;
+      cursor: pointer;
+    }
+
+    .mode-btn.active {
+      color: #5b3a24;
+      background: linear-gradient(135deg, #f4c8ae, #efdbb3 60%, #eeb38b);
+      box-shadow: 0 10px 22px rgba(228, 160, 116, 0.18);
+    }
+
+    .coupon-result {
+      display: none;
+      grid-column: 1 / -1;
+      gap: 10px;
+      border-radius: 20px;
+      padding: 16px;
+      border: 1px dashed rgba(219, 135, 83, 0.34);
+      background: rgba(255,255,255,0.62);
+    }
+
+    .coupon-result.visible {
+      display: grid;
+    }
+
+    .coupon-code-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .coupon-code {
+      flex: 1 1 220px;
+      border-radius: 16px;
+      padding: 14px 16px;
+      background: rgba(63, 48, 36, 0.08);
+      color: #5b3a24;
+      font-size: 22px;
+      font-weight: 950;
+      letter-spacing: 0.08em;
+      word-break: break-all;
+    }
+
     label {
       color: var(--muted);
       font-size: 13px;
@@ -386,6 +446,13 @@
       <section class="panel">
         <h2>퀴즈 만들기</h2>
         <form id="eventForm" class="form-grid">
+          <div class="field full">
+            <label>이벤트 방식</label>
+            <div class="mode-switch" role="tablist" aria-label="이벤트 방식">
+              <button class="mode-btn active" type="button" data-mode="quiz">퀴즈</button>
+              <button class="mode-btn" type="button" data-mode="coupon">코드</button>
+            </div>
+          </div>
           <div class="field">
             <label for="eventTitle">제목</label>
             <input id="eventTitle" maxlength="120" placeholder="예: 정보 퀴즈" required />
@@ -394,11 +461,11 @@
             <label for="eventReward">보상 코인</label>
             <input id="eventReward" type="number" min="10" max="50" step="1" value="20" required />
           </div>
-          <div class="field full">
+          <div class="field full" data-quiz-only>
             <label for="eventQuestion">문제</label>
             <textarea id="eventQuestion" maxlength="500" placeholder="예: OSI 7계층의 5계층은? 세_ 계층" required></textarea>
           </div>
-          <div class="field full">
+          <div class="field full" data-quiz-only>
             <label for="eventHint">힌트</label>
             <input id="eventHint" maxlength="240" placeholder="선택 사항" />
           </div>
@@ -406,11 +473,11 @@
             <label for="eventDescription">설명</label>
             <input id="eventDescription" maxlength="500" placeholder="선택 사항" />
           </div>
-          <div class="field">
+          <div class="field" data-quiz-only>
             <label for="eventAnswer">정답</label>
             <input id="eventAnswer" maxlength="120" placeholder="예: 세션" required />
           </div>
-          <div class="field">
+          <div class="field" data-quiz-only>
             <label for="eventAliases">추가 정답</label>
             <input id="eventAliases" maxlength="240" placeholder="쉼표로 구분. 예: 세션계층, session" />
           </div>
@@ -442,8 +509,18 @@
             </div>
           </div>
           <div class="actions field full">
-            <button id="eventSubmitBtn" class="solid-btn" type="submit">이벤트 만들기</button>
+            <button id="eventSubmitBtn" class="solid-btn" type="submit">퀴즈 만들기</button>
             <span id="eventHelper" class="helper"></span>
+          </div>
+          <div id="couponResult" class="coupon-result">
+            <div>
+              <strong>발급된 코드</strong>
+              <p class="muted">학생에게 이 코드를 알려주면 이벤트 페이지에서 등록할 수 있습니다. 코드는 다시 표시되지 않으니 지금 복사해주세요.</p>
+            </div>
+            <div class="coupon-code-row">
+              <code id="createdCouponCode" class="coupon-code"></code>
+              <button id="copyCouponBtn" class="ghost-btn" type="button">복사</button>
+            </div>
           </div>
         </form>
       </section>

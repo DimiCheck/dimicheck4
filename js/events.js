@@ -2,6 +2,7 @@ class EventPageController {
   constructor() {
     this.state = null;
     this.busyEventId = null;
+    this.couponBusy = false;
     this.toastTimer = null;
   }
 
@@ -9,8 +10,15 @@ class EventPageController {
     this.walletCoins = document.getElementById('walletCoins');
     this.dailyClaimed = document.getElementById('dailyClaimed');
     this.dailyRemaining = document.getElementById('dailyRemaining');
+    this.couponForm = document.getElementById('couponForm');
+    this.couponCodeInput = document.getElementById('couponCodeInput');
+    this.couponClaimBtn = document.getElementById('couponClaimBtn');
     this.eventList = document.getElementById('eventList');
     this.toast = document.getElementById('eventToast');
+    this.couponForm?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      this.claimCoupon();
+    });
     this.eventList?.addEventListener('submit', (event) => {
       const form = event.target.closest('form[data-event-id]');
       if (!form) return;
@@ -77,11 +85,46 @@ class EventPageController {
     }
   }
 
+  async claimCoupon() {
+    if (this.couponBusy) return;
+    const code = String(this.couponCodeInput?.value || '').trim();
+    if (!code) {
+      this.showToast('코드를 입력해주세요.');
+      this.couponCodeInput?.focus();
+      return;
+    }
+    this.couponBusy = true;
+    this.renderCouponBusy();
+    try {
+      const res = await fetch('/api/events/coupon/claim', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(this.humanizeError(error.error, res.status));
+      }
+      const payload = await res.json();
+      this.state.wallet = payload.wallet || this.state.wallet;
+      if (this.couponCodeInput) this.couponCodeInput.value = '';
+      this.showToast(`${payload.title || '코드 보상'} · ${Number(payload.rewardCoins || 0).toLocaleString('ko-KR')}코인을 받았습니다.`);
+    } catch (error) {
+      this.showToast(error.message || '코드를 등록하지 못했습니다.');
+    } finally {
+      this.couponBusy = false;
+      this.render();
+    }
+  }
+
   humanizeError(error, status) {
     if (error === 'incorrect answer') return '아직 정답이 아닙니다.';
     if (error === 'already claimed') return '이미 보상을 받은 퀴즈입니다.';
     if (error === 'daily limit reached') return '오늘 받을 수 있는 퀴즈 보상을 모두 받았습니다.';
     if (error === 'event unavailable') return '참여할 수 없는 이벤트입니다.';
+    if (error === 'coupon code required') return '코드를 입력해주세요.';
+    if (error === 'invalid coupon') return '사용할 수 없는 코드입니다.';
     if (status === 403) return '권한이 없습니다.';
     return error || '요청을 처리하지 못했습니다.';
   }
@@ -99,6 +142,7 @@ class EventPageController {
     if (this.walletCoins) this.walletCoins.textContent = `${coins.toLocaleString('ko-KR')} 코인`;
     if (this.dailyClaimed) this.dailyClaimed.textContent = `${claimed}/${limit}`;
     if (this.dailyRemaining) this.dailyRemaining.textContent = `${remaining}`;
+    this.renderCouponBusy();
 
     const events = this.state.events || [];
     if (!events.length) {
@@ -106,6 +150,14 @@ class EventPageController {
       return;
     }
     this.eventList.innerHTML = events.map((item) => this.renderEvent(item, remaining)).join('');
+  }
+
+  renderCouponBusy() {
+    if (this.couponCodeInput) this.couponCodeInput.disabled = this.couponBusy;
+    if (this.couponClaimBtn) {
+      this.couponClaimBtn.disabled = this.couponBusy;
+      this.couponClaimBtn.textContent = this.couponBusy ? '등록 중...' : '코인 받기';
+    }
   }
 
   renderEvent(item, remaining) {
