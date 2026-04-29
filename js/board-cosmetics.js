@@ -2,7 +2,7 @@
   const cosmeticsByNumber = Object.create(null);
   const dragTrailState = new WeakMap();
   const DRAG_TRAIL_INTERVAL_MS = 54;
-  const MOVE_EFFECT_LIMIT_MS = 360;
+  const MOVE_EFFECT_LIMIT_MS = 240;
   let lastMoveEffectAt = 0;
 
   function normalizeNumber(value) {
@@ -149,6 +149,19 @@
     }
   }
 
+  function playImpactFlare(center, variant) {
+    if (!center) return;
+    const size = variant === 'wormhole'
+      ? center.size * 9.2
+      : variant === 'starburst'
+        ? center.size * 7.6
+        : center.size * 5.8;
+    makeEffectNode(`board-cosmetic-impact-flare board-cosmetic-impact-flare--${variant}`, center.x, center.y, {
+      duration: variant === 'wormhole' ? 1180 : 980,
+      vars: { '--flare-size': `${size}px` }
+    });
+  }
+
   function playPortal(center, variant, phase) {
     if (!center) return;
     const isBlue = variant === 'wormhole';
@@ -159,7 +172,7 @@
       {
         duration: isBlue ? 1120 : 900,
         vars: {
-          '--portal-size': `${isBlue ? center.size * 5.8 : center.size * 4.7}px`
+          '--portal-size': `${isBlue ? center.size * 8.4 : center.size * 6.8}px`
         }
       }
     );
@@ -167,10 +180,18 @@
 
   function playShockwave(center, variant) {
     if (!center) return;
-    const size = variant === 'wormhole' ? center.size * 7.2 : center.size * 5.4;
+    const size = variant === 'wormhole'
+      ? center.size * 10.4
+      : variant === 'starburst'
+        ? center.size * 8.5
+        : center.size * 6.8;
     makeEffectNode(`board-cosmetic-shockwave board-cosmetic-shockwave--${variant}`, center.x, center.y, {
       duration: variant === 'wormhole' ? 1050 : 820,
       vars: { '--wave-size': `${size}px` }
+    });
+    makeEffectNode(`board-cosmetic-shockwave board-cosmetic-shockwave--${variant} board-cosmetic-shockwave--late`, center.x, center.y, {
+      duration: variant === 'wormhole' ? 1260 : 980,
+      vars: { '--wave-size': `${size * 0.74}px` }
     });
   }
 
@@ -199,31 +220,46 @@
     if (effect === 'move_blue_swirl') {
       playPortal(origin, 'wormhole', 'exit');
       playPortal(destination, 'wormhole', 'enter');
+      playImpactFlare(destination, 'wormhole');
       playShockwave(destination, 'wormhole');
       burstParticles(destination, {
-        count: 26,
+        count: 46,
         color: '#54c7ff',
-        spread: 145,
-        duration: 980,
+        spread: 235,
+        duration: 1180,
         className: 'board-cosmetic-particle board-cosmetic-particle--wormhole'
+      });
+      burstParticles(destination, {
+        count: 18,
+        color: '#ffffff',
+        spread: 150,
+        duration: 860
       });
     } else if (effect === 'move_stardust') {
       playPortal(origin, 'starburst', 'exit');
+      playImpactFlare(destination, 'starburst');
       playShockwave(destination, 'starburst');
       playLightning(destination);
       burstParticles(destination, {
-        count: 28,
+        count: 48,
         color: '#ffd15a',
-        spread: 130,
-        duration: 900
+        spread: 205,
+        duration: 1040
+      });
+      burstParticles(destination, {
+        count: 16,
+        color: '#ffffff',
+        spread: 118,
+        duration: 760
       });
     } else {
+      playImpactFlare(destination, 'basic');
       playShockwave(destination, 'basic');
       burstParticles(destination, {
-        count: 18,
+        count: 30,
         color: '#fff2a8',
-        spread: 84,
-        duration: 700
+        spread: 135,
+        duration: 820
       });
     }
 

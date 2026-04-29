@@ -2483,10 +2483,16 @@ function addDragFunctionality(el) {
       // Quick-drop handled; keep right-side board sections as the higher-priority drop target.
     } else {
       magnetsToHandle.forEach(magnet => {
+        const cosmeticOrigin = window.boardCosmetics && typeof window.boardCosmetics.captureMoveOrigin === 'function'
+          ? window.boardCosmetics.captureMoveOrigin(magnet)
+          : null;
         snapToHome(magnet);
         if (magnet.dataset.reason) {
           delete magnet.dataset.reason;
           magnet.classList.remove('has-reason');
+        }
+        if (window.boardCosmetics && typeof window.boardCosmetics.playMoveEffect === 'function') {
+          window.boardCosmetics.playMoveEffect(magnet, 'classroom', { origin: cosmeticOrigin });
         }
       });
       updateAttendance();
