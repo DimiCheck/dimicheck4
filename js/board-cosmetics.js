@@ -1,16 +1,16 @@
 (function () {
   const cosmeticsByNumber = Object.create(null);
   const dragTrailState = new WeakMap();
-  const DRAG_TRAIL_INTERVAL_MS = 54;
+  const DRAG_TRAIL_INTERVAL_MS = 70;
   const MOVE_EFFECT_LIMIT_MS = 240;
-  const TRAIL_POINT_LIMIT = 18;
-  const TRAIL_PARTICLE_LIMIT = 90;
-  const TRAIL_DPR_LIMIT = 2;
+  const TRAIL_POINT_LIMIT = 14;
+  const TRAIL_PARTICLE_LIMIT = 48;
+  const TRAIL_DPR_LIMIT = 1.5;
   const TRAIL_CONFIG = {
-    ribbon: { keepMs: 560, baseWidth: 22 },
-    fire: { keepMs: 820, baseWidth: 32 },
-    neon: { keepMs: 760, baseWidth: 28 },
-    comet: { keepMs: 1180, baseWidth: 34 }
+    ribbon: { keepMs: 440, baseWidth: 20 },
+    fire: { keepMs: 660, baseWidth: 29 },
+    neon: { keepMs: 620, baseWidth: 25 },
+    comet: { keepMs: 900, baseWidth: 31 }
   };
   let lastMoveEffectAt = 0;
   let trailCanvas = null;
@@ -20,6 +20,9 @@
   let trailHeight = 0;
   let trailRaf = 0;
   let trailResizeBound = false;
+  let trailBudgetScale = 1;
+  let lastTrailFrameAt = 0;
+  let slowTrailFrameCount = 0;
   const activeTrails = new Map();
 
   function normalizeNumber(value) {
@@ -391,12 +394,12 @@
     const direction = previousPoint ? unitVector(previousPoint, point) : { x: 1, y: 0, length: 1 };
     const back = { x: -direction.x, y: -direction.y };
     const perp = { x: -direction.y, y: direction.x };
-    const speedBoost = Math.min(1.8, Math.max(0.7, direction.length / 22));
-    const counts = { ribbon: 1, fire: 5, neon: 2, comet: 4 };
-    const count = counts[effect] || 1;
+    const speedBoost = Math.min(1.5, Math.max(0.65, direction.length / 24));
+    const counts = { ribbon: 1, fire: 3, neon: 1, comet: 2 };
+    const count = Math.max(1, Math.round((counts[effect] || 1) * trailBudgetScale));
 
     for (let i = 0; i < count; i += 1) {
-      const side = (Math.random() - 0.5) * (effect === 'comet' ? 44 : effect === 'fire' ? 34 : 24);
+      const side = (Math.random() - 0.5) * (effect === 'comet' ? 38 : effect === 'fire' ? 30 : 22);
       const backSpeed = (effect === 'comet' ? 0.18 : effect === 'fire' ? 0.12 : 0.09) * speedBoost;
       const drift = (Math.random() - 0.5) * (effect === 'fire' ? 0.12 : 0.06);
       const colors = {
@@ -411,8 +414,8 @@
         vx: back.x * (0.08 + Math.random() * backSpeed) + perp.x * drift,
         vy: back.y * (0.08 + Math.random() * backSpeed) + perp.y * drift - (effect === 'fire' ? 0.055 + Math.random() * 0.055 : 0),
         t: now,
-        life: effect === 'comet' ? 760 + Math.random() * 420 : effect === 'fire' ? 460 + Math.random() * 320 : 520 + Math.random() * 260,
-        size: effect === 'comet' ? 2.2 + Math.random() * 4.8 : effect === 'fire' ? 2.8 + Math.random() * 6.2 : 2 + Math.random() * 4,
+        life: effect === 'comet' ? 560 + Math.random() * 260 : effect === 'fire' ? 360 + Math.random() * 220 : 420 + Math.random() * 180,
+        size: effect === 'comet' ? 2 + Math.random() * 4.2 : effect === 'fire' ? 2.4 + Math.random() * 5.2 : 1.8 + Math.random() * 3.2,
         color: colors[effect][Math.floor(Math.random() * colors[effect].length)],
         spin: Math.random() * Math.PI
       });
@@ -441,9 +444,7 @@
       const alpha = options.alpha * (1 - age) * (0.18 + position * 0.82);
       if (alpha <= 0.02) continue;
       const width = options.width * (0.24 + position * 0.96) * (1 - age * 0.52);
-      const midX = (prev.x + point.x) / 2;
-      const midY = (prev.y + point.y) / 2;
-      const wobble = options.wobble
+      const wobble = options.wobble && trailBudgetScale > 0.72
         ? Math.sin(point.t * 0.045 + i * 1.7) * options.wobble * (1 - position * 0.35)
         : 0;
       const direction = unitVector(prev, point);
@@ -457,11 +458,7 @@
         : options.color;
       ctx.beginPath();
       ctx.moveTo(prev.x, prev.y);
-      ctx.quadraticCurveTo(controlX, controlY, midX, midY);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(midX, midY);
-      ctx.quadraticCurveTo(point.x, point.y, point.x, point.y);
+      ctx.quadraticCurveTo(controlX, controlY, point.x, point.y);
       ctx.stroke();
     }
     ctx.restore();
@@ -475,18 +472,18 @@
         width: config.baseWidth * 2.3,
         color: 'rgba(255, 58, 24, 0.34)',
         shadowColor: 'rgba(255, 72, 24, 0.8)',
-        blur: 30,
+        blur: 18,
         alpha: 0.8,
-        wobble: 18,
+        wobble: 12,
         composite: 'lighter'
       });
       drawTrailLayer(ctx, points, now, config, {
         width: config.baseWidth * 1.12,
         color: (position) => position > 0.72 ? '#fff7b0' : position > 0.42 ? '#ffd15a' : '#ff5a24',
         shadowColor: '#ff7a2f',
-        blur: 12,
+        blur: 7,
         alpha: 0.95,
-        wobble: 12,
+        wobble: 8,
         composite: 'lighter'
       });
       return;
@@ -497,7 +494,7 @@
         width: config.baseWidth * 2.6,
         color: 'rgba(95, 190, 255, 0.3)',
         shadowColor: 'rgba(111, 206, 255, 0.9)',
-        blur: 34,
+        blur: 20,
         alpha: 0.82,
         wobble: 4,
         composite: 'lighter'
@@ -506,19 +503,21 @@
         width: config.baseWidth * 1.28,
         color: (position) => position > 0.78 ? '#ffffff' : position > 0.42 ? '#b8f4ff' : '#8a9bff',
         shadowColor: '#8ddfff',
-        blur: 16,
+        blur: 9,
         alpha: 0.92,
         wobble: 2,
         composite: 'lighter'
       });
-      drawTrailLayer(ctx, points, now, config, {
-        width: config.baseWidth * 0.38,
-        color: '#ffffff',
-        shadowColor: '#ffffff',
-        blur: 7,
-        alpha: 0.94,
-        composite: 'lighter'
-      });
+      if (trailBudgetScale > 0.74) {
+        drawTrailLayer(ctx, points, now, config, {
+          width: config.baseWidth * 0.38,
+          color: '#ffffff',
+          shadowColor: '#ffffff',
+          blur: 4,
+          alpha: 0.94,
+          composite: 'lighter'
+        });
+      }
       return;
     }
 
@@ -527,7 +526,7 @@
         width: config.baseWidth * 1.9,
         color: 'rgba(80, 229, 255, 0.35)',
         shadowColor: '#55e9ff',
-        blur: 24,
+        blur: 14,
         alpha: 0.76,
         composite: 'lighter'
       });
@@ -535,7 +534,7 @@
         width: config.baseWidth * 0.92,
         color: (position) => position > 0.5 ? '#ff5cf2' : '#55e9ff',
         shadowColor: '#ff5cf2',
-        blur: 12,
+        blur: 7,
         alpha: 0.9,
         composite: 'lighter'
       });
@@ -546,7 +545,7 @@
       width: config.baseWidth * 1.6,
       color: 'rgba(255, 240, 160, 0.38)',
       shadowColor: '#fff2a8',
-      blur: 20,
+      blur: 11,
       alpha: 0.72,
       composite: 'lighter'
     });
@@ -554,7 +553,7 @@
       width: config.baseWidth * 0.72,
       color: '#fff8c8',
       shadowColor: '#ffffff',
-      blur: 8,
+      blur: 4,
       alpha: 0.82,
       composite: 'lighter'
     });
@@ -568,7 +567,7 @@
     ctx.strokeStyle = color;
     ctx.lineWidth = Math.max(1, size * 0.34);
     ctx.shadowColor = color;
-    ctx.shadowBlur = size * 2.2;
+    ctx.shadowBlur = trailBudgetScale > 0.74 ? size * 1.4 : 0;
     ctx.beginPath();
     ctx.moveTo(-size, 0);
     ctx.lineTo(size, 0);
@@ -585,22 +584,20 @@
       const x = particle.x + particle.vx * (now - particle.t);
       const y = particle.y + particle.vy * (now - particle.t) + (trail.effect === 'fire' ? Math.sin(age * 8 + particle.spin) * 10 : 0);
       const alpha = (1 - age) * (trail.effect === 'fire' ? (0.5 + Math.sin(age * Math.PI) * 0.5) : 1);
-      if (trail.effect === 'comet' && age > 0.2 && Math.random() < 0.34) {
+      if (trail.effect === 'comet' && age > 0.2 && Math.random() < 0.3 * trailBudgetScale) {
         drawSpark(ctx, x, y, particle.size * (1 - age * 0.42), alpha, particle.color, particle.spin + age * 2);
         return;
       }
 
       const radius = particle.size * (1 - age * 0.55);
-      const gradient = ctx.createRadialGradient(x, y, 0, x, y, Math.max(1, radius * 2.7));
-      gradient.addColorStop(0, `rgba(255,255,255,${Math.min(1, alpha)})`);
-      gradient.addColorStop(0.38, particle.color);
-      gradient.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = gradient;
+      ctx.shadowColor = particle.color;
+      ctx.shadowBlur = trailBudgetScale > 0.7 ? radius * 1.8 : 0;
+      ctx.fillStyle = particle.color;
       ctx.beginPath();
-      ctx.arc(x, y, Math.max(1, radius * 2.2), 0, Math.PI * 2);
+      ctx.arc(x, y, Math.max(1, radius), 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     });
@@ -611,6 +608,21 @@
     const ctx = ensureTrailCanvas();
     if (!ctx) return;
     const now = nowMs();
+    if (lastTrailFrameAt) {
+      const delta = now - lastTrailFrameAt;
+      if (delta > 28) {
+        slowTrailFrameCount += 1;
+      } else {
+        slowTrailFrameCount = Math.max(0, slowTrailFrameCount - 1);
+      }
+      if (slowTrailFrameCount >= 4) {
+        trailBudgetScale = Math.max(0.55, trailBudgetScale - 0.12);
+        slowTrailFrameCount = 0;
+      } else if (delta < 20 && trailBudgetScale < 1) {
+        trailBudgetScale = Math.min(1, trailBudgetScale + 0.025);
+      }
+    }
+    lastTrailFrameAt = now;
     ctx.clearRect(0, 0, trailWidth, trailHeight);
 
     activeTrails.forEach((trail, number) => {
@@ -628,6 +640,8 @@
       scheduleTrailFrame();
     } else {
       ctx.clearRect(0, 0, trailWidth, trailHeight);
+      lastTrailFrameAt = 0;
+      slowTrailFrameCount = 0;
     }
   }
 
@@ -661,7 +675,7 @@
     trimTrail(trail, now, config);
     addTrailParticles(trail, point, previousPoint, now);
 
-    if ((effect === 'neon' || effect === 'fire') && now - trail.lastGhostAt > 140) {
+    if ((effect === 'neon' || effect === 'fire') && trailBudgetScale > 0.68 && now - trail.lastGhostAt > 190) {
       makeGhost(magnet, point.x, point.y, effect);
       trail.lastGhostAt = now;
     }
